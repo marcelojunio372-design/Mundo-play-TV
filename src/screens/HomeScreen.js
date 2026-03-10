@@ -93,7 +93,7 @@ async function fetchJson(url) {
       Accept: "application/json, text/plain, */*",
       "Cache-Control": "no-cache",
       Pragma: "no-cache",
-      "User-Agent": "Mozilla/5.0 MundoPlayTV",
+      "User-Agent": "Mozilla/5.0",
     },
   });
 
@@ -109,42 +109,15 @@ function inferItemType(urlLine, groupTitle, name) {
   const lowerGroup = String(groupTitle || "").toLowerCase();
   const lowerName = String(name || "").toLowerCase();
 
-  const movieExts = [
-    ".mp4",
-    ".mkv",
-    ".avi",
-    ".mov",
-    ".wmv",
-    ".m4v",
-    ".mpg",
-    ".mpeg",
-  ];
+  const seriesHints = ["series", "serie", "temporada", "season", "episodio", "episode"];
+  const movieHints = ["filmes", "filme", "movies", "movie", "cinema", "vod"];
 
-  const seriesHints = [
-    "series",
-    "serie",
-    "temporada",
-    "season",
-    "episodio",
-    "episode",
-  ];
-
-  const movieHints = [
-    "filmes",
-    "filme",
-    "movies",
-    "movie",
-    "cinema",
-    "vod",
-  ];
-
-  if (seriesHints.some((x) => lowerGroup.includes(x) || lowerName.includes(x) || lowerUrl.includes(`/${x}/`))) {
+  if (seriesHints.some((x) => lowerGroup.includes(x) || lowerName.includes(x))) {
     return "series";
   }
 
   if (
-    movieHints.some((x) => lowerGroup.includes(x) || lowerName.includes(x) || lowerUrl.includes(`/${x}/`)) ||
-    movieExts.some((ext) => lowerUrl.includes(ext)) ||
+    movieHints.some((x) => lowerGroup.includes(x) || lowerName.includes(x)) ||
     lowerUrl.includes("/movie/") ||
     lowerUrl.includes("/vod/")
   ) {
@@ -218,7 +191,7 @@ async function loadAllFromM3U(url) {
       Accept: "*/*",
       "Cache-Control": "no-cache",
       Pragma: "no-cache",
-      "User-Agent": "Mozilla/5.0 MundoPlayTV",
+      "User-Agent": "Mozilla/5.0",
     },
   });
 
@@ -228,6 +201,14 @@ async function loadAllFromM3U(url) {
 
   const txt = await r.text();
   return parseM3UContent(txt);
+}
+
+async function xtreamAuth(server, username, password) {
+  const url =
+    `${server}/player_api.php?username=${encodeURIComponent(username)}` +
+    `&password=${encodeURIComponent(password)}`;
+
+  return await fetchJson(url);
 }
 
 async function loadFromXtream(server, username, password, kind) {
@@ -245,27 +226,31 @@ async function loadFromXtream(server, username, password, kind) {
   const data = await fetchJson(url);
   const safe = Array.isArray(data) ? data : [];
 
-  return safe.map((x, idx) => ({
-    id: String(x.stream_id || x.series_id || idx),
-    name: x.name || x.title || `Item ${idx + 1}`,
-    logo: x.stream_icon || x.cover || x.cover_big || "",
-    url:
-      x.stream_url ||
-      x.url ||
-      x.stream_source ||
-      (x.stream_id && kind === "live"
-        ? `${server}/live/${username}/${password}/${x.stream_id}.m3u8`
-        : x.stream_id && kind === "vod"
-        ? `${server}/movie/${username}/${password}/${x.stream_id}.${x.container_extension || "mp4"}`
-        : ""),
-    description: x.plot || x.description || x.story_plot || x.overview || "",
-    group:
-      x.category_name ||
-      x.group_name ||
-      (kind === "live" ? "Live TV" : kind === "vod" ? "Filmes" : "Séries"),
-    type: kind,
-    raw: x,
-  }));
+  return safe.map((x, idx) => {
+    let streamUrl = "";
+
+    if (kind === "live" && x.stream_id) {
+      streamUrl = `${server}/live/${username}/${password}/${x.stream_id}.m3u8`;
+    } else if (kind === "vod" && x.stream_id) {
+      streamUrl = `${server}/movie/${username}/${password}/${x.stream_id}.${x.container_extension || "mp4"}`;
+    } else if (kind === "series") {
+      streamUrl = "";
+    }
+
+    return {
+      id: String(x.stream_id || x.series_id || idx),
+      name: x.name || x.title || `Item ${idx + 1}`,
+      logo: x.stream_icon || x.cover || x.cover_big || "",
+      url: x.stream_url || x.url || x.stream_source || streamUrl,
+      description: x.plot || x.description || x.story_plot || x.overview || "",
+      group:
+        x.category_name ||
+        x.group_name ||
+        (kind === "live" ? "Live TV" : kind === "vod" ? "Filmes" : "Séries"),
+      type: kind,
+      raw: x,
+    };
+  });
 }
 
 function formatClock(date) {
@@ -358,10 +343,10 @@ export default function HomeScreen({ navigation }) {
       setLoading(true);
       setStatusText(t.loadingAll);
 
-      const mode = await AsyncStorage.getItem("login_mode");
+      let mode = await AsyncStorage.getItem("login_mode");
       const m3u = normalizeUrl(await AsyncStorage.getItem("m3u_url"));
 
-      let server = await AsyncStorage.getItem("xtream_server");
+      let server = normalizeUrl(await AsyncStorage.getItem("xtream_server"));
       let user = await AsyncStorage.getItem("xtream_user");
       let pass = await AsyncStorage.getItem("xtream_pass");
 
@@ -370,6 +355,7 @@ export default function HomeScreen({ navigation }) {
         server = x.server;
         user = x.username;
         pass = x.password;
+        mode = "xtream";
 
         await AsyncStorage.multiSet([
           ["login_mode", "xtream"],
@@ -383,7 +369,14 @@ export default function HomeScreen({ navigation }) {
       let vod = [];
       let series = [];
 
-      if (mode === "xtream" && server && user && pass) {
+      // Prioridade total para Xtream
+      if (server && user && pass) {
+        const auth = await xtreamAuth(server, user, pass);
+
+        if (!auth?.user_info?.auth) {
+          throw new Error("Login Xtream inválido.");
+        }
+
         live = await loadFromXtream(server, user, pass, "live");
         vod = await loadFromXtream(server, user, pass, "vod");
         series = await loadFromXtream(server, user, pass, "series");
@@ -393,7 +386,7 @@ export default function HomeScreen({ navigation }) {
         vod = parsed.vod;
         series = parsed.series;
       } else {
-        throw new Error("Sem URL M3U salva.");
+        throw new Error("Sem URL ou login salvo.");
       }
 
       setLiveItems(live);
@@ -473,10 +466,7 @@ export default function HomeScreen({ navigation }) {
             resizeMode="contain"
           />
 
-          <TouchableOpacity
-            onPress={() => openBrowse(t.live, liveItems, "live")}
-            hasTVPreferredFocus
-          >
+          <TouchableOpacity onPress={() => openBrowse(t.live, liveItems, "live")} hasTVPreferredFocus>
             <Text style={styles.sideBtnText}>{t.live}</Text>
           </TouchableOpacity>
 
