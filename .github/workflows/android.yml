@@ -28,6 +28,9 @@ jobs:
       - name: Prebuild Android
         run: npx expo prebuild
 
+      - name: Build JS bundle
+        run: npx expo export --platform android
+
       - name: Give permission to gradlew
         run: chmod +x android/gradlew
 
