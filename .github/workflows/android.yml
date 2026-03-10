@@ -19,6 +19,12 @@ jobs:
         with:
           node-version: 18
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
       - name: Install dependencies
         run: npm install
 
@@ -26,10 +32,13 @@ jobs:
         run: npm install -g expo-cli
 
       - name: Prebuild Android
-        run: npx expo prebuild
+        run: npx expo prebuild --platform android
 
-      - name: Build JS bundle
-        run: npx expo export --platform android
+      - name: Create assets folder
+        run: mkdir -p android/app/src/main/assets
+
+      - name: Create JS bundle
+        run: npx react-native bundle --platform android --dev false --entry-file index.ts --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
 
       - name: Give permission to gradlew
         run: chmod +x android/gradlew
