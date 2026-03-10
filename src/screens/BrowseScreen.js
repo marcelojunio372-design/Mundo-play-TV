@@ -1,108 +1,55 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
 View,
 Text,
 FlatList,
 TouchableOpacity,
 StyleSheet,
-TextInput,
-Alert
+TextInput
 } from "react-native";
-
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function BrowseScreen({ route, navigation }) {
 
 const { title="Lista", items=[] } = route.params || {}
 
 const [search,setSearch] = useState("")
-const [favorites,setFavorites] = useState([])
-const [recent,setRecent] = useState([])
-const [epg,setEpg] = useState({})
+const [category,setCategory] = useState(null)
 
-useEffect(()=>{
+const categories = useMemo(()=>{
 
-loadFavorites()
-loadRecent()
-loadEPG()
+const groups = {}
 
-},[])
+items.forEach(item=>{
 
-async function loadFavorites(){
+const g = item.group || "Outros"
 
-const fav = await AsyncStorage.getItem("favorites")
+if(!groups[g]) groups[g] = []
 
-if(fav) setFavorites(JSON.parse(fav))
+groups[g].push(item)
 
-}
+})
 
-async function loadRecent(){
+return groups
 
-const rec = await AsyncStorage.getItem("recent")
+},[items])
 
-if(rec) setRecent(JSON.parse(rec))
-
-}
-
-async function loadEPG(){
-
-try{
-
-const url = await AsyncStorage.getItem("epg_url")
-
-if(!url) return
-
-const res = await fetch(url)
-
-const data = await res.json()
-
-setEpg(data)
-
-}catch{}
-
-}
-
-async function toggleFavorite(item){
-
-let next=[...favorites]
-
-const index = next.findIndex(x=>x.url===item.url)
-
-if(index>=0){
-
-next.splice(index,1)
-
-Alert.alert("Favoritos","Removido")
-
-}else{
-
-next.unshift(item)
-
-Alert.alert("Favoritos","Adicionado")
-
-}
-
-setFavorites(next)
-
-await AsyncStorage.setItem("favorites",JSON.stringify(next))
-
-}
-
-function isFavorite(item){
-
-return favorites.some(x=>x.url===item.url)
-
-}
+const categoryList = Object.keys(categories)
 
 const filtered = useMemo(()=>{
 
-const q=search.toLowerCase()
+let list = category ? categories[category] : items
 
-if(!q) return items
+if(search){
 
-return items.filter(x=>x.name?.toLowerCase().includes(q))
+const q = search.toLowerCase()
 
-},[items,search])
+list = list.filter(x=>x.name?.toLowerCase().includes(q))
+
+}
+
+return list
+
+},[items,search,category])
 
 function openPlayer(item){
 
@@ -110,43 +57,20 @@ navigation.navigate("Player",{channel:item})
 
 }
 
-const renderItem = ({item}) =>{
-
-const program = epg[item.name] || {}
-
-return(
+const renderItem = ({item}) =>(
 
 <TouchableOpacity
 style={styles.row}
 onPress={()=>openPlayer(item)}
-onLongPress={()=>toggleFavorite(item)}
 >
 
-<View style={{flex:1}}>
-
-<Text style={styles.title}>
+<Text style={styles.name}>
 {item.name}
-</Text>
-
-<Text style={styles.program}>
-Agora: {program.now || "Sem informação"}
-</Text>
-
-<Text style={styles.program2}>
-Depois: {program.next || ""}
-</Text>
-
-</View>
-
-<Text style={styles.star}>
-{isFavorite(item) ? "★" : "☆"}
 </Text>
 
 </TouchableOpacity>
 
 )
-
-}
 
 return(
 
@@ -165,7 +89,7 @@ VOLTAR
 
 </TouchableOpacity>
 
-<Text style={styles.header}>
+<Text style={styles.title}>
 {title}
 </Text>
 
@@ -173,18 +97,59 @@ VOLTAR
 
 <TextInput
 style={styles.search}
-placeholder="Procurar canal..."
-placeholderTextColor="#bbb"
+placeholder="Procurar..."
+placeholderTextColor="#aaa"
 value={search}
 onChangeText={setSearch}
 />
 
+{!category && (
+
+<FlatList
+data={categoryList}
+keyExtractor={(item)=>item}
+renderItem={({item})=>(
+
+<TouchableOpacity
+style={styles.category}
+onPress={()=>setCategory(item)}
+>
+
+<Text style={styles.categoryText}>
+{item}
+</Text>
+
+</TouchableOpacity>
+
+)}
+/>
+
+)}
+
+{category && (
+
+<>
+
+<TouchableOpacity
+style={styles.categoryBack}
+onPress={()=>setCategory(null)}
+>
+
+<Text style={styles.categoryBackText}>
+← VOLTAR CATEGORIAS
+</Text>
+
+</TouchableOpacity>
+
 <FlatList
 data={filtered}
-renderItem={renderItem}
 keyExtractor={(item,i)=>String(i)}
-contentContainerStyle={{padding:10}}
+renderItem={renderItem}
 />
+
+</>
+
+)}
 
 </View>
 
@@ -206,7 +171,7 @@ padding:10
 },
 
 back:{
-backgroundColor:"rgba(255,255,255,0.15)",
+backgroundColor:"rgba(255,255,255,0.2)",
 padding:8,
 borderRadius:8
 },
@@ -216,7 +181,7 @@ color:"#fff",
 fontWeight:"bold"
 },
 
-header:{
+title:{
 color:"#fff",
 fontSize:18,
 marginLeft:10,
@@ -224,40 +189,40 @@ fontWeight:"bold"
 },
 
 search:{
-backgroundColor:"rgba(255,255,255,0.10)",
+backgroundColor:"rgba(255,255,255,0.1)",
 margin:10,
 borderRadius:10,
 padding:10,
 color:"#fff"
 },
 
-row:{
-flexDirection:"row",
-alignItems:"center",
-padding:12,
-backgroundColor:"rgba(255,255,255,0.08)",
-borderRadius:10,
-marginBottom:8
+category:{
+padding:15,
+borderBottomWidth:1,
+borderBottomColor:"#333"
 },
 
-title:{
+categoryText:{
 color:"#fff",
-fontWeight:"bold"
+fontSize:16
 },
 
-program:{
-color:"#aaa",
-fontSize:12
+categoryBack:{
+padding:10
 },
 
-program2:{
-color:"#777",
-fontSize:11
+categoryBackText:{
+color:"#aaa"
 },
 
-star:{
-color:"#ffd54a",
-fontSize:20
+row:{
+padding:15,
+borderBottomWidth:1,
+borderBottomColor:"#333"
+},
+
+name:{
+color:"#fff"
 }
 
 })
