@@ -1,37 +1,34 @@
 {
   "expo": {
-    "name": "mundoplaytv",
+    "name": "Mundo Play TV",
     "slug": "mundoplaytv",
     "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "orientation": "landscape",
+    "icon": "./assets/logo.png",
+    "scheme": "mundoplaytv",
+    "userInterfaceStyle": "dark",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#000000"
     },
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.mundoplaytv.app"
-    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "android": {
+      "package": "com.mundoplaytv.app",
+      "versionCode": 1,
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ],
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
-      },
-      "predictiveBackGestureEnabled": false,
-      "package": "com.mundoplaytv.app"
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "edd9867d-8d8b-43ff-a81b-9f5f6369ff23"
+        "foregroundImage": "./assets/logo.png",
+        "backgroundColor": "#000000"
       }
-    }
+    },
+    "plugins": [
+      "expo-av"
+    ]
   }
 }

@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - master
+  workflow_dispatch:
 
 jobs:
   build:
@@ -31,6 +32,13 @@ jobs:
 
       - name: Prebuild Android
         run: npx expo prebuild --platform android --non-interactive
+
+      - name: Fix Metro config
+        run: |
+          cat <<'EOF' > metro.config.js
+          const { getDefaultConfig } = require("expo/metro-config");
+          module.exports = getDefaultConfig(__dirname);
+          EOF
 
       - name: Give permission to gradlew
         run: chmod +x android/gradlew
