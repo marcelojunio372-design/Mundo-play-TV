@@ -1,0 +1,41 @@
+name: Build Release APK
+
+on:
+  push:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Install Expo CLI
+      run: npm install -g expo-cli
+
+    - name: Prebuild Android
+      run: npx expo prebuild --platform android --non-interactive
+
+    - name: Build APK
+      run: |
+        cd android
+        ./gradlew assembleRelease
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: mundo-play-tv-apk
+        path: android/app/build/outputs/apk/release/app-release.apk
