@@ -90,8 +90,8 @@ android {
     namespace 'com.mundoplaytv.app'
     defaultConfig {
         applicationId 'com.mundoplaytv.app'
-        minSdkVersion rootProject.ext.minSdkVersion
-        targetSdkVersion rootProject.ext.targetSdkVersion
+        minSdkVersion 24rootProject.ext.minSdkVersion
+        targetSdkVersion 34rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0.0"
 
