@@ -12,7 +12,7 @@ jobs:
 
     steps:
 
-    - name: Checkout repository
+    - name: Checkout
       uses: actions/checkout@v4
 
     - name: Setup Node
@@ -21,17 +21,20 @@ jobs:
         node-version: 18
 
     - name: Install dependencies
-      run: npm install
+      run: |
+        npm install
+        npm install expo
 
     - name: Install Expo CLI
       run: npm install -g expo-cli
 
-    - name: Prebuild Android
-      run: npx expo prebuild --platform android --non-interactive
+    - name: Generate Android project
+      run: npx expo prebuild --platform android
 
     - name: Build APK
       run: |
         cd android
+        chmod +x gradlew
         ./gradlew assembleRelease
 
     - name: Upload APK
