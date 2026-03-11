@@ -6,390 +6,423 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
+  ImageBackground,
   Alert,
-  ScrollView,
   Dimensions,
   Platform,
+  ScrollView,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Application from "expo-application";
 
 const { width: W, height: H } = Dimensions.get("window");
 
-function normalizeUrl(u) {
-  const s = (u || "").trim();
+const BG_IMAGE = require("../../assets/bg.jpg");
+const LOGO_IMAGE = require("../../assets/logo.png");
+
+const MODES = {
+  XTREAM: "xtream",
+  M3U: "m3u",
+};
+
+function normalizeServer(server) {
+  let s = String(server || "").trim();
   if (!s) return "";
-  if (s.startsWith("http://") || s.startsWith("https://")) return s;
-  return "http://" + s;
+
+  if (!s.startsWith("http://") && !s.startsWith("https://")) {
+    s = "http://" + s;
+  }
+
+  try {
+    const u = new URL(s);
+
+    if (u.hostname === "epics.zip" && !u.port) {
+      u.port = "80";
+    }
+
+    return u.toString().replace(/\/$/, "");
+  } catch {
+    return s.replace(/\/$/, "");
+  }
 }
 
-function extractXtreamFromM3U(url) {
+function normalizeUrl(url) {
+  let s = String(url || "").trim();
+  if (!s) return "";
+
+  if (!s.startsWith("http://") && !s.startsWith("https://")) {
+    s = "http://" + s;
+  }
+
+  return s;
+}
+
+async function fetchJson(url) {
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Accept: "application/json, text/plain, */*",
+      "User-Agent": "Mozilla/5.0",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+    },
+  });
+
+  const text = await response.text();
+
+  if (!response.ok) {
+    throw new Error(`Falha HTTP ${response.status}`);
+  }
+
   try {
-    const u = new URL(url);
-    const username = u.searchParams.get("username") || "";
-    const password = u.searchParams.get("password") || "";
-    const server = `${u.protocol}//${u.host}`;
-    return { server, username, password };
+    return JSON.parse(text);
   } catch {
-    return { server: "", username: "", password: "" };
+    throw new Error("Resposta inválida da API.");
   }
 }
 
 export default function LoginScreen({ navigation }) {
-  const [tab, setTab] = useState("m3u");
+  const [mode, setMode] = useState(MODES.XTREAM);
+
+  const [server, setServer] = useState("http://epics.zip:80");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+
   const [m3uUrl, setM3uUrl] = useState("");
-  const [serverUrl, setServerUrl] = useState("");
-  const [user, setUser] = useState("");
-  const [pass, setPass] = useState("");
-  const [deviceId, setDeviceId] = useState("CARREGANDO...");
 
-  const cardMaxWidth = useMemo(() => Math.min(W * 0.92, 430), []);
+  const [loading, setLoading] = useState(false);
+  const [macAddress, setMacAddress] = useState("00:1A:79:XX:XX:XX");
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const savedM3U = await AsyncStorage.getItem("m3u_url");
-        const savedServer = await AsyncStorage.getItem("xtream_server");
-        const savedUser = await AsyncStorage.getItem("xtream_user");
-        const savedPass = await AsyncStorage.getItem("xtream_pass");
-
-        if (savedM3U) setM3uUrl(savedM3U);
-        if (savedServer) setServerUrl(savedServer);
-        if (savedUser) setUser(savedUser);
-        if (savedPass) setPass(savedPass);
-
-        const id = await Application.getAndroidId();
-        if (id) setDeviceId(String(id).toUpperCase());
-      } catch {
-        setDeviceId("INDISPONÍVEL");
-      }
-    })();
+  const boxWidth = useMemo(() => {
+    if (Platform.isTV) return Math.min(W * 0.42, 520);
+    return Math.min(W * 0.88, 420);
   }, []);
 
-  async function verifyConnection() {
+  useEffect(() => {
+    loadSavedData();
+    loadMac();
+  }, []);
+
+  async function loadSavedData() {
     try {
-      if (tab === "m3u") {
-        const url = normalizeUrl(m3uUrl);
-        if (!url) {
-          return Alert.alert("Erro", "Informe a URL M3U.");
-        }
+      const savedMode = await AsyncStorage.getItem("login_mode");
+      const savedServer = await AsyncStorage.getItem("xtream_server");
+      const savedUser = await AsyncStorage.getItem("xtream_user");
+      const savedPass = await AsyncStorage.getItem("xtream_pass");
+      const savedM3u = await AsyncStorage.getItem("m3u_url");
 
-        await AsyncStorage.multiSet([
-          ["login_mode", "m3u"],
-          ["m3u_url", url],
-        ]);
+      if (savedMode) setMode(savedMode);
+      if (savedServer) setServer(savedServer);
+      if (savedUser) setUsername(savedUser);
+      if (savedPass) setPassword(savedPass);
+      if (savedM3u) setM3uUrl(savedM3u);
+    } catch {}
+  }
 
-        return Alert.alert("OK", "Lista salva com sucesso.");
-      }
+  async function loadMac() {
+    try {
+      const raw =
+        Application.androidId ||
+        Application.applicationId ||
+        "001A79XXXXXX";
 
-      if (tab === "user") {
-        const s = normalizeUrl(serverUrl);
-
-        if (!s) {
-          return Alert.alert("Erro", "Informe o servidor.");
-        }
-
-        if (!user.trim() || !pass.trim()) {
-          return Alert.alert("Erro", "Informe usuário e senha.");
-        }
-
-        await AsyncStorage.multiSet([
-          ["login_mode", "xtream"],
-          ["xtream_server", s],
-          ["xtream_user", user.trim()],
-          ["xtream_pass", pass.trim()],
-        ]);
-
-        return Alert.alert("OK", "Login salvo com sucesso.");
-      }
-    } catch (e) {
-      Alert.alert("Erro", String(e?.message || e));
+      const clean = String(raw).replace(/[^a-fA-F0-9]/g, "").padEnd(12, "0").slice(0, 12);
+      const mac = clean.match(/.{1,2}/g)?.join(":") || "00:1A:79:XX:XX:XX";
+      setMacAddress(mac.toUpperCase());
+    } catch {
+      setMacAddress("00:1A:79:XX:XX:XX");
     }
   }
 
-  async function enterApp() {
+  async function handleXtreamLogin() {
     try {
-      if (tab === "m3u") {
-        const url = normalizeUrl(m3uUrl);
-        if (!url) {
-          return Alert.alert("Erro", "Informe a URL M3U.");
-        }
+      setLoading(true);
 
-        await AsyncStorage.setItem("m3u_url", url);
-
-        const xt = extractXtreamFromM3U(url);
-        const isXtream = !!(xt.server && xt.username && xt.password);
-
-        if (isXtream) {
-          await AsyncStorage.multiSet([
-            ["login_mode", "xtream"],
-            ["xtream_server", xt.server],
-            ["xtream_user", xt.username],
-            ["xtream_pass", xt.password],
-          ]);
-        } else {
-          await AsyncStorage.setItem("login_mode", "m3u");
-        }
-
-        navigation.replace("Home");
+      if (!server || !username || !password) {
+        Alert.alert("Erro", "Preencha servidor, usuário e senha.");
         return;
       }
 
-      if (tab === "user") {
-        const s = normalizeUrl(serverUrl);
+      const fixedServer = normalizeServer(server);
 
-        if (!s) {
-          return Alert.alert("Erro", "Informe o servidor.");
-        }
+      const apiUrl =
+        `${fixedServer}/player_api.php?username=${encodeURIComponent(username)}` +
+        `&password=${encodeURIComponent(password)}`;
 
-        if (!user.trim() || !pass.trim()) {
-          return Alert.alert("Erro", "Informe usuário e senha.");
-        }
+      const data = await fetchJson(apiUrl);
 
-        await AsyncStorage.multiSet([
-          ["login_mode", "xtream"],
-          ["xtream_server", s],
-          ["xtream_user", user.trim()],
-          ["xtream_pass", pass.trim()],
-        ]);
-
-        navigation.replace("Home");
+      if (!data?.user_info?.auth) {
+        throw new Error("Login inválido.");
       }
+
+      await AsyncStorage.multiSet([
+        ["login_mode", MODES.XTREAM],
+        ["xtream_server", fixedServer],
+        ["xtream_user", username],
+        ["xtream_pass", password],
+        ["m3u_url", ""],
+      ]);
+
+      navigation.replace("Home");
     } catch (e) {
       Alert.alert("Erro", String(e?.message || e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleM3ULogin() {
+    try {
+      setLoading(true);
+
+      if (!m3uUrl) {
+        Alert.alert("Erro", "Digite a URL M3U.");
+        return;
+      }
+
+      const fixedUrl = normalizeUrl(m3uUrl);
+
+      const response = await fetch(fixedUrl, {
+        method: "GET",
+        headers: {
+          Accept: "*/*",
+          "User-Agent": "Mozilla/5.0",
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
+      });
+
+      const text = await response.text();
+
+      if (!response.ok) {
+        throw new Error(`Falha HTTP ${response.status}`);
+      }
+
+      if (!text.includes("#EXTM3U") && !text.includes("#EXTINF")) {
+        throw new Error("Lista M3U inválida.");
+      }
+
+      await AsyncStorage.multiSet([
+        ["login_mode", MODES.M3U],
+        ["m3u_url", fixedUrl],
+        ["xtream_server", ""],
+        ["xtream_user", ""],
+        ["xtream_pass", ""],
+      ]);
+
+      navigation.replace("Home");
+    } catch (e) {
+      Alert.alert("Erro", String(e?.message || e));
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <View style={styles.root}>
-      <Image
-        source={require("../../assets/bg.jpg")}
-        style={styles.bg}
-        resizeMode="cover"
-      />
+    <ImageBackground source={BG_IMAGE} resizeMode="cover" style={styles.bg}>
+      <View style={styles.overlay}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={[styles.card, { width: boxWidth }]}>
+            <Image source={LOGO_IMAGE} resizeMode="contain" style={styles.logo} />
 
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-        bounces={false}
-      >
-        <View style={[styles.card, { maxWidth: cardMaxWidth }]}>
-          <Image
-            source={require("../../assets/logo.png")}
-            style={styles.logo}
-            resizeMode="contain"
-          />
+            <View style={styles.tabRow}>
+              <TouchableOpacity
+                style={[styles.tabBtn, mode === MODES.XTREAM && styles.tabBtnActive]}
+                onPress={() => setMode(MODES.XTREAM)}
+              >
+                <Text style={[styles.tabText, mode === MODES.XTREAM && styles.tabTextActive]}>
+                  Xtream
+                </Text>
+              </TouchableOpacity>
 
-          <View style={styles.tabs}>
-            <TouchableOpacity
-              onPress={() => setTab("m3u")}
-              style={[styles.tabBtn, tab === "m3u" && styles.tabBtnActive]}
-            >
-              <Text style={styles.tabText}>M3U</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tabBtn, mode === MODES.M3U && styles.tabBtnActive]}
+                onPress={() => setMode(MODES.M3U)}
+              >
+                <Text style={[styles.tabText, mode === MODES.M3U && styles.tabTextActive]}>
+                  M3U
+                </Text>
+              </TouchableOpacity>
+            </View>
 
-            <TouchableOpacity
-              onPress={() => setTab("user")}
-              style={[styles.tabBtn, tab === "user" && styles.tabBtnActive]}
-            >
-              <Text style={styles.tabText}>Usuário</Text>
-            </TouchableOpacity>
+            {mode === MODES.XTREAM ? (
+              <>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Servidor"
+                  placeholderTextColor="#BFBFBF"
+                  value={server}
+                  onChangeText={setServer}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+
+                <TextInput
+                  style={styles.input}
+                  placeholder="Usuário"
+                  placeholderTextColor="#BFBFBF"
+                  value={username}
+                  onChangeText={setUsername}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+
+                <TextInput
+                  style={styles.input}
+                  placeholder="Senha"
+                  placeholderTextColor="#BFBFBF"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+
+                <TouchableOpacity
+                  style={[styles.mainBtn, loading && styles.btnDisabled]}
+                  onPress={handleXtreamLogin}
+                  disabled={loading}
+                >
+                  <Text style={styles.mainBtnText}>
+                    {loading ? "Entrando..." : "Entrar"}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Digite sua URL M3U"
+                  placeholderTextColor="#BFBFBF"
+                  value={m3uUrl}
+                  onChangeText={setM3uUrl}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+
+                <TouchableOpacity
+                  style={[styles.mainBtn, loading && styles.btnDisabled]}
+                  onPress={handleM3ULogin}
+                  disabled={loading}
+                >
+                  <Text style={styles.mainBtnText}>
+                    {loading ? "Entrando..." : "Entrar"}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            <Text style={styles.macText}>MAC: {macAddress}</Text>
           </View>
-
-          {tab === "m3u" && (
-            <>
-              <TextInput
-                style={styles.input}
-                placeholder="URL da lista M3U"
-                placeholderTextColor="#bbb"
-                value={m3uUrl}
-                onChangeText={setM3uUrl}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <Text style={styles.hint}>Aceita links em http:// e https://</Text>
-            </>
-          )}
-
-          {tab === "user" && (
-            <>
-              <TextInput
-                style={styles.input}
-                placeholder="Servidor (http:// ou https://)"
-                placeholderTextColor="#bbb"
-                value={serverUrl}
-                onChangeText={setServerUrl}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-
-              <TextInput
-                style={styles.input}
-                placeholder="Usuário"
-                placeholderTextColor="#bbb"
-                value={user}
-                onChangeText={setUser}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-
-              <TextInput
-                style={styles.input}
-                placeholder="Senha"
-                placeholderTextColor="#bbb"
-                value={pass}
-                onChangeText={setPass}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-
-              <Text style={styles.hint}>
-                Funciona com servidor em http:// e https://
-              </Text>
-            </>
-          )}
-
-          <View style={styles.row}>
-            <TouchableOpacity style={styles.btnSecondary} onPress={verifyConnection}>
-              <Text style={styles.btnSecondaryText}>VERIFICAR</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.btnPrimary} onPress={enterApp}>
-              <Text style={styles.btnPrimaryText}>ENTRAR</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.footerRow}>
-            <Text style={styles.macFooter}>MAC: {deviceId}</Text>
-          </View>
-        </View>
-      </ScrollView>
-    </View>
+        </ScrollView>
+      </View>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#000" },
-
   bg: {
-    position: "absolute",
+    flex: 1,
     width: "100%",
     height: "100%",
-    opacity: 0.95,
+    backgroundColor: "#000",
   },
 
-  scroll: {
-    minHeight: H,
-    paddingTop: 12,
-    paddingBottom: 12,
-    paddingHorizontal: 12,
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+  },
+
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 24,
   },
 
   card: {
-    width: "100%",
-    backgroundColor: "rgba(0,0,0,0.46)",
-    borderRadius: 18,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderRadius: 26,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 16,
+    alignItems: "center",
   },
 
   logo: {
-    width: "100%",
+    width: 150,
     height: 110,
-    marginBottom: 6,
+    marginBottom: 8,
   },
 
-  tabs: {
+  tabRow: {
     flexDirection: "row",
-    gap: 8,
-    marginBottom: 8,
+    width: "100%",
+    marginBottom: 14,
   },
 
   tabBtn: {
     flex: 1,
-    backgroundColor: "rgba(255,255,255,0.14)",
-    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 12,
     paddingVertical: 10,
-    alignItems: "center",
+    marginHorizontal: 4,
   },
 
   tabBtnActive: {
-    backgroundColor: "rgba(255,255,255,0.24)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.20)",
+    backgroundColor: "#10F0A0",
   },
 
   tabText: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "700",
+    color: "#FFF",
+    fontWeight: "800",
+    textAlign: "center",
+    fontSize: 14,
+  },
+
+  tabTextActive: {
+    color: "#000",
   },
 
   input: {
-    backgroundColor: "rgba(0,0,0,0.35)",
+    width: "100%",
+    backgroundColor: "rgba(20,20,20,0.90)",
+    color: "#FFF",
     borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: Platform.OS === "android" ? 10 : 12,
-    fontSize: 15,
-    color: "#fff",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    marginTop: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    marginBottom: 12,
   },
 
-  hint: {
-    color: "rgba(255,255,255,0.70)",
-    marginTop: 6,
-    fontSize: 12,
-  },
-
-  row: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 10,
-  },
-
-  btnSecondary: {
-    flex: 1,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    borderRadius: 14,
-    paddingVertical: 12,
+  mainBtn: {
+    width: "100%",
+    backgroundColor: "#10F0A0",
+    borderRadius: 16,
+    paddingVertical: 15,
     alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
   },
 
-  btnSecondaryText: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "800",
+  btnDisabled: {
+    opacity: 0.65,
   },
 
-  btnPrimary: {
-    flex: 1,
-    backgroundColor: "rgba(255,255,255,0.92)",
-    borderRadius: 14,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-
-  btnPrimaryText: {
+  mainBtnText: {
     color: "#000",
-    fontSize: 15,
-    fontWeight: "800",
+    fontSize: 18,
+    fontWeight: "900",
   },
 
-  footerRow: {
-    marginTop: 10,
-    alignItems: "flex-start",
-  },
-
-  macFooter: {
-    color: "rgba(255,255,255,0.80)",
-    fontSize: 12,
-    fontWeight: "600",
+  macText: {
+    color: "#C8C8C8",
+    fontSize: 14,
+    fontWeight: "700",
+    marginTop: 16,
   },
 });

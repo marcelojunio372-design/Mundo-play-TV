@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
+  ImageBackground,
   Alert,
   FlatList,
   Dimensions,
@@ -12,6 +13,10 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { width: W } = Dimensions.get("window");
+
+const BG_IMAGE = require("../../assets/bg.jpg");
+const LOGO_IMAGE = require("../../assets/logo.png");
+
 const LANGUAGE_KEY = "MPT_LANGUAGE";
 
 const LANGS = {
@@ -36,8 +41,8 @@ const LANGS = {
     loading: "LOADING...",
     exit: "EXIT",
     carousel: "FEATURED",
-    noCarousel: "No items in carousel.",
-    loadingAll: "Loading full playlist...",
+    noCarousel: "No carousel items.",
+    loadingAll: "Loading full list...",
   },
   es: {
     live: "Live TV",
@@ -54,164 +59,65 @@ const LANGS = {
 };
 
 function normalizeUrl(u) {
-  const s = String(u || "").trim();
+  let s = String(u || "").trim();
   if (!s) return "";
-  if (s.startsWith("http://") || s.startsWith("https://")) return s;
-  return "http://" + s;
-}
 
-function isXtreamLikeM3U(url) {
-  try {
-    const u = new URL(url);
-    const username = u.searchParams.get("username") || "";
-    const password = u.searchParams.get("password") || "";
-    return !!(username && password && u.host);
-  } catch {
-    return false;
+  if (!s.startsWith("http://") && !s.startsWith("https://")) {
+    s = "http://" + s;
   }
-}
 
-function xtreamFromM3U(url) {
   try {
-    const u = new URL(url);
-    return {
-      server: `${u.protocol}//${u.host}`,
-      username: u.searchParams.get("username") || "",
-      password: u.searchParams.get("password") || "",
-    };
+    const url = new URL(s);
+
+    if (url.hostname === "epics.zip" && !url.port) {
+      url.port = "80";
+    }
+
+    return url.toString().replace(/\/$/, "");
   } catch {
-    return { server: "", username: "", password: "" };
+    return s.replace(/\/$/, "");
   }
 }
 
 async function fetchJson(url) {
   const safeUrl = normalizeUrl(url);
 
-  const r = await fetch(safeUrl, {
+  const response = await fetch(safeUrl, {
     method: "GET",
     headers: {
       Accept: "application/json, text/plain, */*",
+      "User-Agent": "Mozilla/5.0",
       "Cache-Control": "no-cache",
       Pragma: "no-cache",
-      "User-Agent": "Mozilla/5.0",
     },
   });
 
-  if (!r.ok) {
-    throw new Error(`Falha HTTP ${r.status}`);
+  const text = await response.text();
+
+  if (!response.ok) {
+    throw new Error(`Falha HTTP ${response.status}`);
   }
 
-  return await r.json();
-}
-
-function inferItemType(urlLine, groupTitle, name) {
-  const lowerUrl = String(urlLine || "").toLowerCase();
-  const lowerGroup = String(groupTitle || "").toLowerCase();
-  const lowerName = String(name || "").toLowerCase();
-
-  const seriesHints = ["series", "serie", "temporada", "season", "episodio", "episode"];
-  const movieHints = ["filmes", "filme", "movies", "movie", "cinema", "vod"];
-
-  if (seriesHints.some((x) => lowerGroup.includes(x) || lowerName.includes(x))) {
-    return "series";
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error("Resposta inválida da API.");
   }
-
-  if (
-    movieHints.some((x) => lowerGroup.includes(x) || lowerName.includes(x)) ||
-    lowerUrl.includes("/movie/") ||
-    lowerUrl.includes("/vod/")
-  ) {
-    return "vod";
-  }
-
-  return "live";
-}
-
-function parseM3UContent(txt) {
-  const lines = String(txt || "").split(/\r?\n/);
-
-  const all = [];
-  let currentName = "";
-  let currentGroup = "";
-  let currentLogo = "";
-  let currentTvgId = "";
-
-  for (let i = 0; i < lines.length; i += 1) {
-    const line = String(lines[i] || "").trim();
-    if (!line) continue;
-
-    if (line.startsWith("#EXTINF")) {
-      const groupMatch = /group-title="([^"]+)"/i.exec(line);
-      const logoMatch = /tvg-logo="([^"]+)"/i.exec(line);
-      const tvgIdMatch = /tvg-id="([^"]+)"/i.exec(line);
-
-      currentGroup = groupMatch?.[1] || "";
-      currentLogo = logoMatch?.[1] || "";
-      currentTvgId = tvgIdMatch?.[1] || "";
-
-      const comma = line.lastIndexOf(",");
-      currentName = comma >= 0 ? line.slice(comma + 1).trim() : "Item";
-      continue;
-    }
-
-    if (!line.startsWith("#")) {
-      const itemType = inferItemType(line, currentGroup, currentName);
-
-      all.push({
-        id: String(all.length + 1),
-        name: currentName || `Item ${all.length + 1}`,
-        logo: currentLogo || "",
-        url: line,
-        group: currentGroup || "",
-        description: "",
-        type: itemType,
-        tvgId: currentTvgId || "",
-      });
-
-      currentName = "";
-      currentGroup = "";
-      currentLogo = "";
-      currentTvgId = "";
-    }
-  }
-
-  return {
-    live: all.filter((x) => x.type === "live"),
-    vod: all.filter((x) => x.type === "vod"),
-    series: all.filter((x) => x.type === "series"),
-  };
-}
-
-async function loadAllFromM3U(url) {
-  const safeUrl = normalizeUrl(url);
-
-  const r = await fetch(safeUrl, {
-    method: "GET",
-    headers: {
-      Accept: "*/*",
-      "Cache-Control": "no-cache",
-      Pragma: "no-cache",
-      "User-Agent": "Mozilla/5.0",
-    },
-  });
-
-  if (!r.ok) {
-    throw new Error(`Falha HTTP ${r.status}`);
-  }
-
-  const txt = await r.text();
-  return parseM3UContent(txt);
 }
 
 async function xtreamAuth(server, username, password) {
+  const fixedServer = normalizeUrl(server);
+
   const url =
-    `${server}/player_api.php?username=${encodeURIComponent(username)}` +
+    `${fixedServer}/player_api.php?username=${encodeURIComponent(username)}` +
     `&password=${encodeURIComponent(password)}`;
 
   return await fetchJson(url);
 }
 
 async function loadFromXtream(server, username, password, kind) {
+  const fixedServer = normalizeUrl(server);
+
   const action =
     kind === "live"
       ? "get_live_streams"
@@ -220,7 +126,7 @@ async function loadFromXtream(server, username, password, kind) {
       : "get_series";
 
   const url =
-    `${server}/player_api.php?username=${encodeURIComponent(username)}` +
+    `${fixedServer}/player_api.php?username=${encodeURIComponent(username)}` +
     `&password=${encodeURIComponent(password)}&action=${action}`;
 
   const data = await fetchJson(url);
@@ -230,9 +136,9 @@ async function loadFromXtream(server, username, password, kind) {
     let streamUrl = "";
 
     if (kind === "live" && x.stream_id) {
-      streamUrl = `${server}/live/${username}/${password}/${x.stream_id}.m3u8`;
+      streamUrl = `${fixedServer}/live/${username}/${password}/${x.stream_id}.m3u8`;
     } else if (kind === "vod" && x.stream_id) {
-      streamUrl = `${server}/movie/${username}/${password}/${x.stream_id}.${x.container_extension || "mp4"}`;
+      streamUrl = `${fixedServer}/movie/${username}/${password}/${x.stream_id}.${x.container_extension || "mp4"}`;
     } else if (kind === "series") {
       streamUrl = "";
     }
@@ -284,7 +190,7 @@ export default function HomeScreen({ navigation }) {
       ...liveItems.slice(0, 8),
     ];
     return mixed;
-  }, [liveItems, movieItems, seriesItems]);
+  }, [movieItems, seriesItems, liveItems]);
 
   useEffect(() => {
     loadLanguage();
@@ -343,51 +249,23 @@ export default function HomeScreen({ navigation }) {
       setLoading(true);
       setStatusText(t.loadingAll);
 
-      let mode = await AsyncStorage.getItem("login_mode");
-      const m3u = normalizeUrl(await AsyncStorage.getItem("m3u_url"));
+      const server = normalizeUrl(await AsyncStorage.getItem("xtream_server"));
+      const user = await AsyncStorage.getItem("xtream_user");
+      const pass = await AsyncStorage.getItem("xtream_pass");
 
-      let server = normalizeUrl(await AsyncStorage.getItem("xtream_server"));
-      let user = await AsyncStorage.getItem("xtream_user");
-      let pass = await AsyncStorage.getItem("xtream_pass");
-
-      if ((!server || !user || !pass) && m3u && isXtreamLikeM3U(m3u)) {
-        const x = xtreamFromM3U(m3u);
-        server = x.server;
-        user = x.username;
-        pass = x.password;
-        mode = "xtream";
-
-        await AsyncStorage.multiSet([
-          ["login_mode", "xtream"],
-          ["xtream_server", server],
-          ["xtream_user", user],
-          ["xtream_pass", pass],
-        ]);
+      if (!server || !user || !pass) {
+        throw new Error("Login Xtream não encontrado. Entre novamente.");
       }
 
-      let live = [];
-      let vod = [];
-      let series = [];
+      const auth = await xtreamAuth(server, user, pass);
 
-      // Prioridade total para Xtream
-      if (server && user && pass) {
-        const auth = await xtreamAuth(server, user, pass);
-
-        if (!auth?.user_info?.auth) {
-          throw new Error("Login Xtream inválido.");
-        }
-
-        live = await loadFromXtream(server, user, pass, "live");
-        vod = await loadFromXtream(server, user, pass, "vod");
-        series = await loadFromXtream(server, user, pass, "series");
-      } else if (m3u) {
-        const parsed = await loadAllFromM3U(m3u);
-        live = parsed.live;
-        vod = parsed.vod;
-        series = parsed.series;
-      } else {
-        throw new Error("Sem URL ou login salvo.");
+      if (!auth?.user_info?.auth) {
+        throw new Error("Login Xtream inválido.");
       }
+
+      const live = await loadFromXtream(server, user, pass, "live");
+      const vod = await loadFromXtream(server, user, pass, "vod");
+      const series = await loadFromXtream(server, user, pass, "series");
 
       setLiveItems(live);
       setMovieItems(vod);
@@ -425,10 +303,7 @@ export default function HomeScreen({ navigation }) {
         {item.logo ? (
           <Image source={{ uri: item.logo }} style={styles.carouselLogo} />
         ) : (
-          <Image
-            source={require("../../assets/logo.png")}
-            style={styles.carouselLogo}
-          />
+          <Image source={LOGO_IMAGE} style={styles.carouselLogo} />
         )}
       </View>
 
@@ -447,89 +322,82 @@ export default function HomeScreen({ navigation }) {
   );
 
   return (
-    <View style={styles.root}>
-      <Image
-        source={require("../../assets/bg.jpg")}
-        style={styles.bg}
-        resizeMode="cover"
-      />
-
-      <View style={styles.topRightClock}>
-        <Text style={styles.clockText}>{clock}</Text>
-      </View>
-
-      <View style={styles.rowMain}>
-        <View style={[styles.sidebar, { width: sidebarW }]}>
-          <Image
-            source={require("../../assets/logo.png")}
-            style={styles.sideLogo}
-            resizeMode="contain"
-          />
-
-          <TouchableOpacity onPress={() => openBrowse(t.live, liveItems, "live")} hasTVPreferredFocus>
-            <Text style={styles.sideBtnText}>{t.live}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => openBrowse(t.movies, movieItems, "vod")}>
-            <Text style={styles.sideBtnText}>{t.movies}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => openBrowse(t.series, seriesItems, "series")}>
-            <Text style={styles.sideBtnText}>{t.series}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => navigation.navigate("Settings")}>
-            <Text style={styles.sideBtnText}>{t.settings}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={reload}
-            style={[styles.sideBtnAction, loading && { opacity: 0.65 }]}
-            disabled={loading}
-          >
-            <Text style={styles.sideBtnActionText}>
-              {loading ? t.loading : t.reload}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={logout} style={styles.sideBtnExit}>
-            <Text style={styles.sideBtnExitText}>{t.exit}</Text>
-          </TouchableOpacity>
+    <ImageBackground source={BG_IMAGE} resizeMode="cover" style={styles.root}>
+      <View style={styles.overlay}>
+        <View style={styles.topRightClock}>
+          <Text style={styles.clockText}>{clock}</Text>
         </View>
 
-        <View style={styles.content}>
-          <Text style={styles.header}>{t.carousel}</Text>
-          {!!statusText && <Text style={styles.sub}>{statusText}</Text>}
+        <View style={styles.rowMain}>
+          <View style={[styles.sidebar, { width: sidebarW }]}>
+            <Image source={LOGO_IMAGE} style={styles.sideLogo} resizeMode="contain" />
 
-          {carouselItems.length ? (
-            <FlatList
-              ref={carouselRef}
-              data={carouselItems}
-              keyExtractor={(item, index) => `${item.id}_${index}`}
-              renderItem={renderCarouselItem}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={{ marginTop: 4, maxHeight: 145 }}
-            />
-          ) : (
-            <View style={styles.emptyBox}>
-              <Text style={styles.emptyText}>{t.noCarousel}</Text>
-            </View>
-          )}
+            <TouchableOpacity onPress={() => openBrowse(t.live, liveItems, "live")}>
+              <Text style={styles.sideBtnText}>{t.live}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => openBrowse(t.movies, movieItems, "vod")}>
+              <Text style={styles.sideBtnText}>{t.movies}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => openBrowse(t.series, seriesItems, "series")}>
+              <Text style={styles.sideBtnText}>{t.series}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => navigation.navigate("Settings")}>
+              <Text style={styles.sideBtnText}>{t.settings}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={reload}
+              style={[styles.sideBtnAction, loading && { opacity: 0.65 }]}
+              disabled={loading}
+            >
+              <Text style={styles.sideBtnActionText}>
+                {loading ? t.loading : t.reload}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={logout} style={styles.sideBtnExit}>
+              <Text style={styles.sideBtnExitText}>{t.exit}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.content}>
+            <Text style={styles.header}>{t.carousel}</Text>
+            {!!statusText && <Text style={styles.sub}>{statusText}</Text>}
+
+            {carouselItems.length ? (
+              <FlatList
+                ref={carouselRef}
+                data={carouselItems}
+                keyExtractor={(item, index) => `${item.id}_${index}`}
+                renderItem={renderCarouselItem}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{ marginTop: 4, maxHeight: 145 }}
+              />
+            ) : (
+              <View style={styles.emptyBox}>
+                <Text style={styles.emptyText}>{t.noCarousel}</Text>
+              </View>
+            )}
+          </View>
         </View>
       </View>
-    </View>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#000" },
+  root: {
+    flex: 1,
+    backgroundColor: "#000",
+  },
 
-  bg: {
-    position: "absolute",
-    width: "100%",
-    height: "100%",
-    opacity: 0.95,
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.20)",
   },
 
   topRightClock: {
