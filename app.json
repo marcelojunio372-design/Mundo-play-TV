@@ -7,26 +7,27 @@
     "icon": "./assets/logo.png",
     "scheme": "mundoplaytv",
     "userInterfaceStyle": "dark",
+
     "splash": {
       "image": "./assets/logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
+
     "assetBundlePatterns": [
       "**/*"
     ],
+
     "android": {
       "package": "com.mundoplaytv.app",
-      "versionCode": 1,
-      "permissions": [
-        "INTERNET",
-        "ACCESS_NETWORK_STATE"
-      ],
+      "usesCleartextTraffic": true,
+
       "adaptiveIcon": {
         "foregroundImage": "./assets/logo.png",
         "backgroundColor": "#000000"
       }
     },
+
     "plugins": [
       "expo-av"
     ]
