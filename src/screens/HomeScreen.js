@@ -332,7 +332,10 @@ setSeriesItems(series);
     });
   }
 
-</Text>renderCarouselItem = ({ item }) => (
+</Text>
+
+const renderCarouselItem = ({ item }) => (
+
     <TouchableOpacity
       activeOpacity={0.85}
       style={styles.carouselCard}
