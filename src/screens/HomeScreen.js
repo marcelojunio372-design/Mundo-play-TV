@@ -105,10 +105,9 @@ function normalizeUrl(u) {
   try {
     const url = new URL(s);
 
-    if (url.hostname === "
-
-
-    return url.toString().replace(/\/$/, "");
+    if (!url.hostname) {
+  return url.toString().replace(/\/$/, "");
+}
   } catch {
     return s.replace(/\/$/, "");
   }
