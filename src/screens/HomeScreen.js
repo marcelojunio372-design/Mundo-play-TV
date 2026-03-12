@@ -300,15 +300,14 @@ loadFavorites();
       }
 
       const live = await loadFromXtream(server, user, pass, "live");
-      const vod = await loadFromXtream(server, user, pass, "vod");
-      const series = await loadFromXtream(server, user, pass, "series");
-const epg = await loadEPG(server + "/xmltv.php?username=" + user + "&password=" + pass)
 
-const liveWithEPG = await attachEPG(live, epg)
+setLiveItems(live.slice(0, 300));
+setMovieItems([]);
+setSeriesItems([]);
 
-setLiveItems(liveWithEPG);
-setMovieItems(vod);
-setSeriesItems(series);
+setStatusText(
+  `${t.live} ${live.length} • ${t.movies} sob demanda • ${t.series} sob demanda`
+);
 
       setStatusText(
         `${t.live} ${live.length} • ${t.movies} ${vod.length} • ${t.series} ${series.length}`
@@ -321,16 +320,48 @@ setSeriesItems(series);
     }
   }
 
-  function openBrowse(title, items, type) {
+  async function openBrowse(title, items, type) {
+  try {
+    setLoading(true);
+    setStatusText(t.loadingAll);
+
+    let finalItems = items;
+
+    if (!items || !items.length) {
+      const server = normalizeUrl(await AsyncStorage.getItem("xtream_server"));
+      const user = await AsyncStorage.getItem("xtream_user");
+      const pass = await AsyncStorage.getItem("xtream_pass");
+
+      if (!server || !user || !pass) {
+        throw new Error("Login Xtream não encontrado.");
+      }
+
+      if (type === "live") {
+        finalItems = await loadFromXtream(server, user, pass, "live");
+        setLiveItems(finalItems);
+      } else if (type === "vod") {
+        finalItems = await loadFromXtream(server, user, pass, "vod");
+        setMovieItems(finalItems);
+      } else if (type === "series") {
+        finalItems = await loadFromXtream(server, user, pass, "series");
+        setSeriesItems(finalItems);
+      }
+    }
+
     navigation.navigate("Browse", {
       title,
-      items,
+      items: finalItems,
       type,
-      liveItems,
-      movieItems,
-      seriesItems,
+      liveItems: type === "live" ? finalItems : liveItems,
+      movieItems: type === "vod" ? finalItems : movieItems,
+      seriesItems: type === "series" ? finalItems : seriesItems,
     });
+  } catch (e) {
+    Alert.alert("Erro", String(e?.message || e));
+  } finally {
+    setLoading(false);
   }
+}
 
 const renderCarouselItem = ({ item }) => (
 
