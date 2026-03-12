@@ -57,7 +57,43 @@ const LANGS = {
     loadingAll: "Cargando lista completa...",
   },
 };
+const EPG_URL_REGEX = /x-tvg-url="([^"]+)"/i;
 
+async function loadEPG(url){
+  try{
+    const res = await fetch(url)
+    const xml = await res.text()
+
+    const map = {}
+
+    const programs = xml.split("<programme")
+
+    programs.forEach(p=>{
+      const ch = p.match(/channel="([^"]+)"/)
+      const title = p.match(/<title[^>]*>([^<]+)</)
+
+      if(ch && title){
+        map[ch[1]] = title[1]
+      }
+    })
+
+    return map
+
+  }catch(e){
+    console.log("EPG error",e)
+    return {}
+  }
+}
+
+async function attachEPG(items, epg){
+  return items.map(i=>{
+    const id = i.tvgId || i.name
+    return {
+      ...i,
+      epgNow: epg[id] || ""
+    }
+  })
+}
 function normalizeUrl(u) {
   let s = String(u || "").trim();
   if (!s) return "";
@@ -69,9 +105,8 @@ function normalizeUrl(u) {
   try {
     const url = new URL(s);
 
-    if (url.hostname === "epics.zip" && !url.port) {
-      url.port = "80";
-    }
+    if (url.hostname === "
+
 
     return url.toString().replace(/\/$/, "");
   } catch {
@@ -170,13 +205,14 @@ function formatClock(date) {
 
 export default function HomeScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
-  const [liveItems, setLiveItems] = useState([]);
-  const [movieItems, setMovieItems] = useState([]);
-  const [seriesItems, setSeriesItems] = useState([]);
-  const [statusText, setStatusText] = useState("Clique em RECARREGAR.");
-  const [lang, setLang] = useState("pt");
-  const [clock, setClock] = useState(formatClock(new Date()));
-  const [carouselOffset, setCarouselOffset] = useState(0);
+const [liveItems, setLiveItems] = useState([]);
+const [movieItems, setMovieItems] = useState([]);
+const [seriesItems, setSeriesItems] = useState([]);
+const [favoriteItems, setFavoriteItems] = useState([]);
+
+const [lang, setLang] = useState("pt");
+const [clock, setClock] = useState(formatClock(new Date()));
+const [carouselOffset, setCarouselOffset] = useState(0);
 
   const t = LANGS[lang] || LANGS.pt;
   const sidebarW = useMemo(() => Math.min(W * 0.21, 128), []);
@@ -195,6 +231,7 @@ export default function HomeScreen({ navigation }) {
   useEffect(() => {
     loadLanguage();
     reload();
+loadFavorites();
 
     const timer = setInterval(() => {
       setClock(formatClock(new Date()));
@@ -266,10 +303,13 @@ export default function HomeScreen({ navigation }) {
       const live = await loadFromXtream(server, user, pass, "live");
       const vod = await loadFromXtream(server, user, pass, "vod");
       const series = await loadFromXtream(server, user, pass, "series");
+const epg = await loadEPG(server + "/xmltv.php?username=" + user + "&password=" + pass)
 
-      setLiveItems(live);
-      setMovieItems(vod);
-      setSeriesItems(series);
+const liveWithEPG = await attachEPG(live, epg)
+
+setLiveItems(liveWithEPG);
+setMovieItems(vod);
+setSeriesItems(series);
 
       setStatusText(
         `${t.live} ${live.length} • ${t.movies} ${vod.length} • ${t.series} ${series.length}`
@@ -293,7 +333,7 @@ export default function HomeScreen({ navigation }) {
     });
   }
 
-  const renderCarouselItem = ({ item }) => (
+</Text>renderCarouselItem = ({ item }) => (
     <TouchableOpacity
       activeOpacity={0.85}
       style={styles.carouselCard}
@@ -310,7 +350,9 @@ export default function HomeScreen({ navigation }) {
       <Text style={styles.carouselName} numberOfLines={1}>
         {item.name}
       </Text>
-
+<Text style={{color:"#bbb",fontSize:11}}>
+{item.epgNow || ""}
+</Text>
       <Text style={styles.carouselType}>
         {item.type === "live"
           ? t.live
@@ -329,10 +371,22 @@ export default function HomeScreen({ navigation }) {
         </View>
 
         <View style={styles.rowMain}>
-          <View style={[styles.sidebar, { width: sidebarW }]}>
-            <Image source={LOGO_IMAGE} style={styles.sideLogo} resizeMode="contain" />
+          
+<View style={[styles.sidebar, { width: sidebarW }]}>
+           
 
-            <TouchableOpacity onPress={() => openBrowse(t.live, liveItems, "live")}>
+
+ <Image source={LOGO_IMAGE} style={styles.sideLogo} resizeMode="contain" />
+
+<TouchableOpacity onPress={() => openBrowse("Favoritos", favoriteItems, "live")}>
+
+
+<Text style={styles.sideBtnText}>⭐ Favoritos</Text>
+
+
+</TouchableOpacity>
+            
+<TouchableOpacity onPress={() => openBrowse(t.live, liveItems, "live")}>
               <Text style={styles.sideBtnText}>{t.live}</Text>
             </TouchableOpacity>
 

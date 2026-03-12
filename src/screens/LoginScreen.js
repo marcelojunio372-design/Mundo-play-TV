@@ -36,9 +36,6 @@ function normalizeServer(server) {
   try {
     const u = new URL(s);
 
-    if (u.hostname === "epics.zip" && !u.port) {
-      u.port = "80";
-    }
 
     return u.toString().replace(/\/$/, "");
   } catch {
@@ -84,7 +81,7 @@ async function fetchJson(url) {
 export default function LoginScreen({ navigation }) {
   const [mode, setMode] = useState(MODES.XTREAM);
 
-  const [server, setServer] = useState("http://epics.zip:80");
+  const [server, setServer] = useState("https://mundoplaytv-api.onrender.com");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 

@@ -1,6 +1,7 @@
 {
   "expo": {
-    "name": "mundoplaytv-app",
+    "name": "mundoplaytv",
+    "displayName": "Mundo Play TV",
     "slug": "mundoplaytv-app",
     "version": "1.0.0",
     "orientation": "portrait",

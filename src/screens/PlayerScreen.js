@@ -46,7 +46,28 @@ await AsyncStorage.setItem("recent",JSON.stringify(list))
 }catch{}
 
 }
+async function toggleFavorite(channel){
+  try{
 
+    const fav = await AsyncStorage.getItem("favorites")
+    let list = fav ? JSON.parse(fav) : []
+
+    const exists = list.find(x => x.url === channel.url)
+
+    if(exists){
+      list = list.filter(x => x.url !== channel.url)
+    }else{
+      list.unshift(channel)
+    }
+
+    await AsyncStorage.setItem("favorites", JSON.stringify(list))
+
+    Alert.alert("Favoritos","Canal atualizado")
+
+  }catch(e){
+    console.log(e)
+  }
+}
 if(!channel?.url){
 
 return(
@@ -85,6 +106,18 @@ style={styles.video}
 useNativeControls
 resizeMode="contain"
 shouldPlay
+isLooping={false}
+onError={()=>{
+  Alert.alert("Erro","Reconectando canal...");
+  setTimeout(()=>{
+    videoRef.current?.replayAsync();
+  },2000);
+}}
+onPlaybackStatusUpdate={(status)=>{
+  if(status.isBuffering){
+    console.log("Buffering...");
+  }
+}}
 />
 
 <View style={styles.topBar}>
@@ -100,18 +133,24 @@ style={styles.title}
 >
 
 {channel.name}
-
+x
 </Text>
+<TouchableOpacity
+style={styles.exit}
+onPress={()=>toggleFavorite(channel)}
+>
+<Text style={styles.exitText}>
+FAVORITO
+</Text>
+</TouchableOpacity>
 
 <TouchableOpacity
 style={styles.exit}
 onPress={()=>navigation.goBack()}
 >
-
 <Text style={styles.exitText}>
 SAIR
 </Text>
-
 </TouchableOpacity>
 
 </View>
