@@ -332,8 +332,6 @@ setSeriesItems(series);
     });
   }
 
-</Text>
-
 const renderCarouselItem = ({ item }) => (
 
     <TouchableOpacity
