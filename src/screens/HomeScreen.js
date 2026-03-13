@@ -116,9 +116,20 @@ export default function HomeScreen({ route, navigation }) {
     navigation.replace("Login");
   }
 
+  function openPlayer(item) {
+    navigation.navigate("Player", {
+      item,
+      loginType,
+      server,
+      username,
+      password,
+      section,
+    });
+  }
+
   function renderItem({ item }) {
     return (
-      <View style={styles.card}>
+      <TouchableOpacity style={styles.card} onPress={() => openPlayer(item)}>
         {item?.logo ? (
           <Image source={{ uri: item.logo }} style={styles.logo} resizeMode="cover" />
         ) : (
@@ -135,7 +146,7 @@ export default function HomeScreen({ route, navigation }) {
             {item?.category || "Geral"}
           </Text>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   }
 
