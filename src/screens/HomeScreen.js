@@ -152,12 +152,11 @@ async function xtreamAuth(server, username, password) {
 async function loadFromXtream(server, username, password, kind) {
   const fixedServer = normalizeUrl(server);
 
-  const action =
-    kind === "live"
-,      ? "get_live_streams"
-      : kind === "vod"
-      ? "get_vod_streams"
-      : "get_series";
+  const action = kind === "live"
+  ? "get_live_streams"
+  : kind === "vod"
+  ? "get_vod_streams"
+  : "get_series";
 
   const url =
     `${fixedServer}/player_api.php?username=${encodeURIComponent(username)}` +
