@@ -1,5 +1,4 @@
-
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -8,8 +7,15 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Alert,
+  ScrollView,
 } from "react-native";
 import { Video, ResizeMode } from "expo-av";
+import {
+  addToHistory,
+  getFavorites,
+  toggleFavorite,
+  updateContinueWatching,
+} from "../utils/storage";
 
 export default function PlayerScreen({ route, navigation }) {
   const params = route?.params || {};
@@ -19,10 +25,12 @@ export default function PlayerScreen({ route, navigation }) {
   const username = params?.username || "";
   const password = params?.password || "";
   const section = params?.section || "live";
+  const detailsOnly = params?.detailsOnly || false;
 
   const [loading, setLoading] = useState(true);
   const [statusText, setStatusText] = useState("Carregando player...");
   const [errorText, setErrorText] = useState("");
+  const [favorite, setFavorite] = useState(false);
 
   const streamUrl = useMemo(() => {
     if (!item) return "";
@@ -50,13 +58,42 @@ export default function PlayerScreen({ route, navigation }) {
     return item?.url || "";
   }, [item, loginType, server, username, password, section]);
 
-  function handlePlaybackStatusUpdate(status) {
+  useEffect(() => {
+    async function setup() {
+      if (!item) return;
+
+      const favs = await getFavorites();
+      const id = `${section}:${item?.id}`;
+      setFavorite(favs.some((x) => x?.favId === id));
+
+      await addToHistory(item, section);
+    }
+
+    setup();
+  }, [item, section]);
+
+  async function handleToggleFavorite() {
+    if (!item) return;
+    const next = await toggleFavorite(item, section);
+    const id = `${section}:${item?.id}`;
+    setFavorite(next.some((x) => x?.favId === id));
+  }
+
+  async function handlePlaybackStatusUpdate(status) {
     if (!status) return;
 
     if (status.isLoaded) {
       setLoading(false);
       setStatusText("");
       setErrorText("");
+
+      const positionMillis = status.positionMillis || 0;
+      const durationMillis = status.durationMillis || 0;
+
+      if (positionMillis > 0) {
+        await updateContinueWatching(item, section, positionMillis, durationMillis);
+      }
+
       return;
     }
 
@@ -92,15 +129,68 @@ export default function PlayerScreen({ route, navigation }) {
           </Text>
         </View>
 
-        <View style={styles.center}>
-          <Text style={styles.infoTitle}>{item?.name || "Série"}</Text>
-          <Text style={styles.infoText}>
-            O suporte completo para temporadas e episódios entra no próximo pacote.
-          </Text>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.actionBtnText}>Voltar para a lista</Text>
+        <ScrollView contentContainerStyle={styles.scroll}>
+          <View style={styles.detailsBox}>
+            <Text style={styles.infoTitle}>{item?.name || "Série"}</Text>
+            <Text style={styles.infoText}>Categoria: {item?.category || "Geral"}</Text>
+            <Text style={styles.infoText}>
+              O suporte completo para temporadas e episódios entra no próximo pacote.
+            </Text>
+
+            <View style={styles.actionsRow}>
+              <TouchableOpacity style={styles.actionBtn} onPress={handleToggleFavorite}>
+                <Text style={styles.actionBtnText}>
+                  {favorite ? "Remover favorito" : "Favoritar"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  if (detailsOnly) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.topBar}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Text style={styles.backBtnText}>Voltar</Text>
           </TouchableOpacity>
+          <Text style={styles.title} numberOfLines={1}>
+            {item?.name || "Detalhes"}
+          </Text>
         </View>
+
+        <ScrollView contentContainerStyle={styles.scroll}>
+          <View style={styles.detailsBox}>
+            <Text style={styles.infoTitle}>{item?.name || "Sem nome"}</Text>
+            <Text style={styles.infoText}>Categoria: {item?.category || "Geral"}</Text>
+            <Text style={styles.infoText}>
+              Tipo: {section === "live" ? "Live TV" : section === "vod" ? "Filme" : "Série"}
+            </Text>
+
+            <View style={styles.actionsRow}>
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={() =>
+                  navigation.replace("Player", {
+                    ...params,
+                    detailsOnly: false,
+                  })
+                }
+              >
+                <Text style={styles.actionBtnText}>Abrir Player</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.actionBtnAlt} onPress={handleToggleFavorite}>
+                <Text style={styles.actionBtnAltText}>
+                  {favorite ? "Desfavoritar" : "Favoritar"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -165,11 +255,35 @@ export default function PlayerScreen({ route, navigation }) {
         </View>
       )}
 
-      <View style={styles.detailsBox}>
-        <Text style={styles.infoTitle}>{item?.name || "Sem nome"}</Text>
-        <Text style={styles.infoText}>Categoria: {item?.category || "Geral"}</Text>
-        <Text style={styles.infoText}>Tipo: {section === "live" ? "Live TV" : "Filme"}</Text>
-      </View>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <View style={styles.detailsBox}>
+          <Text style={styles.infoTitle}>{item?.name || "Sem nome"}</Text>
+          <Text style={styles.infoText}>Categoria: {item?.category || "Geral"}</Text>
+          <Text style={styles.infoText}>
+            Tipo: {section === "live" ? "Live TV" : section === "vod" ? "Filme" : "Série"}
+          </Text>
+
+          <View style={styles.actionsRow}>
+            <TouchableOpacity style={styles.actionBtnAlt} onPress={handleToggleFavorite}>
+              <Text style={styles.actionBtnAltText}>
+                {favorite ? "Desfavoritar" : "Favoritar"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() =>
+                navigation.replace("Player", {
+                  ...params,
+                  detailsOnly: true,
+                })
+              }
+            >
+              <Text style={styles.actionBtnText}>Detalhes</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -267,9 +381,29 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     marginTop: 16,
+    marginRight: 10,
   },
   actionBtnText: {
     color: "#111",
     fontWeight: "800",
+  },
+  actionBtnAlt: {
+    backgroundColor: "#2a1141",
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 16,
+    marginRight: 10,
+  },
+  actionBtnAltText: {
+    color: "#fff",
+    fontWeight: "800",
+  },
+  actionsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  scroll: {
+    paddingBottom: 30,
   },
 });

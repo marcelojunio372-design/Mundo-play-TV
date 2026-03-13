@@ -16,6 +16,11 @@ import {
   loadXtreamContent,
   loadM3UAll,
 } from "../utils/iptv";
+import {
+  getFavorites,
+  getHistory,
+  getContinueWatching,
+} from "../utils/storage";
 
 export default function HomeScreen({ route, navigation }) {
   const params = route?.params || {};
@@ -46,6 +51,7 @@ export default function HomeScreen({ route, navigation }) {
             100
           );
           setItems(preview);
+          setSection("live");
         } catch (e) {
           Alert.alert("Erro", e?.message || "Falha ao carregar prévia.");
         } finally {
@@ -71,6 +77,24 @@ export default function HomeScreen({ route, navigation }) {
       setSection(kind);
       setAllLoaded(false);
 
+      if (kind === "favorites") {
+        const favorites = await getFavorites();
+        setItems(favorites);
+        return;
+      }
+
+      if (kind === "history") {
+        const history = await getHistory();
+        setItems(history);
+        return;
+      }
+
+      if (kind === "continue") {
+        const continueItems = await getContinueWatching();
+        setItems(continueItems);
+        return;
+      }
+
       if (loginType === "xtream") {
         const preview = await loadXtreamPreview(
           server,
@@ -95,6 +119,27 @@ export default function HomeScreen({ route, navigation }) {
     try {
       setFullLoading(true);
       setSection(kind);
+
+      if (kind === "favorites") {
+        const favorites = await getFavorites();
+        setItems(favorites);
+        setAllLoaded(true);
+        return;
+      }
+
+      if (kind === "history") {
+        const history = await getHistory();
+        setItems(history);
+        setAllLoaded(true);
+        return;
+      }
+
+      if (kind === "continue") {
+        const continueItems = await getContinueWatching();
+        setItems(continueItems);
+        setAllLoaded(true);
+        return;
+      }
 
       if (loginType === "xtream") {
         const full = await loadXtreamContent(server, username, password, kind);
@@ -127,27 +172,61 @@ export default function HomeScreen({ route, navigation }) {
     });
   }
 
+  function openDetails(item) {
+    navigation.navigate("Player", {
+      item,
+      loginType,
+      server,
+      username,
+      password,
+      section,
+      detailsOnly: true,
+    });
+  }
+
   function renderItem({ item }) {
     return (
-      <TouchableOpacity style={styles.card} onPress={() => openPlayer(item)}>
-        {item?.logo ? (
-          <Image source={{ uri: item.logo }} style={styles.logo} resizeMode="cover" />
-        ) : (
-          <View style={[styles.logo, styles.logoFallback]}>
-            <Text style={styles.logoFallbackText}>TV</Text>
-          </View>
-        )}
+      <View style={styles.card}>
+        <TouchableOpacity style={styles.cardMain} onPress={() => openPlayer(item)}>
+          {item?.logo ? (
+            <Image source={{ uri: item.logo }} style={styles.logo} resizeMode="cover" />
+          ) : (
+            <View style={[styles.logo, styles.logoFallback]}>
+              <Text style={styles.logoFallbackText}>TV</Text>
+            </View>
+          )}
 
-        <View style={styles.info}>
-          <Text style={styles.name} numberOfLines={1}>
-            {item?.name || "Sem nome"}
-          </Text>
-          <Text style={styles.category} numberOfLines={1}>
-            {item?.category || "Geral"}
-          </Text>
+          <View style={styles.info}>
+            <Text style={styles.name} numberOfLines={1}>
+              {item?.name || "Sem nome"}
+            </Text>
+            <Text style={styles.category} numberOfLines={1}>
+              {item?.category || "Geral"}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        <View style={styles.cardButtons}>
+          <TouchableOpacity style={styles.smallBtn} onPress={() => openPlayer(item)}>
+            <Text style={styles.smallBtnText}>Abrir</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.smallBtnAlt} onPress={() => openDetails(item)}>
+            <Text style={styles.smallBtnAltText}>Detalhes</Text>
+          </TouchableOpacity>
         </View>
-      </TouchableOpacity>
+      </View>
     );
+  }
+
+  function titleLabel() {
+    if (section === "live") return "Live TV";
+    if (section === "vod") return "Filmes";
+    if (section === "series") return "Séries";
+    if (section === "favorites") return "Favoritos";
+    if (section === "history") return "Histórico";
+    if (section === "continue") return "Continuar";
+    return "Home";
   }
 
   return (
@@ -189,6 +268,36 @@ export default function HomeScreen({ route, navigation }) {
 
             <TouchableOpacity
               style={styles.sideBtn}
+              onPress={() => {
+                setMenuOpen(false);
+                loadPreview("favorites");
+              }}
+            >
+              <Text style={styles.sideBtnText}>Favoritos</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.sideBtn}
+              onPress={() => {
+                setMenuOpen(false);
+                loadPreview("history");
+              }}
+            >
+              <Text style={styles.sideBtnText}>Histórico</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.sideBtn}
+              onPress={() => {
+                setMenuOpen(false);
+                loadPreview("continue");
+              }}
+            >
+              <Text style={styles.sideBtnText}>Continuar</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.sideBtn}
               onPress={() =>
                 Alert.alert("Idiomas", "Português / English / Español")
               }
@@ -220,13 +329,7 @@ export default function HomeScreen({ route, navigation }) {
               <Text style={styles.menuBtnText}>☰</Text>
             </TouchableOpacity>
 
-            <Text style={styles.title}>
-              {section === "live"
-                ? "Live TV"
-                : section === "vod"
-                ? "Filmes"
-                : "Séries"}
-            </Text>
+            <Text style={styles.title}>{titleLabel()}</Text>
 
             <TouchableOpacity
               style={styles.refreshBtn}
@@ -272,21 +375,21 @@ export default function HomeScreen({ route, navigation }) {
               <ActivityIndicator size="large" color="#18e7a1" />
               <Text style={styles.loaderText}>
                 {fullLoading
-                  ? "Carregando lista completa..."
-                  : "Carregando 100 itens..."}
+                  ? "Carregando lista..."
+                  : "Carregando conteúdo..."}
               </Text>
             </View>
           ) : (
             <>
               <Text style={styles.countText}>
                 {allLoaded
-                  ? `Lista completa: ${filteredItems.length} itens`
+                  ? `Lista: ${filteredItems.length} itens`
                   : `Prévia leve: ${filteredItems.length} itens`}
               </Text>
 
               <FlatList
                 data={filteredItems}
-                keyExtractor={(item, index) => `${item?.id || index}`}
+                keyExtractor={(item, index) => `${item?.id || item?.favId || item?.historyId || index}`}
                 renderItem={renderItem}
                 contentContainerStyle={{ paddingBottom: 40 }}
               />
@@ -407,11 +510,13 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   card: {
-    flexDirection: "row",
     backgroundColor: "rgba(255,255,255,0.06)",
-    padding: 10,
     borderRadius: 14,
     marginBottom: 10,
+    padding: 10,
+  },
+  cardMain: {
+    flexDirection: "row",
   },
   logo: {
     width: 58,
@@ -440,5 +545,30 @@ const styles = StyleSheet.create({
   category: {
     color: "#bdbdbd",
     marginTop: 4,
+  },
+  cardButtons: {
+    flexDirection: "row",
+    marginTop: 10,
+  },
+  smallBtn: {
+    backgroundColor: "#18e7a1",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginRight: 8,
+  },
+  smallBtnText: {
+    color: "#111",
+    fontWeight: "800",
+  },
+  smallBtnAlt: {
+    backgroundColor: "#2a1141",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  smallBtnAltText: {
+    color: "#fff",
+    fontWeight: "800",
   },
 });
