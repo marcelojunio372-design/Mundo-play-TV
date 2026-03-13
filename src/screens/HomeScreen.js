@@ -154,7 +154,7 @@ async function loadFromXtream(server, username, password, kind) {
 
   const action =
     kind === "live"
-      ? "get_live_streams"
+,      ? "get_live_streams"
       : kind === "vod"
       ? "get_vod_streams"
       : "get_series";
@@ -295,23 +295,16 @@ loadFavorites();
 
       const auth = await xtreamAuth(server, user, pass);
 
-      if (!auth?.user_info?.auth) {
-        throw new Error("Login Xtream inválido.");
-      }
+if (!auth?.user_info?.auth) {
+  throw new Error("Login Xtream inválido.");
+}
 
-      const live = await loadFromXtream(server, user, pass, "live");
-
-setLiveItems(live.slice(0, 300));
+setLiveItems([]);
 setMovieItems([]);
 setSeriesItems([]);
 
-setStatusText(
-  `${t.live} ${live.length} • ${t.movies} sob demanda • ${t.series} sob demanda`
-);
+setStatusText("Conectado com sucesso");
 
-      setStatusText(
-        `${t.live} ${live.length} • ${t.movies} ${vod.length} • ${t.series} ${series.length}`
-      );
     } catch (e) {
       Alert.alert("Erro", String(e?.message || e));
       setStatusText("Erro ao carregar.");
