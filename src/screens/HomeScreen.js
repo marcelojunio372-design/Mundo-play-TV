@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   TextInput,
+  ScrollView,
 } from "react-native";
 import {
   loadXtreamPreview,
@@ -37,6 +38,7 @@ export default function HomeScreen({ route, navigation }) {
   const [search, setSearch] = useState("");
   const [items, setItems] = useState(params?.previewItems || []);
   const [allLoaded, setAllLoaded] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("Todas");
 
   useEffect(() => {
     async function firstLoad() {
@@ -52,6 +54,7 @@ export default function HomeScreen({ route, navigation }) {
           );
           setItems(preview);
           setSection("live");
+          setSelectedCategory("Todas");
         } catch (e) {
           Alert.alert("Erro", e?.message || "Falha ao carregar prévia.");
         } finally {
@@ -63,19 +66,35 @@ export default function HomeScreen({ route, navigation }) {
     firstLoad();
   }, [loginType, server, username, password]);
 
+  const categories = useMemo(() => {
+    const set = new Set(["Todas"]);
+    items.forEach((item) => {
+      if (item?.category) set.add(String(item.category));
+    });
+    return Array.from(set);
+  }, [items]);
+
   const filteredItems = useMemo(() => {
+    let result = items;
+
+    if (selectedCategory !== "Todas") {
+      result = result.filter((item) => String(item?.category || "") === selectedCategory);
+    }
+
     const q = search.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((item) =>
+    if (!q) return result;
+
+    return result.filter((item) =>
       String(item?.name || "").toLowerCase().includes(q)
     );
-  }, [items, search]);
+  }, [items, search, selectedCategory]);
 
   async function loadPreview(kind) {
     try {
       setLoading(true);
       setSection(kind);
       setAllLoaded(false);
+      setSelectedCategory("Todas");
 
       if (kind === "favorites") {
         const favorites = await getFavorites();
@@ -119,6 +138,7 @@ export default function HomeScreen({ route, navigation }) {
     try {
       setFullLoading(true);
       setSection(kind);
+      setSelectedCategory("Todas");
 
       if (kind === "favorites") {
         const favorites = await getFavorites();
@@ -203,6 +223,11 @@ export default function HomeScreen({ route, navigation }) {
             <Text style={styles.category} numberOfLines={1}>
               {item?.category || "Geral"}
             </Text>
+            {!!item?.epg && section === "live" && (
+              <Text style={styles.epgText} numberOfLines={1}>
+                EPG disponível
+              </Text>
+            )}
           </View>
         </TouchableOpacity>
 
@@ -236,81 +261,35 @@ export default function HomeScreen({ route, navigation }) {
           <View style={styles.sidebar}>
             <Text style={styles.sidebarTitle}>MUNDO PLAY TV</Text>
 
-            <TouchableOpacity
-              style={styles.sideBtn}
-              onPress={() => {
-                setMenuOpen(false);
-                loadPreview("live");
-              }}
-            >
+            <TouchableOpacity style={styles.sideBtn} onPress={() => { setMenuOpen(false); loadPreview("live"); }}>
               <Text style={styles.sideBtnText}>Live TV</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.sideBtn}
-              onPress={() => {
-                setMenuOpen(false);
-                loadPreview("vod");
-              }}
-            >
+            <TouchableOpacity style={styles.sideBtn} onPress={() => { setMenuOpen(false); loadPreview("vod"); }}>
               <Text style={styles.sideBtnText}>Filmes</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.sideBtn}
-              onPress={() => {
-                setMenuOpen(false);
-                loadPreview("series");
-              }}
-            >
+            <TouchableOpacity style={styles.sideBtn} onPress={() => { setMenuOpen(false); loadPreview("series"); }}>
               <Text style={styles.sideBtnText}>Séries</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.sideBtn}
-              onPress={() => {
-                setMenuOpen(false);
-                loadPreview("favorites");
-              }}
-            >
+            <TouchableOpacity style={styles.sideBtn} onPress={() => { setMenuOpen(false); loadPreview("favorites"); }}>
               <Text style={styles.sideBtnText}>Favoritos</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.sideBtn}
-              onPress={() => {
-                setMenuOpen(false);
-                loadPreview("history");
-              }}
-            >
+            <TouchableOpacity style={styles.sideBtn} onPress={() => { setMenuOpen(false); loadPreview("history"); }}>
               <Text style={styles.sideBtnText}>Histórico</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.sideBtn}
-              onPress={() => {
-                setMenuOpen(false);
-                loadPreview("continue");
-              }}
-            >
+            <TouchableOpacity style={styles.sideBtn} onPress={() => { setMenuOpen(false); loadPreview("continue"); }}>
               <Text style={styles.sideBtnText}>Continuar</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.sideBtn}
-              onPress={() =>
-                Alert.alert("Idiomas", "Português / English / Español")
-              }
-            >
+            <TouchableOpacity style={styles.sideBtn} onPress={() => Alert.alert("Idiomas", "Português / English / Español")}>
               <Text style={styles.sideBtnText}>Idiomas</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.sideBtn}
-              onPress={() =>
-                Alert.alert("Configurações", "Player, atualização, conta e cache.")
-              }
-            >
+            <TouchableOpacity style={styles.sideBtn} onPress={() => Alert.alert("Configurações", "Player, atualização, conta e cache.")}>
               <Text style={styles.sideBtnText}>Configurações</Text>
             </TouchableOpacity>
 
@@ -322,19 +301,13 @@ export default function HomeScreen({ route, navigation }) {
 
         <View style={styles.main}>
           <View style={styles.topBar}>
-            <TouchableOpacity
-              style={styles.menuBtn}
-              onPress={() => setMenuOpen(!menuOpen)}
-            >
+            <TouchableOpacity style={styles.menuBtn} onPress={() => setMenuOpen(!menuOpen)}>
               <Text style={styles.menuBtnText}>☰</Text>
             </TouchableOpacity>
 
             <Text style={styles.title}>{titleLabel()}</Text>
 
-            <TouchableOpacity
-              style={styles.refreshBtn}
-              onPress={() => loadFull(section)}
-            >
+            <TouchableOpacity style={styles.refreshBtn} onPress={() => loadFull(section)}>
               <Text style={styles.refreshText}>Atualizar</Text>
             </TouchableOpacity>
           </View>
@@ -348,35 +321,46 @@ export default function HomeScreen({ route, navigation }) {
           />
 
           <View style={styles.quickTabs}>
-            <TouchableOpacity
-              style={styles.quickBtn}
-              onPress={() => loadPreview("live")}
-            >
+            <TouchableOpacity style={styles.quickBtn} onPress={() => loadPreview("live")}>
               <Text style={styles.quickBtnText}>Live TV</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.quickBtn}
-              onPress={() => loadPreview("vod")}
-            >
+            <TouchableOpacity style={styles.quickBtn} onPress={() => loadPreview("vod")}>
               <Text style={styles.quickBtnText}>Filmes</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.quickBtn}
-              onPress={() => loadPreview("series")}
-            >
+            <TouchableOpacity style={styles.quickBtn} onPress={() => loadPreview("series")}>
               <Text style={styles.quickBtnText}>Séries</Text>
             </TouchableOpacity>
           </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.categoryBar}
+            contentContainerStyle={styles.categoryBarContent}
+          >
+            {categories.map((cat) => {
+              const active = cat === selectedCategory;
+              return (
+                <TouchableOpacity
+                  key={cat}
+                  style={[styles.categoryChip, active && styles.categoryChipActive]}
+                  onPress={() => setSelectedCategory(cat)}
+                >
+                  <Text style={[styles.categoryChipText, active && styles.categoryChipTextActive]}>
+                    {cat}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
 
           {loading || fullLoading ? (
             <View style={styles.loaderWrap}>
               <ActivityIndicator size="large" color="#18e7a1" />
               <Text style={styles.loaderText}>
-                {fullLoading
-                  ? "Carregando lista..."
-                  : "Carregando conteúdo..."}
+                {fullLoading ? "Carregando lista..." : "Carregando conteúdo..."}
               </Text>
             </View>
           ) : (
@@ -389,9 +373,12 @@ export default function HomeScreen({ route, navigation }) {
 
               <FlatList
                 data={filteredItems}
-                keyExtractor={(item, index) => `${item?.id || item?.favId || item?.historyId || index}`}
+                keyExtractor={(item, index) =>
+                  `${item?.id || item?.favId || item?.historyId || index}`
+                }
                 renderItem={renderItem}
                 contentContainerStyle={{ paddingBottom: 40 }}
+                numColumns={1}
               />
             </>
           )}
@@ -483,7 +470,7 @@ const styles = StyleSheet.create({
   },
   quickTabs: {
     flexDirection: "row",
-    marginBottom: 12,
+    marginBottom: 8,
   },
   quickBtn: {
     backgroundColor: "#291041",
@@ -495,6 +482,29 @@ const styles = StyleSheet.create({
   quickBtnText: {
     color: "#fff",
     fontWeight: "700",
+  },
+  categoryBar: {
+    marginBottom: 10,
+  },
+  categoryBarContent: {
+    paddingRight: 20,
+  },
+  categoryChip: {
+    backgroundColor: "#291041",
+    marginRight: 8,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  categoryChipActive: {
+    backgroundColor: "#18e7a1",
+  },
+  categoryChipText: {
+    color: "#fff",
+    fontWeight: "700",
+  },
+  categoryChipTextActive: {
+    color: "#111",
   },
   countText: {
     color: "#bbb",
@@ -545,6 +555,12 @@ const styles = StyleSheet.create({
   category: {
     color: "#bdbdbd",
     marginTop: 4,
+  },
+  epgText: {
+    color: "#18e7a1",
+    marginTop: 4,
+    fontWeight: "700",
+    fontSize: 12,
   },
   cardButtons: {
     flexDirection: "row",

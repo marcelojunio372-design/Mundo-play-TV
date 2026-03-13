@@ -59,7 +59,6 @@ export function parseM3U(text = "") {
 
   for (const line of lines) {
     const l = line.trim();
-
     if (!l) continue;
 
     if (l.startsWith("#EXTINF:")) {
@@ -78,6 +77,7 @@ export function parseM3U(text = "") {
         logo,
         category: groupTitle || "Geral",
         url: "",
+        epg: "",
         raw: l,
       };
     } else if (!l.startsWith("#") && current) {
@@ -126,7 +126,14 @@ export async function loadXtreamContent(
     id: String(x.stream_id || x.series_id || x.category_id || idx),
     name: x.name || x.title || `Item ${idx + 1}`,
     logo: x.stream_icon || x.cover || x.cover_big || "",
-    category: x.category_name || x.genre || "Geral",
+    category:
+      x.category_name ||
+      x.genre ||
+      x.plot ||
+      x.release_date ||
+      "Geral",
+    epg: x.epg_channel_id || "",
+    plot: x.plot || x.description || x.story_plot || "",
     raw: x,
   }));
 }
@@ -140,4 +147,58 @@ export async function loadXtreamPreview(
 ) {
   const items = await loadXtreamContent(server, username, password, kind);
   return items.slice(0, limit);
+}
+
+export async function loadXtreamSeriesInfo(server, username, password, seriesId) {
+  const fixedServer = normalizeUrl(server);
+  const url =
+    `${fixedServer}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_series_info&series_id=${encodeURIComponent(seriesId)}`;
+
+  const data = await fetchJson(url);
+  return data || {};
+}
+
+export function mapSeriesEpisodes(seriesInfo = {}) {
+  const episodes = seriesInfo?.episodes || {};
+  const seasons = Object.keys(episodes)
+    .sort((a, b) => Number(a) - Number(b))
+    .map((seasonKey) => ({
+      season: seasonKey,
+      items: (episodes[seasonKey] || []).map((ep, idx) => ({
+        id: String(ep.id || ep.episode_num || idx),
+        name: ep.title || ep.name || `Episódio ${idx + 1}`,
+        episodeNum: ep.episode_num || idx + 1,
+        containerExtension: ep.container_extension || "mp4",
+        raw: ep,
+      })),
+    }));
+
+  return seasons;
+}
+
+export function buildSeriesEpisodeUrl(server, username, password, episode = {}) {
+  const fixedServer = normalizeUrl(server);
+  const episodeId = episode?.raw?.id || episode?.id;
+  const ext = episode?.containerExtension || episode?.raw?.container_extension || "mp4";
+
+  if (!episodeId) return "";
+  return `${fixedServer}/series/${username}/${password}/${episodeId}.${ext}`;
+}
+
+export async function loadLiveCategories(server, username, password) {
+  const fixedServer = normalizeUrl(server);
+  const url =
+    `${fixedServer}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_live_categories`;
+
+  const data = await fetchJson(url);
+  return Array.isArray(data) ? data : [];
+}
+
+export async function loadShortEpg(server, username, password, streamId) {
+  const fixedServer = normalizeUrl(server);
+  const url =
+    `${fixedServer}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_short_epg&stream_id=${encodeURIComponent(streamId)}&limit=3`;
+
+  const data = await fetchJson(url);
+  return data?.epg_listings || [];
 }

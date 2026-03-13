@@ -16,6 +16,12 @@ import {
   toggleFavorite,
   updateContinueWatching,
 } from "../utils/storage";
+import {
+  loadShortEpg,
+  loadXtreamSeriesInfo,
+  mapSeriesEpisodes,
+  buildSeriesEpisodeUrl,
+} from "../utils/iptv";
 
 export default function PlayerScreen({ route, navigation }) {
   const params = route?.params || {};
@@ -26,14 +32,21 @@ export default function PlayerScreen({ route, navigation }) {
   const password = params?.password || "";
   const section = params?.section || "live";
   const detailsOnly = params?.detailsOnly || false;
+  const episode = params?.episode || null;
 
   const [loading, setLoading] = useState(true);
   const [statusText, setStatusText] = useState("Carregando player...");
   const [errorText, setErrorText] = useState("");
   const [favorite, setFavorite] = useState(false);
+  const [epgList, setEpgList] = useState([]);
+  const [seriesSeasons, setSeriesSeasons] = useState([]);
 
   const streamUrl = useMemo(() => {
     if (!item) return "";
+
+    if (section === "series" && episode) {
+      return buildSeriesEpisodeUrl(server, username, password, episode);
+    }
 
     if (loginType === "m3u") {
       return item?.url || "";
@@ -41,7 +54,6 @@ export default function PlayerScreen({ route, navigation }) {
 
     const raw = item?.raw || {};
     const streamId = raw?.stream_id;
-    const seriesId = raw?.series_id;
 
     if (section === "live" && streamId) {
       return `${server}/live/${username}/${password}/${streamId}.m3u8`;
@@ -51,26 +63,38 @@ export default function PlayerScreen({ route, navigation }) {
       return `${server}/movie/${username}/${password}/${streamId}.mp4`;
     }
 
-    if (section === "series" && seriesId) {
-      return "";
-    }
-
     return item?.url || "";
-  }, [item, loginType, server, username, password, section]);
+  }, [item, loginType, server, username, password, section, episode]);
 
   useEffect(() => {
     async function setup() {
       if (!item) return;
 
       const favs = await getFavorites();
-      const id = `${section}:${item?.id}`;
+      const favSection = section === "series" && episode ? "series" : section;
+      const id = `${favSection}:${item?.id}`;
       setFavorite(favs.some((x) => x?.favId === id));
 
-      await addToHistory(item, section);
+      await addToHistory(item, favSection);
+
+      if (section === "live" && item?.raw?.stream_id && loginType === "xtream") {
+        try {
+          const epg = await loadShortEpg(server, username, password, item.raw.stream_id);
+          setEpgList(epg);
+        } catch {}
+      }
+
+      if (section === "series" && loginType === "xtream" && item?.raw?.series_id) {
+        try {
+          const info = await loadXtreamSeriesInfo(server, username, password, item.raw.series_id);
+          const seasons = mapSeriesEpisodes(info);
+          setSeriesSeasons(seasons);
+        } catch {}
+      }
     }
 
     setup();
-  }, [item, section]);
+  }, [item, section, loginType, server, username, password, episode]);
 
   async function handleToggleFavorite() {
     if (!item) return;
@@ -117,7 +141,7 @@ export default function PlayerScreen({ route, navigation }) {
     );
   }
 
-  if (section === "series") {
+  if (section === "series" && !episode) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.topBar}>
@@ -133,18 +157,40 @@ export default function PlayerScreen({ route, navigation }) {
           <View style={styles.detailsBox}>
             <Text style={styles.infoTitle}>{item?.name || "Série"}</Text>
             <Text style={styles.infoText}>Categoria: {item?.category || "Geral"}</Text>
-            <Text style={styles.infoText}>
-              O suporte completo para temporadas e episódios entra no próximo pacote.
-            </Text>
+            <Text style={styles.infoText}>{item?.plot || "Sem descrição."}</Text>
 
             <View style={styles.actionsRow}>
-              <TouchableOpacity style={styles.actionBtn} onPress={handleToggleFavorite}>
-                <Text style={styles.actionBtnText}>
-                  {favorite ? "Remover favorito" : "Favoritar"}
+              <TouchableOpacity style={styles.actionBtnAlt} onPress={handleToggleFavorite}>
+                <Text style={styles.actionBtnAltText}>
+                  {favorite ? "Desfavoritar" : "Favoritar"}
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
+
+          {seriesSeasons.map((season) => (
+            <View key={season.season} style={styles.detailsBox}>
+              <Text style={styles.infoTitle}>Temporada {season.season}</Text>
+
+              {season.items.map((ep) => (
+                <TouchableOpacity
+                  key={ep.id}
+                  style={styles.episodeBtn}
+                  onPress={() =>
+                    navigation.replace("Player", {
+                      ...params,
+                      episode: ep,
+                      detailsOnly: false,
+                    })
+                  }
+                >
+                  <Text style={styles.episodeBtnText}>
+                    EP {ep.episodeNum} - {ep.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ))}
         </ScrollView>
       </SafeAreaView>
     );
@@ -169,6 +215,7 @@ export default function PlayerScreen({ route, navigation }) {
             <Text style={styles.infoText}>
               Tipo: {section === "live" ? "Live TV" : section === "vod" ? "Filme" : "Série"}
             </Text>
+            {!!item?.plot && <Text style={styles.infoText}>{item.plot}</Text>}
 
             <View style={styles.actionsRow}>
               <TouchableOpacity
@@ -190,6 +237,18 @@ export default function PlayerScreen({ route, navigation }) {
               </TouchableOpacity>
             </View>
           </View>
+
+          {section === "live" && epgList.length > 0 && (
+            <View style={styles.detailsBox}>
+              <Text style={styles.infoTitle}>EPG</Text>
+              {epgList.map((epg, idx) => (
+                <Text key={idx} style={styles.infoText}>
+                  {epg?.title || epg?.programme_title || "Programa"}{" "}
+                  {epg?.start ? `- ${epg.start}` : ""}
+                </Text>
+              ))}
+            </View>
+          )}
         </ScrollView>
       </SafeAreaView>
     );
@@ -222,7 +281,7 @@ export default function PlayerScreen({ route, navigation }) {
         </TouchableOpacity>
 
         <Text style={styles.title} numberOfLines={1}>
-          {item?.name || "Player"}
+          {episode ? episode.name : item?.name || "Player"}
         </Text>
       </View>
 
@@ -257,11 +316,12 @@ export default function PlayerScreen({ route, navigation }) {
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.detailsBox}>
-          <Text style={styles.infoTitle}>{item?.name || "Sem nome"}</Text>
+          <Text style={styles.infoTitle}>{episode ? episode.name : item?.name || "Sem nome"}</Text>
           <Text style={styles.infoText}>Categoria: {item?.category || "Geral"}</Text>
           <Text style={styles.infoText}>
             Tipo: {section === "live" ? "Live TV" : section === "vod" ? "Filme" : "Série"}
           </Text>
+          {!!item?.plot && <Text style={styles.infoText}>{item.plot}</Text>}
 
           <View style={styles.actionsRow}>
             <TouchableOpacity style={styles.actionBtnAlt} onPress={handleToggleFavorite}>
@@ -283,6 +343,18 @@ export default function PlayerScreen({ route, navigation }) {
             </TouchableOpacity>
           </View>
         </View>
+
+        {section === "live" && epgList.length > 0 && (
+          <View style={styles.detailsBox}>
+            <Text style={styles.infoTitle}>EPG</Text>
+            {epgList.map((epg, idx) => (
+              <Text key={idx} style={styles.infoText}>
+                {epg?.title || epg?.programme_title || "Programa"}{" "}
+                {epg?.start ? `- ${epg.start}` : ""}
+              </Text>
+            ))}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -405,5 +477,16 @@ const styles = StyleSheet.create({
   },
   scroll: {
     paddingBottom: 30,
+  },
+  episodeBtn: {
+    backgroundColor: "#2a1141",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  episodeBtnText: {
+    color: "#fff",
+    fontWeight: "700",
   },
 });
