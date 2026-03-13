@@ -17,10 +17,12 @@ import {
   updateContinueWatching,
 } from "../utils/storage";
 import {
+  buildMovieStreamUrl,
+  buildSeriesEpisodeUrl,
+  buildLiveStreamUrl,
   loadShortEpg,
   loadXtreamSeriesInfo,
   mapSeriesEpisodes,
-  buildSeriesEpisodeUrl,
 } from "../utils/iptv";
 
 export default function PlayerScreen({ route, navigation }) {
@@ -31,11 +33,9 @@ export default function PlayerScreen({ route, navigation }) {
   const username = params?.username || "";
   const password = params?.password || "";
   const section = params?.section || "live";
-  const detailsOnly = params?.detailsOnly || false;
   const episode = params?.episode || null;
 
   const [loading, setLoading] = useState(true);
-  const [statusText, setStatusText] = useState("Carregando player...");
   const [errorText, setErrorText] = useState("");
   const [favorite, setFavorite] = useState(false);
   const [epgList, setEpgList] = useState([]);
@@ -52,15 +52,12 @@ export default function PlayerScreen({ route, navigation }) {
       return item?.url || "";
     }
 
-    const raw = item?.raw || {};
-    const streamId = raw?.stream_id;
-
-    if (section === "live" && streamId) {
-      return `${server}/live/${username}/${password}/${streamId}.m3u8`;
+    if (section === "live") {
+      return buildLiveStreamUrl(server, username, password, item);
     }
 
-    if (section === "vod" && streamId) {
-      return `${server}/movie/${username}/${password}/${streamId}.mp4`;
+    if (section === "vod") {
+      return buildMovieStreamUrl(server, username, password, item);
     }
 
     return item?.url || "";
@@ -71,30 +68,38 @@ export default function PlayerScreen({ route, navigation }) {
       if (!item) return;
 
       const favs = await getFavorites();
-      const favSection = section === "series" && episode ? "series" : section;
-      const id = `${favSection}:${item?.id}`;
+      const id = `${section}:${item?.id}`;
       setFavorite(favs.some((x) => x?.favId === id));
 
-      await addToHistory(item, favSection);
+      await addToHistory(item, section);
 
-      if (section === "live" && item?.raw?.stream_id && loginType === "xtream") {
+      if (section === "live" && loginType === "xtream" && item?.raw?.stream_id) {
         try {
           const epg = await loadShortEpg(server, username, password, item.raw.stream_id);
           setEpgList(epg);
-        } catch {}
+        } catch {
+          setEpgList([]);
+        }
       }
 
       if (section === "series" && loginType === "xtream" && item?.raw?.series_id) {
         try {
-          const info = await loadXtreamSeriesInfo(server, username, password, item.raw.series_id);
+          const info = await loadXtreamSeriesInfo(
+            server,
+            username,
+            password,
+            item.raw.series_id
+          );
           const seasons = mapSeriesEpisodes(info);
           setSeriesSeasons(seasons);
-        } catch {}
+        } catch {
+          setSeriesSeasons([]);
+        }
       }
     }
 
     setup();
-  }, [item, section, loginType, server, username, password, episode]);
+  }, [item, section, loginType, server, username, password]);
 
   async function handleToggleFavorite() {
     if (!item) return;
@@ -108,7 +113,6 @@ export default function PlayerScreen({ route, navigation }) {
 
     if (status.isLoaded) {
       setLoading(false);
-      setStatusText("");
       setErrorText("");
 
       const positionMillis = status.positionMillis || 0;
@@ -117,7 +121,6 @@ export default function PlayerScreen({ route, navigation }) {
       if (positionMillis > 0) {
         await updateContinueWatching(item, section, positionMillis, durationMillis);
       }
-
       return;
     }
 
@@ -133,9 +136,6 @@ export default function PlayerScreen({ route, navigation }) {
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
           <Text style={styles.errorText}>Item inválido.</Text>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.backBtnText}>Voltar</Text>
-          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -156,16 +156,16 @@ export default function PlayerScreen({ route, navigation }) {
         <ScrollView contentContainerStyle={styles.scroll}>
           <View style={styles.detailsBox}>
             <Text style={styles.infoTitle}>{item?.name || "Série"}</Text>
-            <Text style={styles.infoText}>Categoria: {item?.category || "Geral"}</Text>
-            <Text style={styles.infoText}>{item?.plot || "Sem descrição."}</Text>
+            <Text style={styles.infoText}>{item?.category || "Geral"}</Text>
+            <Text style={styles.infoText}>
+              {item?.plot || "Sem resumo disponível para esta série."}
+            </Text>
 
-            <View style={styles.actionsRow}>
-              <TouchableOpacity style={styles.actionBtnAlt} onPress={handleToggleFavorite}>
-                <Text style={styles.actionBtnAltText}>
-                  {favorite ? "Desfavoritar" : "Favoritar"}
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity style={styles.actionBtnAlt} onPress={handleToggleFavorite}>
+              <Text style={styles.actionBtnAltText}>
+                {favorite ? "Desfavoritar" : "Favoritar"}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           {seriesSeasons.map((season) => (
@@ -180,7 +180,6 @@ export default function PlayerScreen({ route, navigation }) {
                     navigation.replace("Player", {
                       ...params,
                       episode: ep,
-                      detailsOnly: false,
                     })
                   }
                 >
@@ -196,78 +195,11 @@ export default function PlayerScreen({ route, navigation }) {
     );
   }
 
-  if (detailsOnly) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.topBar}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.backBtnText}>Voltar</Text>
-          </TouchableOpacity>
-          <Text style={styles.title} numberOfLines={1}>
-            {item?.name || "Detalhes"}
-          </Text>
-        </View>
-
-        <ScrollView contentContainerStyle={styles.scroll}>
-          <View style={styles.detailsBox}>
-            <Text style={styles.infoTitle}>{item?.name || "Sem nome"}</Text>
-            <Text style={styles.infoText}>Categoria: {item?.category || "Geral"}</Text>
-            <Text style={styles.infoText}>
-              Tipo: {section === "live" ? "Live TV" : section === "vod" ? "Filme" : "Série"}
-            </Text>
-            {!!item?.plot && <Text style={styles.infoText}>{item.plot}</Text>}
-
-            <View style={styles.actionsRow}>
-              <TouchableOpacity
-                style={styles.actionBtn}
-                onPress={() =>
-                  navigation.replace("Player", {
-                    ...params,
-                    detailsOnly: false,
-                  })
-                }
-              >
-                <Text style={styles.actionBtnText}>Abrir Player</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.actionBtnAlt} onPress={handleToggleFavorite}>
-                <Text style={styles.actionBtnAltText}>
-                  {favorite ? "Desfavoritar" : "Favoritar"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {section === "live" && epgList.length > 0 && (
-            <View style={styles.detailsBox}>
-              <Text style={styles.infoTitle}>EPG</Text>
-              {epgList.map((epg, idx) => (
-                <Text key={idx} style={styles.infoText}>
-                  {epg?.title || epg?.programme_title || "Programa"}{" "}
-                  {epg?.start ? `- ${epg.start}` : ""}
-                </Text>
-              ))}
-            </View>
-          )}
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
-
   if (!streamUrl) {
     return (
       <SafeAreaView style={styles.safe}>
-        <View style={styles.topBar}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.backBtnText}>Voltar</Text>
-          </TouchableOpacity>
-          <Text style={styles.title} numberOfLines={1}>
-            {item?.name || "Player"}
-          </Text>
-        </View>
-
         <View style={styles.center}>
-          <Text style={styles.errorText}>URL do stream não encontrada.</Text>
+          <Text style={styles.errorText}>URL do conteúdo não encontrada.</Text>
         </View>
       </SafeAreaView>
     );
@@ -281,7 +213,7 @@ export default function PlayerScreen({ route, navigation }) {
         </TouchableOpacity>
 
         <Text style={styles.title} numberOfLines={1}>
-          {episode ? episode.name : item?.name || "Player"}
+          {episode ? episode?.name : item?.name || "Player"}
         </Text>
       </View>
 
@@ -296,14 +228,13 @@ export default function PlayerScreen({ route, navigation }) {
           onError={() => {
             setLoading(false);
             setErrorText("Erro ao abrir vídeo.");
-            Alert.alert("Erro", "Erro ao abrir vídeo.");
           }}
         />
 
         {loading && (
           <View style={styles.overlay}>
             <ActivityIndicator size="large" color="#18e7a1" />
-            <Text style={styles.overlayText}>{statusText}</Text>
+            <Text style={styles.overlayText}>Carregando player...</Text>
           </View>
         )}
       </View>
@@ -316,41 +247,32 @@ export default function PlayerScreen({ route, navigation }) {
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.detailsBox}>
-          <Text style={styles.infoTitle}>{episode ? episode.name : item?.name || "Sem nome"}</Text>
+          <Text style={styles.infoTitle}>
+            {episode ? episode?.name : item?.name || "Sem nome"}
+          </Text>
           <Text style={styles.infoText}>Categoria: {item?.category || "Geral"}</Text>
           <Text style={styles.infoText}>
-            Tipo: {section === "live" ? "Live TV" : section === "vod" ? "Filme" : "Série"}
+            {item?.plot ||
+              (section === "live"
+                ? "Canal ao vivo em reprodução."
+                : section === "vod"
+                ? "Filme em reprodução."
+                : "Episódio em reprodução.")}
           </Text>
-          {!!item?.plot && <Text style={styles.infoText}>{item.plot}</Text>}
 
-          <View style={styles.actionsRow}>
-            <TouchableOpacity style={styles.actionBtnAlt} onPress={handleToggleFavorite}>
-              <Text style={styles.actionBtnAltText}>
-                {favorite ? "Desfavoritar" : "Favoritar"}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() =>
-                navigation.replace("Player", {
-                  ...params,
-                  detailsOnly: true,
-                })
-              }
-            >
-              <Text style={styles.actionBtnText}>Detalhes</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={styles.actionBtnAlt} onPress={handleToggleFavorite}>
+            <Text style={styles.actionBtnAltText}>
+              {favorite ? "Desfavoritar" : "Favoritar"}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {section === "live" && epgList.length > 0 && (
           <View style={styles.detailsBox}>
             <Text style={styles.infoTitle}>EPG</Text>
-            {epgList.map((epg, idx) => (
+            {epgList.slice(0, 5).map((epg, idx) => (
               <Text key={idx} style={styles.infoText}>
-                {epg?.title || epg?.programme_title || "Programa"}{" "}
-                {epg?.start ? `- ${epg.start}` : ""}
+                {epg?.title || epg?.programme_title || "Programa"}
               </Text>
             ))}
           </View>
@@ -414,6 +336,17 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontWeight: "700",
   },
+  messageBox: {
+    marginHorizontal: 14,
+    marginTop: 14,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 14,
+    padding: 14,
+  },
+  errorText: {
+    color: "#ffb3b3",
+    fontWeight: "700",
+  },
   detailsBox: {
     margin: 14,
     backgroundColor: "rgba(255,255,255,0.06)",
@@ -430,53 +363,26 @@ const styles = StyleSheet.create({
     color: "#d1d1d1",
     marginBottom: 6,
   },
-  messageBox: {
-    marginHorizontal: 14,
-    marginTop: 14,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderRadius: 14,
-    padding: 14,
-  },
-  errorText: {
-    color: "#ffb3b3",
-    fontWeight: "700",
-  },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-  },
-  actionBtn: {
-    backgroundColor: "#18e7a1",
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginTop: 16,
-    marginRight: 10,
-  },
-  actionBtnText: {
-    color: "#111",
-    fontWeight: "800",
-  },
   actionBtnAlt: {
     backgroundColor: "#2a1141",
     paddingHorizontal: 18,
     paddingVertical: 12,
     borderRadius: 12,
     marginTop: 16,
-    marginRight: 10,
+    alignSelf: "flex-start",
   },
   actionBtnAltText: {
     color: "#fff",
     fontWeight: "800",
   },
-  actionsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-  },
   scroll: {
     paddingBottom: 30,
+  },
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
   },
   episodeBtn: {
     backgroundColor: "#2a1141",

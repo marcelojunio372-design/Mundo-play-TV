@@ -5,23 +5,15 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
-  FlatList,
-  Image,
-  ActivityIndicator,
-  Alert,
-  TextInput,
   ScrollView,
+  Image,
+  Alert,
 } from "react-native";
 import {
+  getAccountExpiryText,
+  getAccountStatusText,
   loadXtreamPreview,
-  loadXtreamContent,
-  loadM3UAll,
 } from "../utils/iptv";
-import {
-  getFavorites,
-  getHistory,
-  getContinueWatching,
-} from "../utils/storage";
 
 export default function HomeScreen({ route, navigation }) {
   const params = route?.params || {};
@@ -29,359 +21,192 @@ export default function HomeScreen({ route, navigation }) {
   const server = params?.server || "";
   const username = params?.username || "";
   const password = params?.password || "";
+  const authData = params?.authData || null;
   const m3uUrl = params?.m3uUrl || "";
 
-  const [section, setSection] = useState("live");
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [fullLoading, setFullLoading] = useState(false);
-  const [search, setSearch] = useState("");
-  const [items, setItems] = useState(params?.previewItems || []);
-  const [allLoaded, setAllLoaded] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState("Todas");
+  const [now, setNow] = useState(new Date());
+  const [carouselItems, setCarouselItems] = useState([]);
+  const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
-    async function firstLoad() {
-      if (loginType === "xtream") {
-        try {
-          setLoading(true);
-          const preview = await loadXtreamPreview(
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    async function loadCarousel() {
+      try {
+        if (loginType === "xtream") {
+          const vodItems = await loadXtreamPreview(
             server,
             username,
             password,
-            "live",
-            100
+            "vod",
+            8
           );
-          setItems(preview);
-          setSection("live");
-          setSelectedCategory("Todas");
-        } catch (e) {
-          Alert.alert("Erro", e?.message || "Falha ao carregar prévia.");
-        } finally {
-          setLoading(false);
+          setCarouselItems(vodItems);
+        } else {
+          setCarouselItems([]);
         }
+      } catch {
+        setCarouselItems([]);
       }
     }
 
-    firstLoad();
+    loadCarousel();
   }, [loginType, server, username, password]);
 
-  const categories = useMemo(() => {
-    const set = new Set(["Todas"]);
-    items.forEach((item) => {
-      if (item?.category) set.add(String(item.category));
-    });
-    return Array.from(set);
-  }, [items]);
+  useEffect(() => {
+    if (!carouselItems.length) return;
 
-  const filteredItems = useMemo(() => {
-    let result = items;
+    const timer = setInterval(() => {
+      setActiveIndex((prev) => {
+        const next = prev + 1;
+        return next >= carouselItems.length ? 0 : next;
+      });
+    }, 3000);
 
-    if (selectedCategory !== "Todas") {
-      result = result.filter((item) => String(item?.category || "") === selectedCategory);
-    }
+    return () => clearInterval(timer);
+  }, [carouselItems]);
 
-    const q = search.trim().toLowerCase();
-    if (!q) return result;
+  const activeBanner = useMemo(() => {
+    if (!carouselItems.length) return null;
+    return carouselItems[activeIndex] || carouselItems[0];
+  }, [carouselItems, activeIndex]);
 
-    return result.filter((item) =>
-      String(item?.name || "").toLowerCase().includes(q)
-    );
-  }, [items, search, selectedCategory]);
-
-  async function loadPreview(kind) {
-    try {
-      setLoading(true);
-      setSection(kind);
-      setAllLoaded(false);
-      setSelectedCategory("Todas");
-
-      if (kind === "favorites") {
-        const favorites = await getFavorites();
-        setItems(favorites);
-        return;
-      }
-
-      if (kind === "history") {
-        const history = await getHistory();
-        setItems(history);
-        return;
-      }
-
-      if (kind === "continue") {
-        const continueItems = await getContinueWatching();
-        setItems(continueItems);
-        return;
-      }
-
-      if (loginType === "xtream") {
-        const preview = await loadXtreamPreview(
-          server,
-          username,
-          password,
-          kind,
-          100
-        );
-        setItems(preview);
-      } else {
-        const full = await loadM3UAll(m3uUrl);
-        setItems(full.slice(0, 100));
-      }
-    } catch (e) {
-      Alert.alert("Erro", e?.message || "Falha ao carregar prévia.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadFull(kind) {
-    try {
-      setFullLoading(true);
-      setSection(kind);
-      setSelectedCategory("Todas");
-
-      if (kind === "favorites") {
-        const favorites = await getFavorites();
-        setItems(favorites);
-        setAllLoaded(true);
-        return;
-      }
-
-      if (kind === "history") {
-        const history = await getHistory();
-        setItems(history);
-        setAllLoaded(true);
-        return;
-      }
-
-      if (kind === "continue") {
-        const continueItems = await getContinueWatching();
-        setItems(continueItems);
-        setAllLoaded(true);
-        return;
-      }
-
-      if (loginType === "xtream") {
-        const full = await loadXtreamContent(server, username, password, kind);
-        setItems(full);
-      } else {
-        const full = await loadM3UAll(m3uUrl);
-        setItems(full);
-      }
-
-      setAllLoaded(true);
-    } catch (e) {
-      Alert.alert("Erro", e?.message || "Falha ao atualizar lista.");
-    } finally {
-      setFullLoading(false);
-    }
-  }
-
-  function handleLogout() {
-    navigation.replace("Login");
-  }
-
-  function openPlayer(item) {
-    navigation.navigate("Player", {
-      item,
-      loginType,
-      server,
-      username,
-      password,
-      section,
+  function openScreen(screenName) {
+    navigation.navigate(screenName, {
+      ...params,
     });
   }
 
-  function openDetails(item) {
-    navigation.navigate("Player", {
-      item,
-      loginType,
-      server,
-      username,
-      password,
-      section,
-      detailsOnly: true,
+  function formattedDate() {
+    return now.toLocaleDateString("pt-BR");
+  }
+
+  function formattedTime() {
+    return now.toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
     });
-  }
-
-  function renderItem({ item }) {
-    return (
-      <View style={styles.card}>
-        <TouchableOpacity style={styles.cardMain} onPress={() => openPlayer(item)}>
-          {item?.logo ? (
-            <Image source={{ uri: item.logo }} style={styles.logo} resizeMode="cover" />
-          ) : (
-            <View style={[styles.logo, styles.logoFallback]}>
-              <Text style={styles.logoFallbackText}>TV</Text>
-            </View>
-          )}
-
-          <View style={styles.info}>
-            <Text style={styles.name} numberOfLines={1}>
-              {item?.name || "Sem nome"}
-            </Text>
-            <Text style={styles.category} numberOfLines={1}>
-              {item?.category || "Geral"}
-            </Text>
-            {!!item?.epg && section === "live" && (
-              <Text style={styles.epgText} numberOfLines={1}>
-                EPG disponível
-              </Text>
-            )}
-          </View>
-        </TouchableOpacity>
-
-        <View style={styles.cardButtons}>
-          <TouchableOpacity style={styles.smallBtn} onPress={() => openPlayer(item)}>
-            <Text style={styles.smallBtnText}>Abrir</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.smallBtnAlt} onPress={() => openDetails(item)}>
-            <Text style={styles.smallBtnAltText}>Detalhes</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  function titleLabel() {
-    if (section === "live") return "Live TV";
-    if (section === "vod") return "Filmes";
-    if (section === "series") return "Séries";
-    if (section === "favorites") return "Favoritos";
-    if (section === "history") return "Histórico";
-    if (section === "continue") return "Continuar";
-    return "Home";
   }
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
-        {menuOpen && (
-          <View style={styles.sidebar}>
-            <Text style={styles.sidebarTitle}>MUNDO PLAY TV</Text>
+        <View style={styles.sidebar}>
+          <Text style={styles.logo}>MUNDO PLAY TV</Text>
 
-            <TouchableOpacity style={styles.sideBtn} onPress={() => { setMenuOpen(false); loadPreview("live"); }}>
-              <Text style={styles.sideBtnText}>Live TV</Text>
-            </TouchableOpacity>
+          <TouchableOpacity style={styles.menuButton} onPress={() => openScreen("LiveTV")}>
+            <Text style={styles.menuButtonText}>Live TV</Text>
+          </TouchableOpacity>
 
-            <TouchableOpacity style={styles.sideBtn} onPress={() => { setMenuOpen(false); loadPreview("vod"); }}>
-              <Text style={styles.sideBtnText}>Filmes</Text>
-            </TouchableOpacity>
+          <TouchableOpacity style={styles.menuButton} onPress={() => openScreen("Movies")}>
+            <Text style={styles.menuButtonText}>Filmes</Text>
+          </TouchableOpacity>
 
-            <TouchableOpacity style={styles.sideBtn} onPress={() => { setMenuOpen(false); loadPreview("series"); }}>
-              <Text style={styles.sideBtnText}>Séries</Text>
-            </TouchableOpacity>
+          <TouchableOpacity style={styles.menuButton} onPress={() => openScreen("Series")}>
+            <Text style={styles.menuButtonText}>Séries</Text>
+          </TouchableOpacity>
 
-            <TouchableOpacity style={styles.sideBtn} onPress={() => { setMenuOpen(false); loadPreview("favorites"); }}>
-              <Text style={styles.sideBtnText}>Favoritos</Text>
-            </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() =>
+              Alert.alert("Configurações", "Player, cache, conta e atualização.")
+            }
+          >
+            <Text style={styles.menuButtonText}>Configuração</Text>
+          </TouchableOpacity>
 
-            <TouchableOpacity style={styles.sideBtn} onPress={() => { setMenuOpen(false); loadPreview("history"); }}>
-              <Text style={styles.sideBtnText}>Histórico</Text>
-            </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() =>
+              Alert.alert("Idiomas", "Português / English / Español")
+            }
+          >
+            <Text style={styles.menuButtonText}>Idiomas</Text>
+          </TouchableOpacity>
 
-            <TouchableOpacity style={styles.sideBtn} onPress={() => { setMenuOpen(false); loadPreview("continue"); }}>
-              <Text style={styles.sideBtnText}>Continuar</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.sideBtn} onPress={() => Alert.alert("Idiomas", "Português / English / Español")}>
-              <Text style={styles.sideBtnText}>Idiomas</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.sideBtn} onPress={() => Alert.alert("Configurações", "Player, atualização, conta e cache.")}>
-              <Text style={styles.sideBtnText}>Configurações</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.sideBtn} onPress={handleLogout}>
-              <Text style={styles.sideBtnText}>Sair</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() => navigation.replace("Login")}
+          >
+            <Text style={styles.menuButtonText}>Sair</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.main}>
-          <View style={styles.topBar}>
-            <TouchableOpacity style={styles.menuBtn} onPress={() => setMenuOpen(!menuOpen)}>
-              <Text style={styles.menuBtnText}>☰</Text>
-            </TouchableOpacity>
-
-            <Text style={styles.title}>{titleLabel()}</Text>
-
-            <TouchableOpacity style={styles.refreshBtn} onPress={() => loadFull(section)}>
-              <Text style={styles.refreshText}>Atualizar</Text>
-            </TouchableOpacity>
+          <View style={styles.topRight}>
+            <Text style={styles.topInfo}>{formattedDate()}</Text>
+            <Text style={styles.topInfo}>{formattedTime()}</Text>
           </View>
 
-          <TextInput
-            style={styles.search}
-            placeholder="Buscar conteúdo"
-            placeholderTextColor="#aaa"
-            value={search}
-            onChangeText={setSearch}
-          />
+          <ScrollView contentContainerStyle={styles.content}>
+            <View style={styles.statusCard}>
+              <Text style={styles.statusTitle}>Informações da lista</Text>
+              <Text style={styles.statusText}>
+                Status: {loginType === "xtream" ? getAccountStatusText(authData) : "M3U"}
+              </Text>
+              <Text style={styles.statusText}>
+                Vencimento: {loginType === "xtream" ? getAccountExpiryText(authData) : "Não disponível"}
+              </Text>
+              {!!username && <Text style={styles.statusText}>Usuário: {username}</Text>}
+              {!!server && <Text style={styles.statusText}>Servidor: {server}</Text>}
+              {!server && !!m3uUrl && <Text style={styles.statusText}>Lista: M3U carregada</Text>}
+            </View>
 
-          <View style={styles.quickTabs}>
-            <TouchableOpacity style={styles.quickBtn} onPress={() => loadPreview("live")}>
-              <Text style={styles.quickBtnText}>Live TV</Text>
-            </TouchableOpacity>
+            <View style={styles.carouselCard}>
+              <Text style={styles.sectionTitle}>Carrossel</Text>
 
-            <TouchableOpacity style={styles.quickBtn} onPress={() => loadPreview("vod")}>
-              <Text style={styles.quickBtnText}>Filmes</Text>
-            </TouchableOpacity>
+              {activeBanner ? (
+                <View style={styles.bannerWrap}>
+                  {activeBanner?.logo ? (
+                    <Image
+                      source={{ uri: activeBanner.logo }}
+                      style={styles.bannerImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={[styles.bannerImage, styles.bannerFallback]}>
+                      <Text style={styles.bannerFallbackText}>MUNDO PLAY TV</Text>
+                    </View>
+                  )}
 
-            <TouchableOpacity style={styles.quickBtn} onPress={() => loadPreview("series")}>
-              <Text style={styles.quickBtnText}>Séries</Text>
-            </TouchableOpacity>
-          </View>
+                  <View style={styles.bannerOverlay}>
+                    <Text style={styles.bannerTitle} numberOfLines={1}>
+                      {activeBanner?.name || "Destaque"}
+                    </Text>
+                    <Text style={styles.bannerSubtitle} numberOfLines={2}>
+                      {activeBanner?.plot || activeBanner?.category || "Catálogo em destaque"}
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                <View style={[styles.bannerWrap, styles.bannerFallback]}>
+                  <Text style={styles.bannerFallbackText}>Nenhum banner disponível</Text>
+                </View>
+              )}
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.categoryBar}
-            contentContainerStyle={styles.categoryBarContent}
-          >
-            {categories.map((cat) => {
-              const active = cat === selectedCategory;
-              return (
-                <TouchableOpacity
-                  key={cat}
-                  style={[styles.categoryChip, active && styles.categoryChipActive]}
-                  onPress={() => setSelectedCategory(cat)}
-                >
-                  <Text style={[styles.categoryChipText, active && styles.categoryChipTextActive]}>
-                    {cat}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+              <View style={styles.dotsRow}>
+                {carouselItems.map((_, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.dot,
+                      index === activeIndex && styles.dotActive,
+                    ]}
+                  />
+                ))}
+              </View>
+            </View>
 
-          {loading || fullLoading ? (
-            <View style={styles.loaderWrap}>
-              <ActivityIndicator size="large" color="#18e7a1" />
-              <Text style={styles.loaderText}>
-                {fullLoading ? "Carregando lista..." : "Carregando conteúdo..."}
+            <View style={styles.welcomeCard}>
+              <Text style={styles.sectionTitle}>Bem-vindo</Text>
+              <Text style={styles.welcomeText}>
+                Escolha uma opção no menu lateral para abrir Live TV, Filmes ou Séries.
               </Text>
             </View>
-          ) : (
-            <>
-              <Text style={styles.countText}>
-                {allLoaded
-                  ? `Lista: ${filteredItems.length} itens`
-                  : `Prévia leve: ${filteredItems.length} itens`}
-              </Text>
-
-              <FlatList
-                data={filteredItems}
-                keyExtractor={(item, index) =>
-                  `${item?.id || item?.favId || item?.historyId || index}`
-                }
-                renderItem={renderItem}
-                contentContainerStyle={{ paddingBottom: 40 }}
-                numColumns={1}
-              />
-            </>
-          )}
+          </ScrollView>
         </View>
       </View>
     </SafeAreaView>
@@ -404,20 +229,20 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: "rgba(255,255,255,0.08)",
   },
-  sidebarTitle: {
+  logo: {
     color: "#fff",
     fontSize: 20,
     fontWeight: "800",
     marginBottom: 20,
   },
-  sideBtn: {
+  menuButton: {
     backgroundColor: "rgba(255,255,255,0.06)",
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderRadius: 12,
     marginBottom: 10,
   },
-  sideBtnText: {
+  menuButtonText: {
     color: "#fff",
     fontWeight: "700",
   },
@@ -425,166 +250,104 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 14,
   },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  menuBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: "#18e7a1",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  menuBtnText: {
-    color: "#111",
-    fontSize: 20,
-    fontWeight: "800",
-  },
-  title: {
-    flex: 1,
-    color: "#fff",
-    fontSize: 20,
-    fontWeight: "800",
-    marginLeft: 12,
-  },
-  refreshBtn: {
-    backgroundColor: "rgba(255,255,255,0.08)",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  refreshText: {
-    color: "#fff",
-    fontWeight: "700",
-  },
-  search: {
-    backgroundColor: "rgba(255,255,255,0.08)",
-    color: "#fff",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 12,
-  },
-  quickTabs: {
-    flexDirection: "row",
-    marginBottom: 8,
-  },
-  quickBtn: {
-    backgroundColor: "#291041",
-    marginRight: 8,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  quickBtnText: {
-    color: "#fff",
-    fontWeight: "700",
-  },
-  categoryBar: {
+  topRight: {
+    alignSelf: "flex-end",
+    alignItems: "flex-end",
     marginBottom: 10,
   },
-  categoryBarContent: {
-    paddingRight: 20,
-  },
-  categoryChip: {
-    backgroundColor: "#291041",
-    marginRight: 8,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  categoryChipActive: {
-    backgroundColor: "#18e7a1",
-  },
-  categoryChipText: {
+  topInfo: {
     color: "#fff",
+    fontSize: 14,
     fontWeight: "700",
   },
-  categoryChipTextActive: {
-    color: "#111",
+  content: {
+    paddingBottom: 40,
   },
-  countText: {
-    color: "#bbb",
-    marginBottom: 10,
-  },
-  loaderWrap: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  loaderText: {
-    color: "#fff",
-    marginTop: 10,
-  },
-  card: {
+  statusCard: {
     backgroundColor: "rgba(255,255,255,0.06)",
-    borderRadius: 14,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
+  },
+  statusTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "800",
     marginBottom: 10,
-    padding: 10,
   },
-  cardMain: {
-    flexDirection: "row",
+  statusText: {
+    color: "#d9d9d9",
+    marginBottom: 6,
   },
-  logo: {
-    width: 58,
-    height: 58,
-    borderRadius: 10,
-    backgroundColor: "#2b2b2b",
+  carouselCard: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
   },
-  logoFallback: {
+  sectionTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 12,
+  },
+  bannerWrap: {
+    height: 220,
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: "#26103b",
+  },
+  bannerImage: {
+    width: "100%",
+    height: "100%",
+  },
+  bannerOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 14,
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  bannerTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "800",
+  },
+  bannerSubtitle: {
+    color: "#ddd",
+    marginTop: 4,
+  },
+  bannerFallback: {
     alignItems: "center",
     justifyContent: "center",
   },
-  logoFallbackText: {
+  bannerFallbackText: {
     color: "#fff",
     fontWeight: "800",
   },
-  info: {
-    flex: 1,
-    marginLeft: 12,
-    justifyContent: "center",
-  },
-  name: {
-    color: "#fff",
-    fontWeight: "800",
-    fontSize: 16,
-  },
-  category: {
-    color: "#bdbdbd",
-    marginTop: 4,
-  },
-  epgText: {
-    color: "#18e7a1",
-    marginTop: 4,
-    fontWeight: "700",
-    fontSize: 12,
-  },
-  cardButtons: {
+  dotsRow: {
     flexDirection: "row",
-    marginTop: 10,
+    justifyContent: "center",
+    marginTop: 12,
   },
-  smallBtn: {
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.25)",
+    marginHorizontal: 4,
+  },
+  dotActive: {
     backgroundColor: "#18e7a1",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-    marginRight: 8,
   },
-  smallBtnText: {
-    color: "#111",
-    fontWeight: "800",
+  welcomeCard: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 16,
+    padding: 16,
   },
-  smallBtnAlt: {
-    backgroundColor: "#2a1141",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  smallBtnAltText: {
-    color: "#fff",
-    fontWeight: "800",
+  welcomeText: {
+    color: "#d9d9d9",
+    lineHeight: 22,
   },
 });

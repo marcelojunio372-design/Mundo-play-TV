@@ -8,9 +8,7 @@ export function normalizeUrl(url = "") {
 export async function fetchText(url) {
   const res = await fetch(url, {
     method: "GET",
-    headers: {
-      Accept: "*/*",
-    },
+    headers: { Accept: "*/*" },
   });
 
   if (!res.ok) {
@@ -25,7 +23,7 @@ export async function fetchJson(url) {
 
   try {
     return JSON.parse(text);
-  } catch (e) {
+  } catch {
     throw new Error("Resposta inválida do servidor.");
   }
 }
@@ -77,6 +75,7 @@ export function parseM3U(text = "") {
         logo,
         category: groupTitle || "Geral",
         url: "",
+        plot: "",
         epg: "",
         raw: l,
       };
@@ -126,12 +125,7 @@ export async function loadXtreamContent(
     id: String(x.stream_id || x.series_id || x.category_id || idx),
     name: x.name || x.title || `Item ${idx + 1}`,
     logo: x.stream_icon || x.cover || x.cover_big || "",
-    category:
-      x.category_name ||
-      x.genre ||
-      x.plot ||
-      x.release_date ||
-      "Geral",
+    category: x.category_name || x.genre || "Geral",
     epg: x.epg_channel_id || "",
     plot: x.plot || x.description || x.story_plot || "",
     raw: x,
@@ -179,26 +173,74 @@ export function mapSeriesEpisodes(seriesInfo = {}) {
 export function buildSeriesEpisodeUrl(server, username, password, episode = {}) {
   const fixedServer = normalizeUrl(server);
   const episodeId = episode?.raw?.id || episode?.id;
-  const ext = episode?.containerExtension || episode?.raw?.container_extension || "mp4";
+  const ext =
+    episode?.containerExtension ||
+    episode?.raw?.container_extension ||
+    "mp4";
 
   if (!episodeId) return "";
   return `${fixedServer}/series/${username}/${password}/${episodeId}.${ext}`;
 }
 
-export async function loadLiveCategories(server, username, password) {
-  const fixedServer = normalizeUrl(server);
-  const url =
-    `${fixedServer}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_live_categories`;
-
-  const data = await fetchJson(url);
-  return Array.isArray(data) ? data : [];
-}
-
 export async function loadShortEpg(server, username, password, streamId) {
   const fixedServer = normalizeUrl(server);
   const url =
-    `${fixedServer}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_short_epg&stream_id=${encodeURIComponent(streamId)}&limit=3`;
+    `${fixedServer}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_short_epg&stream_id=${encodeURIComponent(streamId)}&limit=5`;
 
   const data = await fetchJson(url);
   return data?.epg_listings || [];
+}
+
+export function buildLiveStreamUrl(server, username, password, item) {
+  const raw = item?.raw || {};
+  const streamId = raw?.stream_id || item?.id;
+  if (!streamId) return item?.url || "";
+  return `${normalizeUrl(server)}/live/${username}/${password}/${streamId}.m3u8`;
+}
+
+export function buildMovieStreamUrl(server, username, password, item) {
+  const raw = item?.raw || {};
+  const streamId = raw?.stream_id || item?.id;
+  if (!streamId) return item?.url || "";
+  return `${normalizeUrl(server)}/movie/${username}/${password}/${streamId}.mp4`;
+}
+
+export function formatUnixDate(value) {
+  if (!value) return "Não informado";
+
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return "Não informado";
+
+  const d = new Date(n * 1000);
+  return d.toLocaleDateString("pt-BR");
+}
+
+export function getAccountExpiryText(authData) {
+  const exp =
+    authData?.user_info?.exp_date ||
+    authData?.server_info?.exp_date ||
+    null;
+
+  return formatUnixDate(exp);
+}
+
+export function getAccountStatusText(authData) {
+  const status =
+    authData?.user_info?.status ||
+    authData?.user_info?.auth ||
+    "";
+
+  if (status === "Active" || status === "1" || status === 1) {
+    return "Ativa";
+  }
+
+  if (status === "Banned") return "Banida";
+  if (status === "Disabled") return "Desativada";
+  if (status === "Expired") return "Expirada";
+
+  return "Não informado";
+}
+
+export function getRecentItemsBySection(items = [], section = "live") {
+  return items.filter((x) => x?.section === section);
 }
