@@ -9,12 +9,11 @@ import {
   Image,
   ActivityIndicator,
   TextInput,
-  ScrollView,
-  Alert,
+  Dimensions,
 } from "react-native";
 import {
   loadM3UAll,
-  loadXtreamPreview,
+  loadXtreamContent,
   getRecentItemsBySection,
   filterM3UBySection,
 } from "../utils/iptv";
@@ -25,6 +24,10 @@ import {
   toggleFavorite,
 } from "../utils/storage";
 
+const { width } = Dimensions.get("window");
+const LEFT_W = Math.max(250, width * 0.27);
+const GRID_COLS = width > 900 ? 4 : 3;
+
 export default function SeriesScreen({ route, navigation }) {
   const params = route?.params || {};
   const loginType = params?.loginType || "xtream";
@@ -33,105 +36,115 @@ export default function SeriesScreen({ route, navigation }) {
   const password = params?.password || "";
   const m3uUrl = params?.m3uUrl || "";
 
-  const [items, setItems] = useState([]);
-  const [sourceItems, setSourceItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("Todas");
-  const [mode, setMode] = useState("all");
+  const [allItems, setAllItems] = useState([]);
+  const [gridItems, setGridItems] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState("TODOS OS CANAIS");
+  const [leftMode, setLeftMode] = useState("categories");
   const [selectedSeries, setSelectedSeries] = useState(null);
+  const [search, setSearch] = useState("");
   const [favoriteIds, setFavoriteIds] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadSeries();
+    init();
   }, []);
 
-  async function refreshFavorites() {
-    const favs = await getFavorites();
-    const ids = favs
-      .filter((x) => x?.section === "series")
-      .map((x) => `series:${x?.id}`);
-    setFavoriteIds(ids);
-  }
+  useEffect(() => {
+    applyFilter();
+  }, [allItems, selectedCategory, search, leftMode]);
 
-  async function loadSeries() {
+  async function init() {
     try {
       setLoading(true);
 
       let loaded = [];
       if (loginType === "xtream") {
-        loaded = await loadXtreamPreview(server, username, password, "series", 150);
+        loaded = await loadXtreamContent(server, username, password, "series");
       } else {
         const all = await loadM3UAll(m3uUrl);
-        loaded = filterM3UBySection(all, "series").slice(0, 150);
+        loaded = filterM3UBySection(all, "series");
       }
 
-      setSourceItems(loaded);
-      setItems(loaded);
-      setSelectedSeries(loaded[0] || null);
-      await refreshFavorites();
-    } catch (e) {
-      Alert.alert("Erro", e?.message || "Falha ao carregar séries.");
+      setAllItems(loaded);
+
+      const favs = await getFavorites();
+      setFavoriteIds(favs.filter((x) => x?.section === "series").map((x) => `series:${x?.id}`));
     } finally {
       setLoading(false);
     }
   }
 
-  async function applyMode(nextMode) {
-    try {
-      setLoading(true);
-      setMode(nextMode);
-      setSelectedCategory("Todas");
+  async function refreshFavorites() {
+    const favs = await getFavorites();
+    setFavoriteIds(favs.filter((x) => x?.section === "series").map((x) => `series:${x?.id}`));
+  }
 
-      if (nextMode === "all") {
-        setItems(sourceItems);
-      } else if (nextMode === "favorites") {
-        const favs = await getFavorites();
-        const filtered = favs.filter((x) => x?.section === "series");
-        setItems(filtered);
-        setSelectedSeries(filtered[0] || null);
-      } else if (nextMode === "recent") {
-        const history = await getHistory();
-        const filtered = getRecentItemsBySection(history, "series");
-        setItems(filtered);
-        setSelectedSeries(filtered[0] || null);
-      }
-    } finally {
-      setLoading(false);
+  async function applyFilter() {
+    let base = allItems;
+
+    if (leftMode === "favorites") {
+      const favs = await getFavorites();
+      base = favs.filter((x) => x?.section === "series");
+    } else if (leftMode === "recent") {
+      const hist = await getHistory();
+      base = getRecentItemsBySection(hist, "series");
+    } else if (selectedCategory !== "TODOS OS CANAIS") {
+      base = allItems.filter((x) => (x?.category || "").toUpperCase() === selectedCategory);
+    }
+
+    const q = search.trim().toLowerCase();
+    if (q) {
+      base = base.filter((x) => String(x?.name || "").toLowerCase().includes(q));
+    }
+
+    setGridItems(base);
+    if (base.length && !selectedSeries) {
+      pickSeries(base[0]);
     }
   }
 
   const categories = useMemo(() => {
-    const set = new Set(["Todas"]);
-    items.forEach((item) => {
-      if (item?.category) set.add(String(item.category));
+    const map = {};
+    allItems.forEach((item) => {
+      const key = String(item?.category || "GERAL").toUpperCase();
+      map[key] = (map[key] || 0) + 1;
     });
-    return Array.from(set);
-  }, [items]);
 
-  const filteredItems = useMemo(() => {
-    let result = items;
+    const arr = Object.keys(map)
+      .sort()
+      .map((name) => ({ name, count: map[name] }));
 
-    if (selectedCategory !== "Todas") {
-      result = result.filter(
-        (item) => String(item?.category || "") === selectedCategory
-      );
-    }
+    return [
+      { name: "TODOS OS CANAIS", count: allItems.length },
+      { name: "FAVORITOS", count: favoriteIds.length },
+      { name: "RECENTEMENTE VISTO", count: 0 },
+      ...arr,
+    ];
+  }, [allItems, favoriteIds]);
 
-    const q = search.trim().toLowerCase();
-    if (!q) return result;
-
-    return result.filter((item) =>
-      String(item?.name || "").toLowerCase().includes(q)
-    );
-  }, [items, search, selectedCategory]);
-
-  async function selectSeries(item) {
+  async function pickSeries(item) {
     setSelectedSeries(item);
     await addToHistory(item, "series");
   }
 
-  async function handleToggleFavorite(item) {
+  async function onCategoryPress(cat) {
+    if (cat === "FAVORITOS") {
+      setLeftMode("favorites");
+      setSelectedCategory("FAVORITOS");
+      return;
+    }
+
+    if (cat === "RECENTEMENTE VISTO") {
+      setLeftMode("recent");
+      setSelectedCategory("RECENTEMENTE VISTO");
+      return;
+    }
+
+    setLeftMode("categories");
+    setSelectedCategory(cat);
+  }
+
+  async function onToggleFavorite(item) {
     await toggleFavorite(item, "series");
     await refreshFavorites();
   }
@@ -140,41 +153,55 @@ export default function SeriesScreen({ route, navigation }) {
     return favoriteIds.includes(`series:${item?.id}`);
   }
 
-  function openSeriesDetails() {
-    if (!selectedSeries) return;
-
+  function openSeries(item) {
     navigation.navigate("Player", {
       ...params,
-      item: selectedSeries,
+      item,
       section: "series",
-      autoPlay: false,
     });
   }
 
-  function renderItem({ item }) {
-    const fav = isFavorite(item);
-
+  function renderCategory({ item }) {
+    const active = selectedCategory === item.name;
     return (
-      <TouchableOpacity style={styles.card} onPress={() => selectSeries(item)}>
+      <TouchableOpacity
+        style={[styles.leftItem, active && styles.leftItemActive]}
+        onPress={() => onCategoryPress(item.name)}
+      >
+        <Text style={[styles.leftItemText, active && styles.leftItemTextActive]} numberOfLines={1}>
+          {item.name}
+        </Text>
+        <Text style={[styles.leftCount, active && styles.leftItemTextActive]}>
+          {item.count}
+        </Text>
+      </TouchableOpacity>
+    );
+  }
+
+  function renderPoster({ item }) {
+    const active = selectedSeries?.id === item?.id;
+    return (
+      <TouchableOpacity
+        style={[styles.posterCard, active && styles.posterCardActive]}
+        onPress={() => pickSeries(item)}
+        onLongPress={() => openSeries(item)}
+      >
         {item?.logo ? (
-          <Image source={{ uri: item.logo }} style={styles.logo} resizeMode="cover" />
+          <Image source={{ uri: item.logo }} style={styles.posterImage} resizeMode="cover" />
         ) : (
-          <View style={[styles.logo, styles.logoFallback]}>
-            <Text style={styles.logoFallbackText}>SÉRIE</Text>
+          <View style={[styles.posterImage, styles.posterFallback]}>
+            <Text style={styles.posterFallbackText}>SÉRIE</Text>
           </View>
         )}
 
-        <View style={styles.info}>
-          <Text style={styles.name} numberOfLines={1}>
+        <View style={styles.posterOverlay}>
+          <Text style={styles.posterTitle} numberOfLines={2}>
             {item?.name || "Série"}
-          </Text>
-          <Text style={styles.category} numberOfLines={1}>
-            {item?.category || "Geral"}
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.favButton} onPress={() => handleToggleFavorite(item)}>
-          <Text style={styles.favButtonText}>{fav ? "★" : "☆"}</Text>
+        <TouchableOpacity style={styles.posterStar} onPress={() => onToggleFavorite(item)}>
+          <Text style={styles.posterStarText}>{isFavorite(item) ? "★" : "☆"}</Text>
         </TouchableOpacity>
       </TouchableOpacity>
     );
@@ -182,273 +209,238 @@ export default function SeriesScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.topBar}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backBtnText}>Voltar</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Séries</Text>
-      </View>
-
-      <View style={styles.modeRow}>
-        <TouchableOpacity
-          style={[styles.modeBtn, mode === "all" && styles.modeBtnActive]}
-          onPress={() => applyMode("all")}
-        >
-          <Text style={[styles.modeBtnText, mode === "all" && styles.modeBtnTextActive]}>
-            Categorias
-          </Text>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
+          <Text style={styles.closeBtnText}>✕</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.modeBtn, mode === "favorites" && styles.modeBtnActive]}
-          onPress={() => applyMode("favorites")}
-        >
-          <Text style={[styles.modeBtnText, mode === "favorites" && styles.modeBtnTextActive]}>
-            Favoritos
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.modeBtn, mode === "recent" && styles.modeBtnActive]}
-          onPress={() => applyMode("recent")}
-        >
-          <Text style={[styles.modeBtnText, mode === "recent" && styles.modeBtnTextActive]}>
-            Visto por último
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <TextInput
-        style={styles.search}
-        placeholder="Buscar série"
-        placeholderTextColor="#aaa"
-        value={search}
-        onChangeText={setSearch}
-      />
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.categoryBar}
-        contentContainerStyle={styles.categoryBarContent}
-      >
-        {categories.map((cat) => {
-          const active = cat === selectedCategory;
-          return (
-            <TouchableOpacity
-              key={cat}
-              style={[styles.categoryChip, active && styles.categoryChipActive]}
-              onPress={() => setSelectedCategory(cat)}
-            >
-              <Text
-                style={[
-                  styles.categoryChipText,
-                  active && styles.categoryChipTextActive,
-                ]}
-              >
-                {cat}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
-      {selectedSeries && (
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>{selectedSeries?.name || "Série"}</Text>
-          <Text style={styles.summaryCategory}>
-            {selectedSeries?.category || "Geral"}
-          </Text>
-          <Text style={styles.summaryText}>
-            {selectedSeries?.plot || "Sem resumo disponível para esta série."}
-          </Text>
-
-          <TouchableOpacity style={styles.playBtn} onPress={openSeriesDetails}>
-            <Text style={styles.playBtnText}>Abrir temporadas</Text>
-          </TouchableOpacity>
+        <View style={styles.searchWrap}>
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Pesquisa em categorias"
+            placeholderTextColor="#bfc6ff"
+            style={styles.searchInput}
+          />
         </View>
-      )}
+
+        <Text style={styles.headerTitle}>Séries</Text>
+      </View>
 
       {loading ? (
         <View style={styles.loaderWrap}>
-          <ActivityIndicator size="large" color="#18e7a1" />
+          <ActivityIndicator size="large" color="#7ef7ef" />
         </View>
       ) : (
-        <FlatList
-          data={filteredItems}
-          keyExtractor={(item, index) => `${item?.id || index}`}
-          renderItem={renderItem}
-          contentContainerStyle={{ paddingBottom: 40 }}
-        />
+        <View style={styles.layout}>
+          <View style={styles.leftPane}>
+            <FlatList
+              data={categories}
+              keyExtractor={(item) => item.name}
+              renderItem={renderCategory}
+            />
+          </View>
+
+          <View style={styles.rightPane}>
+            {selectedSeries && (
+              <View style={styles.summaryBox}>
+                <Text style={styles.summaryTitle}>{selectedSeries?.name}</Text>
+                <Text style={styles.summarySub}>{selectedSeries?.category || "GERAL"}</Text>
+                <Text style={styles.summaryText} numberOfLines={3}>
+                  {selectedSeries?.plot || "Sem resumo disponível."}
+                </Text>
+
+                <TouchableOpacity style={styles.watchBtn} onPress={() => openSeries(selectedSeries)}>
+                  <Text style={styles.watchBtnText}>TEMPORADAS</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <FlatList
+              data={gridItems}
+              keyExtractor={(item, index) => `${item?.id || index}`}
+              renderItem={renderPoster}
+              numColumns={GRID_COLS}
+              contentContainerStyle={{ paddingBottom: 30 }}
+            />
+          </View>
+        </View>
       )}
     </SafeAreaView>
   );
 }
 
+const posterGap = 10;
+const posterWidth = ((width - LEFT_W - 44) / GRID_COLS) - posterGap;
+
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: "#12031f",
-    paddingHorizontal: 14,
+    backgroundColor: "#151d63",
   },
-  topBar: {
+  header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingTop: 8,
-    paddingBottom: 12,
-  },
-  backBtn: {
-    backgroundColor: "#18e7a1",
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 12,
   },
-  backBtnText: {
-    color: "#111",
-    fontWeight: "800",
+  closeBtn: {
+    width: 54,
+    height: 54,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  title: {
-    flex: 1,
-    color: "#fff",
-    fontSize: 22,
-    fontWeight: "800",
-    marginLeft: 12,
+  closeBtnText: {
+    color: "#c9f7ff",
+    fontSize: 34,
+    fontWeight: "300",
   },
-  modeRow: {
-    flexDirection: "row",
-    marginBottom: 12,
+  searchWrap: {
+    width: LEFT_W - 30,
+    marginRight: 12,
   },
-  modeBtn: {
-    backgroundColor: "#291041",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-    marginRight: 8,
-  },
-  modeBtnActive: {
-    backgroundColor: "#18e7a1",
-  },
-  modeBtnText: {
-    color: "#fff",
-    fontWeight: "700",
-  },
-  modeBtnTextActive: {
-    color: "#111",
-  },
-  search: {
+  searchInput: {
     backgroundColor: "rgba(255,255,255,0.08)",
     color: "#fff",
-    borderRadius: 12,
+    borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    marginBottom: 10,
+    fontSize: 18,
   },
-  categoryBar: {
-    marginBottom: 10,
-  },
-  categoryBarContent: {
-    paddingRight: 20,
-  },
-  categoryChip: {
-    backgroundColor: "#291041",
-    marginRight: 8,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  categoryChipActive: {
-    backgroundColor: "#18e7a1",
-  },
-  categoryChipText: {
-    color: "#fff",
-    fontWeight: "700",
-  },
-  categoryChipTextActive: {
-    color: "#111",
-  },
-  summaryCard: {
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-  },
-  summaryTitle: {
-    color: "#fff",
-    fontSize: 20,
-    fontWeight: "800",
-  },
-  summaryCategory: {
-    color: "#18e7a1",
-    marginTop: 4,
-    fontWeight: "700",
-  },
-  summaryText: {
-    color: "#d8d8d8",
-    marginTop: 10,
-    lineHeight: 22,
-  },
-  playBtn: {
-    backgroundColor: "#18e7a1",
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: "center",
-    marginTop: 14,
-  },
-  playBtnText: {
-    color: "#111",
-    fontWeight: "800",
+  headerTitle: {
+    color: "#d8e2ff",
+    fontSize: 28,
+    fontWeight: "900",
   },
   loaderWrap: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
   },
-  card: {
+  layout: {
+    flex: 1,
+    flexDirection: "row",
+  },
+  leftPane: {
+    width: LEFT_W,
+    paddingHorizontal: 10,
+    paddingBottom: 14,
+  },
+  rightPane: {
+    flex: 1,
+    paddingRight: 12,
+    paddingBottom: 14,
+  },
+  leftItem: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.08)",
+  },
+  leftItemActive: {
+    backgroundColor: "#8cf7f0",
+    borderRadius: 8,
+  },
+  leftItemText: {
+    flex: 1,
+    color: "#d7e7ff",
+    fontSize: 18,
+    fontWeight: "700",
+    marginRight: 10,
+  },
+  leftItemTextActive: {
+    color: "#111",
+  },
+  leftCount: {
+    color: "#d7e7ff",
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  summaryBox: {
     backgroundColor: "rgba(255,255,255,0.06)",
-    padding: 10,
     borderRadius: 14,
-    marginBottom: 10,
+    padding: 14,
+    marginBottom: 12,
   },
-  logo: {
-    width: 58,
-    height: 82,
-    borderRadius: 10,
-    backgroundColor: "#2b2b2b",
+  summaryTitle: {
+    color: "#fff",
+    fontSize: 22,
+    fontWeight: "900",
   },
-  logoFallback: {
+  summarySub: {
+    color: "#8cf7f0",
+    fontSize: 16,
+    fontWeight: "700",
+    marginTop: 4,
+  },
+  summaryText: {
+    color: "#dbe7ff",
+    fontSize: 15,
+    lineHeight: 22,
+    marginTop: 8,
+  },
+  watchBtn: {
+    backgroundColor: "#8cf7f0",
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+    marginTop: 12,
+  },
+  watchBtnText: {
+    color: "#111",
+    fontWeight: "900",
+    fontSize: 18,
+  },
+  posterCard: {
+    width: posterWidth,
+    marginRight: 10,
+    marginBottom: 12,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  posterCardActive: {
+    borderWidth: 2,
+    borderColor: "#8cf7f0",
+  },
+  posterImage: {
+    width: "100%",
+    height: posterWidth * 1.45,
+  },
+  posterFallback: {
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "#2b2b2b",
   },
-  logoFallbackText: {
+  posterFallbackText: {
     color: "#fff",
-    fontWeight: "800",
-    fontSize: 10,
+    fontWeight: "900",
   },
-  info: {
-    flex: 1,
-    marginLeft: 12,
+  posterOverlay: {
+    padding: 8,
   },
-  name: {
+  posterTitle: {
     color: "#fff",
     fontWeight: "800",
     fontSize: 16,
   },
-  category: {
-    color: "#bdbdbd",
-    marginTop: 4,
-  },
-  favButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: "#2a1141",
+  posterStar: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    borderRadius: 999,
+    width: 28,
+    height: 28,
     alignItems: "center",
     justifyContent: "center",
   },
-  favButtonText: {
+  posterStarText: {
     color: "#fff",
-    fontSize: 22,
+    fontSize: 16,
   },
 });

@@ -7,6 +7,7 @@ import LiveTVScreen from "../screens/LiveTVScreen";
 import MoviesScreen from "../screens/MoviesScreen";
 import SeriesScreen from "../screens/SeriesScreen";
 import PlayerScreen from "../screens/PlayerScreen";
+import SubscriptionInfoScreen from "../screens/SubscriptionInfoScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -20,6 +21,7 @@ export default function AppNavigator() {
         <Stack.Screen name="Movies" component={MoviesScreen} />
         <Stack.Screen name="Series" component={SeriesScreen} />
         <Stack.Screen name="Player" component={PlayerScreen} />
+        <Stack.Screen name="SubscriptionInfo" component={SubscriptionInfoScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
