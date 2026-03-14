@@ -12,10 +12,13 @@
         android:allowBackup="true"
         android:theme="@style/AppTheme">
 
-        <activity
-            android:name=".MainActivity"
-            android:exported="true"
-            android:screenOrientation="portrait">
+       <activity
+    android:name=".MainActivity"
+    android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode"
+    android:launchMode="singleTask"
+    android:windowSoftInputMode="adjustResize"
+    android:screenOrientation="landscape"
+    android:exported="true">
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

@@ -246,7 +246,7 @@ export default function MoviesScreen({ route, navigation }) {
               <View style={styles.summaryBox}>
                 <Text style={styles.summaryTitle}>{selectedMovie?.name}</Text>
                 <Text style={styles.summarySub}>{selectedMovie?.category || "GERAL"}</Text>
-                <Text style={styles.summaryText} numberOfLines={3}>
+                <Text style={styles.summaryText} numberOfLines={4}>
                   {selectedMovie?.plot || "Sem resumo disponível."}
                 </Text>
 
@@ -361,34 +361,34 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   summaryBox: {
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderRadius: 14,
-    padding: 14,
+    padding: 16,
     marginBottom: 12,
   },
   summaryTitle: {
     color: "#fff",
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "900",
   },
   summarySub: {
     color: "#8cf7f0",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "700",
     marginTop: 4,
   },
   summaryText: {
     color: "#dbe7ff",
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 24,
     marginTop: 8,
   },
   watchBtn: {
     backgroundColor: "#8cf7f0",
     borderRadius: 12,
-    paddingVertical: 12,
+    paddingVertical: 14,
     alignItems: "center",
-    marginTop: 12,
+    marginTop: 14,
   },
   watchBtnText: {
     color: "#111",

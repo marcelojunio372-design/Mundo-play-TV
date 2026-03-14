@@ -1,4 +1,4 @@
-import React from "react";
+-import React from "react";
 import {
   View,
   Text,
@@ -8,26 +8,26 @@ import {
   Alert,
 } from "react-native";
 
-export default function SettingsScreen({ navigation }) {
+export default function LanguageScreen({ navigation }) {
+  function pickLanguage(lang) {
+    Alert.alert("Idioma", `${lang} selecionado.`);
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
-        <Text style={styles.title}>Configuração</Text>
+        <Text style={styles.title}>Idiomas</Text>
 
-        <TouchableOpacity style={styles.item} onPress={() => Alert.alert("Player", "Configuração do player em breve.")}>
-          <Text style={styles.itemText}>Player</Text>
+        <TouchableOpacity style={styles.item} onPress={() => pickLanguage("Português")}>
+          <Text style={styles.itemText}>Português</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.item} onPress={() => Alert.alert("Cache", "Limpeza de cache em breve.")}>
-          <Text style={styles.itemText}>Limpar cache</Text>
+        <TouchableOpacity style={styles.item} onPress={() => pickLanguage("English")}>
+          <Text style={styles.itemText}>English</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.item} onPress={() => Alert.alert("Atualização", "Verificação de atualização em breve.")}>
-          <Text style={styles.itemText}>Atualização</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.item} onPress={() => Alert.alert("Conta", "Informações da conta em breve.")}>
-          <Text style={styles.itemText}>Conta</Text>
+        <TouchableOpacity style={styles.item} onPress={() => pickLanguage("Español")}>
+          <Text style={styles.itemText}>Español</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
