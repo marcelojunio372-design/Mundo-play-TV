@@ -42,12 +42,6 @@ export async function toggleFavorite(item, section = "live") {
   return next;
 }
 
-export async function isFavorite(item, section = "live") {
-  const current = await getFavorites();
-  const id = `${section}:${item?.id}`;
-  return current.some((x) => x?.favId === id);
-}
-
 export async function getHistory() {
   try {
     const raw = await AsyncStorage.getItem(HISTORY_KEY);
@@ -115,3 +109,5 @@ export async function updateContinueWatching(item, section = "live", positionMil
   await saveContinueWatching(next);
   return next;
 }
+
+

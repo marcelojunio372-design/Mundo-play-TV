@@ -17,7 +17,6 @@ import {
   buildLiveStreamUrl,
   loadM3UAll,
   loadShortEpg,
-  loadXtreamContent,
   loadXtreamPreview,
   getRecentItemsBySection,
   filterM3UBySection,
@@ -334,7 +333,7 @@ export default function LiveTVScreen({ route, navigation }) {
   );
 }
 
-const styles = {
+const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: "#12031f",
@@ -526,4 +525,4 @@ const styles = {
     color: "#111",
     fontWeight: "800",
   },
-};
+});

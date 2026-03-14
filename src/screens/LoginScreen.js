@@ -57,13 +57,12 @@ export default function LoginScreen({ navigation }) {
       }
 
       setLoading(true);
-
-      const preview = await loadM3UPreview(m3uUrl, 100);
+      await loadM3UPreview(m3uUrl, 20);
 
       navigation.replace("Home", {
         loginType: "m3u",
         m3uUrl,
-        previewItems: preview,
+        previewItems: [],
       });
     } catch (e) {
       Alert.alert("Erro", e?.message || "Falha ao carregar M3U.");
@@ -84,12 +83,7 @@ export default function LoginScreen({ navigation }) {
               style={[styles.tab, mode === "xtream" && styles.tabActive]}
               onPress={() => setMode("xtream")}
             >
-              <Text
-                style={[
-                  styles.tabText,
-                  mode === "xtream" && styles.tabTextActive,
-                ]}
-              >
+              <Text style={[styles.tabText, mode === "xtream" && styles.tabTextActive]}>
                 Xtream
               </Text>
             </TouchableOpacity>
@@ -98,12 +92,7 @@ export default function LoginScreen({ navigation }) {
               style={[styles.tab, mode === "m3u" && styles.tabActive]}
               onPress={() => setMode("m3u")}
             >
-              <Text
-                style={[
-                  styles.tabText,
-                  mode === "m3u" && styles.tabTextActive,
-                ]}
-              >
+              <Text style={[styles.tabText, mode === "m3u" && styles.tabTextActive]}>
                 M3U
               </Text>
             </TouchableOpacity>
@@ -136,16 +125,8 @@ export default function LoginScreen({ navigation }) {
                 secureTextEntry
                 autoCapitalize="none"
               />
-              <TouchableOpacity
-                style={styles.button}
-                onPress={handleXtreamLogin}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>ENTRAR</Text>
-                )}
+              <TouchableOpacity style={styles.button} onPress={handleXtreamLogin} disabled={loading}>
+                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>ENTRAR</Text>}
               </TouchableOpacity>
             </>
           ) : (
@@ -158,16 +139,8 @@ export default function LoginScreen({ navigation }) {
                 onChangeText={setM3uUrl}
                 autoCapitalize="none"
               />
-              <TouchableOpacity
-                style={styles.button}
-                onPress={handleM3ULogin}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>CARREGAR M3U</Text>
-                )}
+              <TouchableOpacity style={styles.button} onPress={handleM3ULogin} disabled={loading}>
+                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>CARREGAR M3U</Text>}
               </TouchableOpacity>
             </>
           )}

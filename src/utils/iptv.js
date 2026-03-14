@@ -20,7 +20,6 @@ export async function fetchText(url) {
 
 export async function fetchJson(url) {
   const text = await fetchText(url);
-
   try {
     return JSON.parse(text);
   } catch {
@@ -89,15 +88,14 @@ export function parseM3U(text = "") {
   return items;
 }
 
-export async function loadM3UPreview(m3uUrl, limit = 100) {
-  const text = await fetchText(m3uUrl);
-  const parsed = parseM3U(text);
-  return parsed.slice(0, limit);
-}
-
 export async function loadM3UAll(m3uUrl) {
   const text = await fetchText(m3uUrl);
   return parseM3U(text);
+}
+
+export async function loadM3UPreview(m3uUrl, limit = 100) {
+  const all = await loadM3UAll(m3uUrl);
+  return all.slice(0, limit);
 }
 
 export async function loadXtreamContent(server, username, password, kind = "live") {
@@ -127,13 +125,7 @@ export async function loadXtreamContent(server, username, password, kind = "live
   }));
 }
 
-export async function loadXtreamPreview(
-  server,
-  username,
-  password,
-  kind = "live",
-  limit = 100
-) {
+export async function loadXtreamPreview(server, username, password, kind = "live", limit = 100) {
   const items = await loadXtreamContent(server, username, password, kind);
   return items.slice(0, limit);
 }
@@ -149,7 +141,7 @@ export async function loadXtreamSeriesInfo(server, username, password, seriesId)
 
 export function mapSeriesEpisodes(seriesInfo = {}) {
   const episodes = seriesInfo?.episodes || {};
-  const seasons = Object.keys(episodes)
+  return Object.keys(episodes)
     .sort((a, b) => Number(a) - Number(b))
     .map((seasonKey) => ({
       season: seasonKey,
@@ -161,8 +153,6 @@ export function mapSeriesEpisodes(seriesInfo = {}) {
         raw: ep,
       })),
     }));
-
-  return seasons;
 }
 
 export function buildSeriesEpisodeUrl(server, username, password, episode = {}) {
@@ -202,12 +192,9 @@ export function buildMovieStreamUrl(server, username, password, item) {
 
 export function formatUnixDate(value) {
   if (!value) return "Não informado";
-
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) return "Não informado";
-
-  const d = new Date(n * 1000);
-  return d.toLocaleDateString("pt-BR");
+  return new Date(n * 1000).toLocaleDateString("pt-BR");
 }
 
 export function getAccountExpiryText(authData) {
@@ -242,29 +229,23 @@ function textHasAny(text, words = []) {
 }
 
 export function detectM3USection(item) {
-  const text = `${item?.name || ""} ${item?.category || ""}`.toLowerCase();
+  const url = (item?.url || "").toLowerCase();
+  const category = (item?.category || "").toLowerCase();
+  const name = (item?.name || "").toLowerCase();
+  const text = `${url} ${category} ${name}`;
 
-  const movieWords = [
-    "filme",
-    "filmes",
-    "movie",
-    "movies",
-    "cinema",
-    "vod",
-  ];
+  if (text.includes("/series/")) return "series";
+  if (text.includes("/movie/")) return "vod";
+  if (text.includes("/live/")) return "live";
 
-  const seriesWords = [
-    "serie",
-    "series",
-    "série",
-    "séries",
-    "temporada",
-    "episodio",
-    "episódio",
-  ];
+  if (textHasAny(text, ["serie", "series", "série", "séries", "temporada", "episodio", "episódio"])) {
+    return "series";
+  }
 
-  if (textHasAny(text, seriesWords)) return "series";
-  if (textHasAny(text, movieWords)) return "vod";
+  if (textHasAny(text, ["filme", "filmes", "movie", "movies", "cinema", "vod"])) {
+    return "vod";
+  }
+
   return "live";
 }
 
