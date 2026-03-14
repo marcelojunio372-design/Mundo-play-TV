@@ -20,6 +20,7 @@ import {
   loadXtreamContent,
   loadXtreamPreview,
   getRecentItemsBySection,
+  filterM3UBySection,
 } from "../utils/iptv";
 import {
   addToHistory,
@@ -68,7 +69,7 @@ export default function LiveTVScreen({ route, navigation }) {
         loaded = await loadXtreamPreview(server, username, password, "live", 150);
       } else {
         const all = await loadM3UAll(m3uUrl);
-        loaded = all.slice(0, 150);
+        loaded = filterM3UBySection(all, "live").slice(0, 150);
       }
 
       setSourceItems(loaded);
@@ -333,7 +334,7 @@ export default function LiveTVScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = {
   safe: {
     flex: 1,
     backgroundColor: "#12031f",
@@ -525,4 +526,4 @@ const styles = StyleSheet.create({
     color: "#111",
     fontWeight: "800",
   },
-});
+};

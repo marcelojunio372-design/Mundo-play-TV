@@ -14,9 +14,9 @@ import {
 } from "react-native";
 import {
   loadM3UAll,
-  loadXtreamContent,
   loadXtreamPreview,
   getRecentItemsBySection,
+  filterM3UBySection,
 } from "../utils/iptv";
 import {
   addToHistory,
@@ -63,7 +63,7 @@ export default function MoviesScreen({ route, navigation }) {
         loaded = await loadXtreamPreview(server, username, password, "vod", 150);
       } else {
         const all = await loadM3UAll(m3uUrl);
-        loaded = all.slice(0, 150);
+        loaded = filterM3UBySection(all, "vod").slice(0, 150);
       }
 
       setSourceItems(loaded);

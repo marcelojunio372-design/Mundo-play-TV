@@ -100,12 +100,7 @@ export async function loadM3UAll(m3uUrl) {
   return parseM3U(text);
 }
 
-export async function loadXtreamContent(
-  server,
-  username,
-  password,
-  kind = "live"
-) {
+export async function loadXtreamContent(server, username, password, kind = "live") {
   const fixedServer = normalizeUrl(server);
 
   const action =
@@ -230,17 +225,49 @@ export function getAccountStatusText(authData) {
     authData?.user_info?.auth ||
     "";
 
-  if (status === "Active" || status === "1" || status === 1) {
-    return "Ativa";
-  }
-
+  if (status === "Active" || status === "1" || status === 1) return "Ativa";
   if (status === "Banned") return "Banida";
   if (status === "Disabled") return "Desativada";
   if (status === "Expired") return "Expirada";
-
   return "Não informado";
 }
 
 export function getRecentItemsBySection(items = [], section = "live") {
   return items.filter((x) => x?.section === section);
+}
+
+function textHasAny(text, words = []) {
+  const t = String(text || "").toLowerCase();
+  return words.some((w) => t.includes(w));
+}
+
+export function detectM3USection(item) {
+  const text = `${item?.name || ""} ${item?.category || ""}`.toLowerCase();
+
+  const movieWords = [
+    "filme",
+    "filmes",
+    "movie",
+    "movies",
+    "cinema",
+    "vod",
+  ];
+
+  const seriesWords = [
+    "serie",
+    "series",
+    "série",
+    "séries",
+    "temporada",
+    "episodio",
+    "episódio",
+  ];
+
+  if (textHasAny(text, seriesWords)) return "series";
+  if (textHasAny(text, movieWords)) return "vod";
+  return "live";
+}
+
+export function filterM3UBySection(items = [], section = "live") {
+  return items.filter((item) => detectM3USection(item) === section);
 }

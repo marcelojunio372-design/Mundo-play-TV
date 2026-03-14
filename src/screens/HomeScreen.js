@@ -12,7 +12,9 @@ import {
 import {
   getAccountExpiryText,
   getAccountStatusText,
+  loadM3UAll,
   loadXtreamPreview,
+  filterM3UBySection,
 } from "../utils/iptv";
 
 export default function HomeScreen({ route, navigation }) {
@@ -45,16 +47,20 @@ export default function HomeScreen({ route, navigation }) {
             8
           );
           setCarouselItems(vodItems);
-        } else {
-          setCarouselItems([]);
+          return;
         }
+
+        const all = await loadM3UAll(m3uUrl);
+        const movies = filterM3UBySection(all, "vod").slice(0, 8);
+        const series = filterM3UBySection(all, "series").slice(0, 4);
+        setCarouselItems([...movies, ...series].slice(0, 8));
       } catch {
         setCarouselItems([]);
       }
     }
 
     loadCarousel();
-  }, [loginType, server, username, password]);
+  }, [loginType, server, username, password, m3uUrl]);
 
   useEffect(() => {
     if (!carouselItems.length) return;
@@ -75,9 +81,7 @@ export default function HomeScreen({ route, navigation }) {
   }, [carouselItems, activeIndex]);
 
   function openScreen(screenName) {
-    navigation.navigate(screenName, {
-      ...params,
-    });
+    navigation.navigate(screenName, { ...params });
   }
 
   function formattedDate() {
@@ -91,12 +95,78 @@ export default function HomeScreen({ route, navigation }) {
     });
   }
 
+  function showValidity() {
+    const lines = [];
+
+    if (loginType === "xtream") {
+      lines.push(`Status: ${getAccountStatusText(authData)}`);
+      lines.push(`Vencimento: ${getAccountExpiryText(authData)}`);
+      if (username) lines.push(`Usuário: ${username}`);
+      if (server) lines.push(`Servidor: ${server}`);
+    } else {
+      lines.push("Status: M3U");
+      lines.push("Vencimento: Não disponível na lista M3U");
+      lines.push("Lista: M3U carregada");
+    }
+
+    Alert.alert("Validade da lista", lines.join("\n"));
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.container}>
-        <View style={styles.sidebar}>
-          <Text style={styles.logo}>MUNDO PLAY TV</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.logo}>MUNDO PLAY TV</Text>
 
+        <View style={styles.dateBox}>
+          <Text style={styles.dateText}>{formattedDate()}</Text>
+          <Text style={styles.dateText}>{formattedTime()}</Text>
+        </View>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.carouselCard}>
+          <Text style={styles.sectionTitle}>Destaques</Text>
+
+          {activeBanner ? (
+            <View style={styles.bannerWrap}>
+              {activeBanner?.logo ? (
+                <Image
+                  source={{ uri: activeBanner.logo }}
+                  style={styles.bannerImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={[styles.bannerImage, styles.bannerFallback]}>
+                  <Text style={styles.bannerFallbackText}>MUNDO PLAY TV</Text>
+                </View>
+              )}
+
+              <View style={styles.bannerOverlay}>
+                <Text style={styles.bannerTitle} numberOfLines={1}>
+                  {activeBanner?.name || "Destaque"}
+                </Text>
+                <Text style={styles.bannerSubtitle} numberOfLines={2}>
+                  {activeBanner?.plot || activeBanner?.category || "Conteúdo em destaque"}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <View style={[styles.bannerWrap, styles.bannerFallback]}>
+              <Text style={styles.bannerFallbackText}>Nenhum banner disponível</Text>
+            </View>
+          )}
+
+          <View style={styles.dotsRow}>
+            {carouselItems.map((_, index) => (
+              <View
+                key={index}
+                style={[styles.dot, index === activeIndex && styles.dotActive]}
+              />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.menuGrid}>
           <TouchableOpacity style={styles.menuButton} onPress={() => openScreen("LiveTV")}>
             <Text style={styles.menuButtonText}>Live TV</Text>
           </TouchableOpacity>
@@ -111,18 +181,14 @@ export default function HomeScreen({ route, navigation }) {
 
           <TouchableOpacity
             style={styles.menuButton}
-            onPress={() =>
-              Alert.alert("Configurações", "Player, cache, conta e atualização.")
-            }
+            onPress={() => Alert.alert("Configuração", "Player, cache, conta e atualização.")}
           >
             <Text style={styles.menuButtonText}>Configuração</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.menuButton}
-            onPress={() =>
-              Alert.alert("Idiomas", "Português / English / Español")
-            }
+            onPress={() => Alert.alert("Idiomas", "Português / English / Español")}
           >
             <Text style={styles.menuButtonText}>Idiomas</Text>
           </TouchableOpacity>
@@ -133,82 +199,12 @@ export default function HomeScreen({ route, navigation }) {
           >
             <Text style={styles.menuButtonText}>Sair</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuButtonWide} onPress={showValidity}>
+            <Text style={styles.menuButtonText}>Validade da lista</Text>
+          </TouchableOpacity>
         </View>
-
-        <View style={styles.main}>
-          <View style={styles.topRight}>
-            <Text style={styles.topInfo}>{formattedDate()}</Text>
-            <Text style={styles.topInfo}>{formattedTime()}</Text>
-          </View>
-
-          <ScrollView contentContainerStyle={styles.content}>
-            <View style={styles.statusCard}>
-              <Text style={styles.statusTitle}>Informações da lista</Text>
-              <Text style={styles.statusText}>
-                Status: {loginType === "xtream" ? getAccountStatusText(authData) : "M3U"}
-              </Text>
-              <Text style={styles.statusText}>
-                Vencimento: {loginType === "xtream" ? getAccountExpiryText(authData) : "Não disponível"}
-              </Text>
-              {!!username && <Text style={styles.statusText}>Usuário: {username}</Text>}
-              {!!server && <Text style={styles.statusText}>Servidor: {server}</Text>}
-              {!server && !!m3uUrl && <Text style={styles.statusText}>Lista: M3U carregada</Text>}
-            </View>
-
-            <View style={styles.carouselCard}>
-              <Text style={styles.sectionTitle}>Carrossel</Text>
-
-              {activeBanner ? (
-                <View style={styles.bannerWrap}>
-                  {activeBanner?.logo ? (
-                    <Image
-                      source={{ uri: activeBanner.logo }}
-                      style={styles.bannerImage}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={[styles.bannerImage, styles.bannerFallback]}>
-                      <Text style={styles.bannerFallbackText}>MUNDO PLAY TV</Text>
-                    </View>
-                  )}
-
-                  <View style={styles.bannerOverlay}>
-                    <Text style={styles.bannerTitle} numberOfLines={1}>
-                      {activeBanner?.name || "Destaque"}
-                    </Text>
-                    <Text style={styles.bannerSubtitle} numberOfLines={2}>
-                      {activeBanner?.plot || activeBanner?.category || "Catálogo em destaque"}
-                    </Text>
-                  </View>
-                </View>
-              ) : (
-                <View style={[styles.bannerWrap, styles.bannerFallback]}>
-                  <Text style={styles.bannerFallbackText}>Nenhum banner disponível</Text>
-                </View>
-              )}
-
-              <View style={styles.dotsRow}>
-                {carouselItems.map((_, index) => (
-                  <View
-                    key={index}
-                    style={[
-                      styles.dot,
-                      index === activeIndex && styles.dotActive,
-                    ]}
-                  />
-                ))}
-              </View>
-            </View>
-
-            <View style={styles.welcomeCard}>
-              <Text style={styles.sectionTitle}>Bem-vindo</Text>
-              <Text style={styles.welcomeText}>
-                Escolha uma opção no menu lateral para abrir Live TV, Filmes ou Séries.
-              </Text>
-            </View>
-          </ScrollView>
-        </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -217,82 +213,47 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: "#12031f",
+    paddingHorizontal: 14,
+    paddingTop: 10,
   },
-  container: {
-    flex: 1,
+  headerRow: {
     flexDirection: "row",
-  },
-  sidebar: {
-    width: 220,
-    backgroundColor: "#1d0b2f",
-    padding: 16,
-    borderRightWidth: 1,
-    borderRightColor: "rgba(255,255,255,0.08)",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    marginBottom: 12,
   },
   logo: {
     color: "#fff",
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "800",
-    marginBottom: 20,
-  },
-  menuButton: {
-    backgroundColor: "rgba(255,255,255,0.06)",
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    marginBottom: 10,
-  },
-  menuButtonText: {
-    color: "#fff",
-    fontWeight: "700",
-  },
-  main: {
     flex: 1,
-    padding: 14,
+    marginRight: 10,
   },
-  topRight: {
-    alignSelf: "flex-end",
+  dateBox: {
     alignItems: "flex-end",
-    marginBottom: 10,
   },
-  topInfo: {
+  dateText: {
     color: "#fff",
-    fontSize: 14,
     fontWeight: "700",
+    fontSize: 14,
   },
   content: {
     paddingBottom: 40,
   },
-  statusCard: {
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 14,
-  },
-  statusTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "800",
-    marginBottom: 10,
-  },
-  statusText: {
-    color: "#d9d9d9",
-    marginBottom: 6,
-  },
   carouselCard: {
     backgroundColor: "rgba(255,255,255,0.06)",
     borderRadius: 16,
-    padding: 16,
+    padding: 14,
     marginBottom: 14,
   },
   sectionTitle: {
     color: "#fff",
     fontSize: 18,
     fontWeight: "800",
-    marginBottom: 12,
+    marginBottom: 10,
   },
   bannerWrap: {
-    height: 220,
+    height: 210,
     borderRadius: 16,
     overflow: "hidden",
     backgroundColor: "#26103b",
@@ -341,13 +302,26 @@ const styles = StyleSheet.create({
   dotActive: {
     backgroundColor: "#18e7a1",
   },
-  welcomeCard: {
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderRadius: 16,
-    padding: 16,
+  menuGrid: {
+    flexDirection: "column",
   },
-  welcomeText: {
-    color: "#d9d9d9",
-    lineHeight: 22,
+  menuButton: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+  },
+  menuButtonWide: {
+    backgroundColor: "#18e7a1",
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+  },
+  menuButtonText: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 18,
   },
 });

@@ -16,6 +16,7 @@ import {
   loadM3UAll,
   loadXtreamPreview,
   getRecentItemsBySection,
+  filterM3UBySection,
 } from "../utils/iptv";
 import {
   addToHistory,
@@ -62,7 +63,7 @@ export default function SeriesScreen({ route, navigation }) {
         loaded = await loadXtreamPreview(server, username, password, "series", 150);
       } else {
         const all = await loadM3UAll(m3uUrl);
-        loaded = all.slice(0, 150);
+        loaded = filterM3UBySection(all, "series").slice(0, 150);
       }
 
       setSourceItems(loaded);
