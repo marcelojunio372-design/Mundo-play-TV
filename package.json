@@ -24,7 +24,6 @@
     "expo-application": "~5.5.0",
     "expo-av": "~16.0.8",
     "expo-constants": "~18.0.13",
-    "expo-dev-client": "~5.0.16",
     "expo-font": "~14.0.11",
     "expo-haptics": "~15.0.8",
     "expo-image": "~3.0.11",
