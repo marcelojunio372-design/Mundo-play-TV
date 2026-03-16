@@ -1,34 +1,53 @@
-export async function fetchM3U(url) {
-  try {
-    const response = await fetch(url);
-    const text = await response.text();
+export async function loadM3U(url) {
+  const res = await fetch(url);
+  const text = await res.text();
 
-    const lines = text.split("\n");
+  const lines = text.split("\n");
 
-    const channels = [];
+  const channels = [];
+  const movies = [];
+  const series = [];
 
-    let current = {};
+  let current = null;
 
-    for (let line of lines) {
-      line = line.trim();
+  for (let line of lines) {
+    line = line.trim();
 
-      if (line.startsWith("#EXTINF")) {
-        const name = line.split(",")[1];
+    if (line.startsWith("#EXTINF")) {
+      const name = line.split(",")[1] || "Sem nome";
 
-        current = {
-          name: name || "Canal",
-        };
-      }
+      const groupMatch = line.match(/group-title="([^"]+)"/);
+      const group = groupMatch ? groupMatch[1] : "Outros";
 
-      if (line.startsWith("http")) {
-        current.url = line;
-        channels.push(current);
-      }
+      current = {
+        name,
+        group,
+        url: "",
+      };
     }
 
-    return channels;
-  } catch (err) {
-    console.log("Erro M3U:", err);
-    return [];
+    else if (line.startsWith("http")) {
+      if (!current) continue;
+
+      current.url = line;
+
+      if (current.group.toLowerCase().includes("movie")) {
+        movies.push(current);
+      }
+      else if (current.group.toLowerCase().includes("serie")) {
+        series.push(current);
+      }
+      else {
+        channels.push(current);
+      }
+
+      current = null;
+    }
   }
+
+  return {
+    channels,
+    movies,
+    series,
+  };
 }

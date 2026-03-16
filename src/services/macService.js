@@ -1,11 +1,20 @@
-export async function loginMacPortal(server, mac) {
-  const url = server + "/portal.php?type=stb&action=handshake&JsHttpRequest=1-xml";
+export async function loginMAC(portal, mac) {
+
+  const url = `${portal}/portal.php?action=handshake&type=stb&token=&JsHttpRequest=1-xml`;
 
   const res = await fetch(url, {
     headers: {
-      Cookie: "mac=" + mac,
-    },
+      Cookie: `mac=${mac}; stb_lang=en; timezone=America/Sao_Paulo`
+    }
   });
 
-  return await res.json();
+  const data = await res.json();
+
+  if (!data.js || !data.js.token) {
+    throw new Error("MAC inválido");
+  }
+
+  return {
+    token: data.js.token
+  };
 }

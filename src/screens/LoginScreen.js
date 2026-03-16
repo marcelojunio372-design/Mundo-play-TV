@@ -6,114 +6,171 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  StatusBar,
+  Alert
 } from "react-native";
-import { COLORS } from "../utils/constants";
+
+import { loadM3U } from "../services/m3uService";
+import { loginXtream } from "../services/xtreamService";
+import { loginMAC } from "../services/macService";
 
 export default function LoginScreen({ onLogin }) {
-  const [mode, setMode] = useState("xtream");
+
+  const [mode, setMode] = useState("m3u");
+
+  const [m3u, setM3u] = useState("");
+
   const [server, setServer] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [m3uUrl, setM3uUrl] = useState("");
+  const [user, setUser] = useState("");
+  const [pass, setPass] = useState("");
+
   const [mac, setMac] = useState("");
+
+  async function connect() {
+
+    try {
+
+      if (mode === "m3u") {
+
+        const data = await loadM3U(m3u);
+
+        onLogin({
+          type: "m3u",
+          data
+        });
+      }
+
+      if (mode === "xtream") {
+
+        const data = await loginXtream(server, user, pass);
+
+        onLogin({
+          type: "xtream",
+          data
+        });
+      }
+
+      if (mode === "mac") {
+
+        const data = await loginMAC(server, mac);
+
+        onLogin({
+          type: "mac",
+          data
+        });
+      }
+
+    } catch (e) {
+
+      Alert.alert("Erro", e.message);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
-      <View style={styles.loginWrap}>
-        <View style={styles.loginCard}>
-          <Text style={styles.loginLogo}>MUNDO PLAY TV</Text>
-          <Text style={styles.loginSub}>Entrar no aplicativo</Text>
 
-          <View style={styles.modeRow}>
-            <TouchableOpacity style={[styles.modeBtn, mode === "xtream" && styles.modeBtnActive]} onPress={() => setMode("xtream")}>
-              <Text style={styles.modeText}>Usuário / Senha</Text>
-            </TouchableOpacity>
+      <Text style={styles.title}>MUNDO PLAY TV</Text>
 
-            <TouchableOpacity style={[styles.modeBtn, mode === "m3u" && styles.modeBtnActive]} onPress={() => setMode("m3u")}>
-              <Text style={styles.modeText}>M3U</Text>
-            </TouchableOpacity>
+      <View style={styles.tabs}>
 
-            <TouchableOpacity style={[styles.modeBtn, mode === "mac" && styles.modeBtnActive]} onPress={() => setMode("mac")}>
-              <Text style={styles.modeText}>MAC</Text>
-            </TouchableOpacity>
-          </View>
+        <TouchableOpacity onPress={() => setMode("xtream")}>
+          <Text style={styles.tab}>Usuário / Senha</Text>
+        </TouchableOpacity>
 
-          {mode === "xtream" && (
-            <>
-              <TextInput style={styles.input} placeholder="Servidor" placeholderTextColor={COLORS.muted} value={server} onChangeText={setServer} />
-              <TextInput style={styles.input} placeholder="Usuário" placeholderTextColor={COLORS.muted} value={username} onChangeText={setUsername} />
-              <TextInput style={styles.input} placeholder="Senha" placeholderTextColor={COLORS.muted} secureTextEntry value={password} onChangeText={setPassword} />
-            </>
-          )}
+        <TouchableOpacity onPress={() => setMode("m3u")}>
+          <Text style={styles.tab}>M3U</Text>
+        </TouchableOpacity>
 
-          {mode === "m3u" && (
-            <TextInput
-              style={[styles.input, { height: 110, textAlignVertical: "top" }]}
-              placeholder="Cole aqui sua URL M3U"
-              placeholderTextColor={COLORS.muted}
-              multiline
-              value={m3uUrl}
-              onChangeText={setM3uUrl}
-            />
-          )}
+        <TouchableOpacity onPress={() => setMode("mac")}>
+          <Text style={styles.tab}>MAC</Text>
+        </TouchableOpacity>
 
-          {mode === "mac" && (
-            <>
-              <TextInput style={styles.input} placeholder="Servidor / Portal" placeholderTextColor={COLORS.muted} value={server} onChangeText={setServer} />
-              <TextInput style={styles.input} placeholder="MAC Address" placeholderTextColor={COLORS.muted} value={mac} onChangeText={setMac} />
-            </>
-          )}
-
-          <TouchableOpacity style={styles.loginBtn} onPress={onLogin}>
-            <Text style={styles.loginBtnText}>CONECTAR</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.macFooter}>Login IPTV profissional</Text>
-        </View>
       </View>
+
+      {mode === "m3u" && (
+        <TextInput
+          placeholder="Cole aqui sua URL M3U"
+          placeholderTextColor="#aaa"
+          style={styles.input}
+          onChangeText={setM3u}
+        />
+      )}
+
+      {mode === "xtream" && (
+        <>
+          <TextInput
+            placeholder="Servidor"
+            style={styles.input}
+            onChangeText={setServer}
+          />
+
+          <TextInput
+            placeholder="Usuário"
+            style={styles.input}
+            onChangeText={setUser}
+          />
+
+          <TextInput
+            placeholder="Senha"
+            style={styles.input}
+            onChangeText={setPass}
+          />
+        </>
+      )}
+
+      {mode === "mac" && (
+        <>
+          <TextInput
+            placeholder="Portal"
+            style={styles.input}
+            onChangeText={setServer}
+          />
+
+          <TextInput
+            placeholder="MAC Address"
+            style={styles.input}
+            onChangeText={setMac}
+          />
+        </>
+      )}
+
+      <TouchableOpacity style={styles.button} onPress={connect}>
+        <Text style={styles.buttonText}>CONECTAR</Text>
+      </TouchableOpacity>
+
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg },
-  loginWrap: { flex: 1, alignItems: "center", justifyContent: "center", padding: 20 },
-  loginCard: {
-    width: "100%",
-    maxWidth: 560,
-    backgroundColor: COLORS.panel,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 24,
-    padding: 20,
-  },
-  loginLogo: { color: COLORS.primary, fontSize: 30, fontWeight: "900", textAlign: "center" },
-  loginSub: { color: COLORS.text, fontSize: 16, textAlign: "center", marginTop: 8, marginBottom: 18 },
-  modeRow: { flexDirection: "row", gap: 8, marginBottom: 14 },
-  modeBtn: {
-    flex: 1,
-    backgroundColor: COLORS.panel2,
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  modeBtnActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primarySoft },
-  modeText: { color: COLORS.text, textAlign: "center", fontWeight: "700", fontSize: 12 },
-  input: {
-    backgroundColor: COLORS.card,
-    color: COLORS.text,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    marginBottom: 12,
-  },
-  loginBtn: { backgroundColor: COLORS.primary, borderRadius: 16, paddingVertical: 16, marginTop: 6 },
-  loginBtnText: { color: "#00151d", textAlign: "center", fontSize: 16, fontWeight: "900" },
-  macFooter: { color: COLORS.muted, textAlign: "center", marginTop: 14, fontSize: 12 },
+
+container:{flex:1,backgroundColor:"#06111d",alignItems:"center",justifyContent:"center"},
+
+title:{color:"#40d8ff",fontSize:32,fontWeight:"bold",marginBottom:30},
+
+tabs:{flexDirection:"row",gap:20,marginBottom:20},
+
+tab:{color:"#fff",fontSize:16},
+
+input:{
+width:"80%",
+height:50,
+backgroundColor:"#0e2235",
+borderRadius:10,
+marginBottom:12,
+paddingHorizontal:12,
+color:"#fff"
+},
+
+button:{
+backgroundColor:"#40d8ff",
+width:"80%",
+height:55,
+borderRadius:12,
+alignItems:"center",
+justifyContent:"center",
+marginTop:10
+},
+
+buttonText:{fontWeight:"bold",fontSize:18}
+
 });
