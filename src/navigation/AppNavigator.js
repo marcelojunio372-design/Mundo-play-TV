@@ -4,33 +4,25 @@ import HomeScreen from "../screens/HomeScreen";
 import LiveTVScreen from "../screens/LiveTVScreen";
 import MoviesScreen from "../screens/MoviesScreen";
 import SeriesScreen from "../screens/SeriesScreen";
-import SubscriptionScreen from "../screens/SubscriptionScreen";
-import LanguageScreen from "../screens/LanguageScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 
 export default function AppNavigator() {
   const [loggedIn, setLoggedIn] = useState(true);
   const [screen, setScreen] = useState("home");
 
-  const handleLogin = () => {
-    setLoggedIn(true);
-    setScreen("home");
-  };
-
-  const handleLogout = () => {
-    setLoggedIn(false);
-    setScreen("home");
-  };
-
   if (!loggedIn) {
-    return <LoginScreen onLogin={handleLogin} />;
+    return <LoginScreen onLogin={() => setLoggedIn(true)} />;
   }
 
   if (screen === "live") {
     return (
       <LiveTVScreen
         onBack={() => setScreen("home")}
-        onLogout={handleLogout}
+        onOpenSettings={() => setScreen("settings")}
+        onLogout={() => {
+          setLoggedIn(false);
+          setScreen("home");
+        }}
       />
     );
   }
@@ -39,7 +31,11 @@ export default function AppNavigator() {
     return (
       <MoviesScreen
         onBack={() => setScreen("home")}
-        onLogout={handleLogout}
+        onOpenSettings={() => setScreen("settings")}
+        onLogout={() => {
+          setLoggedIn(false);
+          setScreen("home");
+        }}
       />
     );
   }
@@ -48,25 +44,11 @@ export default function AppNavigator() {
     return (
       <SeriesScreen
         onBack={() => setScreen("home")}
-        onLogout={handleLogout}
-      />
-    );
-  }
-
-  if (screen === "subscription") {
-    return (
-      <SubscriptionScreen
-        onBack={() => setScreen("home")}
-        onLogout={handleLogout}
-      />
-    );
-  }
-
-  if (screen === "languages") {
-    return (
-      <LanguageScreen
-        onBack={() => setScreen("home")}
-        onLogout={handleLogout}
+        onOpenSettings={() => setScreen("settings")}
+        onLogout={() => {
+          setLoggedIn(false);
+          setScreen("home");
+        }}
       />
     );
   }
@@ -75,7 +57,10 @@ export default function AppNavigator() {
     return (
       <SettingsScreen
         onBack={() => setScreen("home")}
-        onLogout={handleLogout}
+        onLogout={() => {
+          setLoggedIn(false);
+          setScreen("home");
+        }}
       />
     );
   }
@@ -85,10 +70,11 @@ export default function AppNavigator() {
       onOpenLive={() => setScreen("live")}
       onOpenMovies={() => setScreen("movies")}
       onOpenSeries={() => setScreen("series")}
-      onOpenSubscription={() => setScreen("subscription")}
-      onOpenLanguages={() => setScreen("languages")}
       onOpenSettings={() => setScreen("settings")}
-      onLogout={handleLogout}
+      onLogout={() => {
+        setLoggedIn(false);
+        setScreen("home");
+      }}
     />
   );
 }

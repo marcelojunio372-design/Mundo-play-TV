@@ -1,24 +1,34 @@
+import { Dimensions, Platform } from "react-native";
+
+const { width, height } = Dimensions.get("window");
+
+const isTVLike = width >= 900 || height >= 600;
+
 export const COLORS = {
-  bg: "#03101f",
-  panel: "#0b1c2d",
-  panel2: "#10263c",
-  card: "#10233a",
-  primary: "#23d5ff",
-  primarySoft: "rgba(35,213,255,0.18)",
+  bg: "#06111d",
+  panel: "#0d1b2a",
+  panel2: "#122338",
+  primary: "#38d7ff",
+  primarySoft: "rgba(56,215,255,0.18)",
   text: "#ffffff",
-  muted: "#9fb3c8",
-  border: "rgba(255,255,255,0.10)",
+  muted: "#9fb2c7",
+  border: "rgba(255,255,255,0.08)",
 };
 
-export const IS_TV_LAYOUT = true;
+export const LAYOUT = {
+  isTV: isTVLike,
+  isMobile: !isTVLike,
+  sidebarWidth: isTVLike ? 250 : 96,
+  rightPanelWidth: isTVLike ? 320 : 0,
+  headerHeight: isTVLike ? 76 : 64,
+  posterWidth: isTVLike ? 150 : 110,
+  posterHeight: isTVLike ? 210 : 160,
+  gap: isTVLike ? 14 : 10,
+  topTitle: isTVLike ? 28 : 18,
+  menuText: isTVLike ? 18 : 12,
+};
 
-export const TV = {
-  headerHeight: 72,
-  sideWidth: 210,
-  rightWidth: 230,
-  title: 18,
-  subtitle: 11,
-  menuText: 14,
-  cardTitle: 16,
-  cardText: 12,
+export const APP_CONFIG = {
+  appName: "MUNDO PLAY TV",
+  tagline: "IPTV Profissional",
 };

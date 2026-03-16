@@ -1,168 +1,256 @@
-import React, { useEffect, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   SafeAreaView,
   View,
   Text,
-  FlatList,
   TouchableOpacity,
+  ScrollView,
   StyleSheet,
 } from "react-native";
-import { COLORS } from "../utils/constants";
-import { SERIES } from "../data/mockData";
-import VideoPlayer from "../components/VideoPlayer";
-import { addRecent, getFavorites, getLanguage, getRecent, toggleFavorite } from "../utils/storage";
-import { t } from "../utils/helpers";
+import { COLORS, LAYOUT } from "../utils/constants";
+import { SERIES_CATEGORIES, SERIES } from "../data/mockData";
 
-export default function SeriesScreen({ onBack, onLogout }) {
-  const [selectedEpisode, setSelectedEpisode] = useState(null);
-  const [favorites, setFavorites] = useState([]);
-  const [recent, setRecent] = useState([]);
-  const [lang, setLang] = useState("pt");
-
-  useEffect(() => {
-    async function load() {
-      setFavorites(await getFavorites("series"));
-      setRecent(await getRecent("series"));
-      setLang(await getLanguage());
-    }
-    load();
-  }, []);
-
-  async function openSeries(item) {
-    setSelectedEpisode(item);
-    setRecent(await addRecent("series", item));
-  }
-
-  async function handleToggleFavorite(item) {
-    setFavorites(await toggleFavorite("series", item));
-  }
-
-  function isFavorite(item) {
-    return favorites.some((x) => x.id === item.id);
-  }
-
-  if (selectedEpisode) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => setSelectedEpisode(null)}>
-            <Text style={styles.btn}>{t(lang, "back")}</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.title}>{selectedEpisode.title}</Text>
-
-          <TouchableOpacity onPress={onLogout}>
-            <Text style={styles.btn}>{t(lang, "logout")}</Text>
-          </TouchableOpacity>
-        </View>
-
-        <VideoPlayer url={selectedEpisode.url} />
-      </SafeAreaView>
-    );
-  }
+export default function SeriesScreen({ onBack, onOpenSettings, onLogout }) {
+  const [selectedCategory, setSelectedCategory] = useState(0);
+  const now = useMemo(() => new Date(), []);
+  const time = now.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const date = now.toLocaleDateString("pt-BR");
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack}>
-          <Text style={styles.btn}>{t(lang, "back")}</Text>
+        <Text style={styles.headerBrand}>📺 Séries</Text>
+        <Text style={styles.headerClock}>{time}   {date}</Text>
+      </View>
+
+      <View style={styles.body}>
+        <View style={styles.leftPanel}>
+          <Text style={styles.searchTitle}>Pesquisa em categorias</Text>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {SERIES_CATEGORIES.map((item, index) => {
+              const active = selectedCategory === index;
+
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[styles.categoryRow, active && styles.categoryRowActive]}
+                  onPress={() => setSelectedCategory(index)}
+                >
+                  <Text
+                    style={[
+                      styles.categoryName,
+                      active && styles.categoryNameActive,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {item.name}
+                  </Text>
+
+                  <Text
+                    style={[
+                      styles.categoryCount,
+                      active && styles.categoryNameActive,
+                    ]}
+                  >
+                    {item.count}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        <View style={styles.gridPanel}>
+          <Text style={styles.gridTitle}>TODAS AS SÉRIES</Text>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={styles.posterGrid}>
+              {SERIES.map((item) => (
+                <TouchableOpacity key={item.id} style={styles.posterCard}>
+                  <View style={styles.poster}>
+                    <View style={styles.ratingBadge}>
+                      <Text style={styles.ratingText}>{item.rating}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.posterTitle} numberOfLines={2}>
+                    {item.title}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+
+      <View style={styles.bottomActions}>
+        <TouchableOpacity style={styles.bottomBtn} onPress={onBack}>
+          <Text style={styles.bottomBtnText}>VOLTAR</Text>
         </TouchableOpacity>
 
-        <Text style={styles.title}>{t(lang, "series")}</Text>
+        <TouchableOpacity style={styles.bottomBtn} onPress={onOpenSettings}>
+          <Text style={styles.bottomBtnText}>CONFIGURAÇÃO</Text>
+        </TouchableOpacity>
 
-        <TouchableOpacity onPress={onLogout}>
-          <Text style={styles.btn}>{t(lang, "logout")}</Text>
+        <TouchableOpacity style={styles.bottomBtn} onPress={onLogout}>
+          <Text style={styles.bottomBtnText}>SAIR</Text>
         </TouchableOpacity>
       </View>
-
-      <View style={styles.block}>
-        <Text style={styles.blockTitle}>{t(lang, "recent")}</Text>
-        <FlatList
-          horizontal
-          data={recent}
-          keyExtractor={(item) => `recent-${item.id}`}
-          renderItem={({ item }) => (
-            <TouchableOpacity style={styles.smallCard} onPress={() => openSeries(item)}>
-              <Text style={styles.cardTitle}>{item.title}</Text>
-            </TouchableOpacity>
-          )}
-        />
-      </View>
-
-      <View style={styles.block}>
-        <Text style={styles.blockTitle}>{t(lang, "favorites")}</Text>
-        <FlatList
-          horizontal
-          data={favorites}
-          keyExtractor={(item) => `fav-${item.id}`}
-          renderItem={({ item }) => (
-            <TouchableOpacity style={styles.smallCard} onPress={() => openSeries(item)}>
-              <Text style={styles.cardTitle}>★ {item.title}</Text>
-            </TouchableOpacity>
-          )}
-        />
-      </View>
-
-      <FlatList
-        data={SERIES}
-        keyExtractor={(item) => item.id}
-        numColumns={4}
-        contentContainerStyle={styles.grid}
-        renderItem={({ item }) => (
-          <TouchableOpacity style={styles.card} onPress={() => openSeries(item)}>
-            <Text style={styles.star} onPress={() => handleToggleFavorite(item)}>
-              {isFavorite(item) ? "★" : "☆"}
-            </Text>
-            <Text style={styles.cardTitle}>{item.title}</Text>
-          </TouchableOpacity>
-        )}
-      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg },
+  container: { flex: 1, backgroundColor: "#101737" },
+
   header: {
-    height: 80,
-    backgroundColor: COLORS.panel,
+    height: LAYOUT.isTV ? 70 : 56,
+    paddingHorizontal: LAYOUT.isTV ? 18 : 10,
+    backgroundColor: "#2b2f66",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
   },
-  title: { color: COLORS.text, fontSize: 24, fontWeight: "bold" },
-  btn: { color: COLORS.primary, fontSize: 18, fontWeight: "bold" },
-  block: { paddingHorizontal: 20, paddingTop: 14 },
-  blockTitle: { color: COLORS.text, fontSize: 18, fontWeight: "800", marginBottom: 10 },
-  grid: { padding: 20 },
-  card: {
+
+  headerBrand: {
+    color: "#d9f6ff",
+    fontSize: LAYOUT.isTV ? 18 : 12,
+    fontWeight: "700",
+  },
+
+  headerClock: {
+    color: "#e7fbff",
+    fontSize: LAYOUT.isTV ? 16 : 11,
+    fontWeight: "700",
+  },
+
+  body: {
     flex: 1,
-    margin: 10,
-    height: 120,
-    backgroundColor: COLORS.panel,
-    borderRadius: 12,
-    justifyContent: "center",
+    flexDirection: "row",
+    padding: LAYOUT.isTV ? 12 : 8,
+  },
+
+  leftPanel: {
+    width: LAYOUT.isTV ? 360 : 130,
+    paddingRight: 10,
+  },
+
+  searchTitle: {
+    color: "#dff8ff",
+    fontSize: LAYOUT.isTV ? 16 : 10,
+    marginBottom: 10,
+  },
+
+  categoryRow: {
+    minHeight: LAYOUT.isTV ? 54 : 40,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.08)",
+    flexDirection: "row",
     alignItems: "center",
-    position: "relative",
+    justifyContent: "space-between",
   },
-  smallCard: {
-    width: 220,
-    height: 80,
-    backgroundColor: COLORS.panel2,
-    marginRight: 10,
-    borderRadius: 12,
-    justifyContent: "center",
-    paddingHorizontal: 12,
+
+  categoryRowActive: {
+    backgroundColor: "#6de9ea",
+    borderRadius: 4,
   },
-  cardTitle: { color: COLORS.text, fontWeight: "bold", textAlign: "center" },
-  star: {
-    position: "absolute",
-    top: 8,
-    right: 10,
-    color: "#ffd54a",
-    fontSize: 24,
+
+  categoryName: {
+    color: "#ecf7ff",
+    fontSize: LAYOUT.isTV ? 15 : 10,
+    fontWeight: "700",
+    flex: 1,
+    marginRight: 8,
+  },
+
+  categoryNameActive: {
+    color: "#0d2340",
+  },
+
+  categoryCount: {
+    color: "#ecf7ff",
+    fontSize: LAYOUT.isTV ? 15 : 10,
+    fontWeight: "700",
+  },
+
+  gridPanel: {
+    flex: 1,
+    paddingLeft: 10,
+  },
+
+  gridTitle: {
+    color: "#eaf9ff",
+    fontSize: LAYOUT.isTV ? 18 : 12,
     fontWeight: "900",
-    zIndex: 2,
+    marginBottom: 12,
+  },
+
+  posterGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: LAYOUT.isTV ? 14 : 10,
+  },
+
+  posterCard: {
+    width: LAYOUT.posterWidth,
+    marginBottom: 12,
+  },
+
+  poster: {
+    width: "100%",
+    height: LAYOUT.posterHeight,
+    borderRadius: 10,
+    backgroundColor: "#3d4b8c",
+    marginBottom: 8,
+    overflow: "hidden",
+  },
+
+  ratingBadge: {
+    position: "absolute",
+    top: 6,
+    left: 6,
+    backgroundColor: "#59d1f0",
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+
+  ratingText: {
+    color: "#07354b",
+    fontSize: LAYOUT.isTV ? 11 : 8,
+    fontWeight: "900",
+  },
+
+  posterTitle: {
+    color: "#ffffff",
+    fontSize: LAYOUT.isTV ? 13 : 10,
+    fontWeight: "700",
+  },
+
+  bottomActions: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+  },
+
+  bottomBtn: {
+    flex: 1,
+    backgroundColor: COLORS.primarySoft,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+
+  bottomBtnText: {
+    color: COLORS.primary,
+    fontSize: LAYOUT.isTV ? 13 : 10,
+    fontWeight: "900",
   },
 });
