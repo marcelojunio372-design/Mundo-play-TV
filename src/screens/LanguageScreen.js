@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -7,29 +7,54 @@ import {
   StyleSheet,
 } from "react-native";
 import { COLORS } from "../utils/constants";
+import { getLanguage, setLanguage } from "../utils/storage";
+import { t } from "../utils/helpers";
 
 export default function LanguageScreen({ onBack, onLogout }) {
+  const [lang, setLang] = useState("pt");
+
+  useEffect(() => {
+    async function load() {
+      const saved = await getLanguage();
+      setLang(saved);
+    }
+    load();
+  }, []);
+
+  async function choose(next) {
+    await setLanguage(next);
+    setLang(next);
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack}>
-          <Text style={styles.headerBtn}>VOLTAR</Text>
+          <Text style={styles.headerBtn}>{t(lang, "back")}</Text>
         </TouchableOpacity>
 
-        <Text style={styles.brand}>IDIOMAS</Text>
+        <Text style={styles.brand}>{t(lang, "languages")}</Text>
 
         <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
-          <Text style={styles.logoutText}>SAIR</Text>
+          <Text style={styles.logoutText}>{t(lang, "logout")}</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.centeredScreen}>
         <View style={styles.infoCard}>
-          <Text style={styles.contentTitle}>Idiomas disponíveis</Text>
-          <Text style={styles.infoLine}>• Português</Text>
-          <Text style={styles.infoLine}>• English</Text>
-          <Text style={styles.infoLine}>• Español</Text>
-          <Text style={styles.infoLine}>• Français</Text>
+          <Text style={styles.contentTitle}>{t(lang, "chooseLanguage")}</Text>
+
+          <TouchableOpacity style={[styles.langBtn, lang === "pt" && styles.langBtnActive]} onPress={() => choose("pt")}>
+            <Text style={styles.infoLine}>Português</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.langBtn, lang === "en" && styles.langBtnActive]} onPress={() => choose("en")}>
+            <Text style={styles.infoLine}>English</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.langBtn, lang === "es" && styles.langBtnActive]} onPress={() => choose("es")}>
+            <Text style={styles.infoLine}>Español</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </SafeAreaView>
@@ -60,14 +85,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   logoutText: { color: COLORS.primary, fontWeight: "800" },
-
   centeredScreen: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: 18,
   },
-
   infoCard: {
     width: "100%",
     maxWidth: 700,
@@ -77,17 +100,27 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     padding: 20,
   },
-
   contentTitle: {
     color: COLORS.text,
     fontSize: 20,
     fontWeight: "900",
     marginBottom: 12,
   },
-
+  langBtn: {
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.panel2,
+    marginBottom: 12,
+  },
+  langBtnActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primarySoft,
+  },
   infoLine: {
     color: COLORS.text,
-    fontSize: 16,
-    marginBottom: 10,
+    fontSize: 18,
+    fontWeight: "700",
   },
 });

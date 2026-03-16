@@ -1,15 +1,51 @@
-export function groupByCategory(list, key = "category") {
-  const map = {};
+export const I18N = {
+  pt: {
+    home: "Início",
+    live: "LIVE TV",
+    movies: "FILMES",
+    series: "SÉRIES",
+    subscription: "ASSINATURA",
+    languages: "IDIOMAS",
+    settings: "CONFIGURAÇÕES",
+    favorites: "FAVORITOS",
+    recent: "VISTO POR ÚLTIMO",
+    back: "VOLTAR",
+    logout: "SAIR",
+    chooseLanguage: "Escolha o idioma",
+    active: "Ativo",
+  },
+  en: {
+    home: "Home",
+    live: "LIVE TV",
+    movies: "MOVIES",
+    series: "SERIES",
+    subscription: "SUBSCRIPTION",
+    languages: "LANGUAGES",
+    settings: "SETTINGS",
+    favorites: "FAVORITES",
+    recent: "RECENTLY WATCHED",
+    back: "BACK",
+    logout: "LOGOUT",
+    chooseLanguage: "Choose language",
+    active: "Active",
+  },
+  es: {
+    home: "Inicio",
+    live: "LIVE TV",
+    movies: "PELÍCULAS",
+    series: "SERIES",
+    subscription: "SUSCRIPCIÓN",
+    languages: "IDIOMAS",
+    settings: "CONFIGURACIÓN",
+    favorites: "FAVORITOS",
+    recent: "VISTO RECIENTEMENTE",
+    back: "VOLVER",
+    logout: "SALIR",
+    chooseLanguage: "Elige el idioma",
+    active: "Activo",
+  },
+};
 
-  list.forEach((item) => {
-    const cat = item[key] || "OUTROS";
-
-    if (!map[cat]) {
-      map[cat] = [];
-    }
-
-    map[cat].push(item);
-  });
-
-  return map;
+export function t(lang, key) {
+  return I18N[lang]?.[key] || I18N.pt[key] || key;
 }

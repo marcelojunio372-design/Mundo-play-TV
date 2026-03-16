@@ -9,7 +9,7 @@ import LanguageScreen from "../screens/LanguageScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 
 export default function AppNavigator() {
-  const [loggedIn, setLoggedIn] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(true);
   const [screen, setScreen] = useState("home");
 
   const handleLogin = () => {
@@ -27,27 +27,57 @@ export default function AppNavigator() {
   }
 
   if (screen === "live") {
-    return <LiveTVScreen onBack={() => setScreen("home")} onLogout={handleLogout} />;
+    return (
+      <LiveTVScreen
+        onBack={() => setScreen("home")}
+        onLogout={handleLogout}
+      />
+    );
   }
 
   if (screen === "movies") {
-    return <MoviesScreen onBack={() => setScreen("home")} onLogout={handleLogout} />;
+    return (
+      <MoviesScreen
+        onBack={() => setScreen("home")}
+        onLogout={handleLogout}
+      />
+    );
   }
 
   if (screen === "series") {
-    return <SeriesScreen onBack={() => setScreen("home")} onLogout={handleLogout} />;
+    return (
+      <SeriesScreen
+        onBack={() => setScreen("home")}
+        onLogout={handleLogout}
+      />
+    );
   }
 
   if (screen === "subscription") {
-    return <SubscriptionScreen onBack={() => setScreen("home")} onLogout={handleLogout} />;
+    return (
+      <SubscriptionScreen
+        onBack={() => setScreen("home")}
+        onLogout={handleLogout}
+      />
+    );
   }
 
   if (screen === "languages") {
-    return <LanguageScreen onBack={() => setScreen("home")} onLogout={handleLogout} />;
+    return (
+      <LanguageScreen
+        onBack={() => setScreen("home")}
+        onLogout={handleLogout}
+      />
+    );
   }
 
   if (screen === "settings") {
-    return <SettingsScreen onBack={() => setScreen("home")} onLogout={handleLogout} />;
+    return (
+      <SettingsScreen
+        onBack={() => setScreen("home")}
+        onLogout={handleLogout}
+      />
+    );
   }
 
   return (
