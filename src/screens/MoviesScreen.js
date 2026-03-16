@@ -5,12 +5,12 @@ import {
   Text,
   TouchableOpacity,
   FlatList,
+  Image,
   StyleSheet,
 } from "react-native";
 
 export default function MoviesScreen({ session, onBack, onOpenSettings, onLogout }) {
-  const realMovies = session?.type === "m3u" ? session?.data?.movies || [] : [];
-  const movies = realMovies.slice(0, 200);
+  const movies = session?.data?.movies || [];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -29,19 +29,24 @@ export default function MoviesScreen({ session, onBack, onOpenSettings, onLogout
       <View style={styles.topBlocks}>
         <Text style={styles.blockTitle}>VISTO POR ÚLTIMO</Text>
         <Text style={styles.blockTitle}>FAVORITOS</Text>
-        <Text style={styles.blockTitle}>TODOS OS FILMES ({movies.length})</Text>
+        <Text style={styles.blockTitle}>TODOS ({movies.length})</Text>
       </View>
 
       <FlatList
         data={movies}
         keyExtractor={(item, index) => item.id || String(index)}
-        numColumns={3}
+        numColumns={4}
+        initialNumToRender={24}
+        maxToRenderPerBatch={24}
+        windowSize={10}
         contentContainerStyle={styles.grid}
         renderItem={({ item }) => (
           <View style={styles.card}>
-            <View style={styles.poster}>
-              <Text style={styles.star}>☆</Text>
-            </View>
+            {item.logo ? (
+              <Image source={{ uri: item.logo }} style={styles.poster} />
+            ) : (
+              <View style={styles.poster} />
+            )}
 
             <Text style={styles.title} numberOfLines={2}>
               {item.name || item.title || "Sem nome"}
@@ -59,7 +64,7 @@ export default function MoviesScreen({ session, onBack, onOpenSettings, onLogout
 
       <View style={styles.footer}>
         <TouchableOpacity style={styles.footerBtn} onPress={onOpenSettings}>
-          <Text style={styles.footerBtnText}>CONFIG.</Text>
+          <Text style={styles.footerBtnText}>CONF.</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -70,11 +75,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#06111d" },
 
   header: {
-    height: 52,
+    height: 48,
     backgroundColor: "#0d1b2a",
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -82,82 +87,73 @@ const styles = StyleSheet.create({
 
   headerBtn: {
     color: "#38d7ff",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "900",
   },
 
   headerTitle: {
     color: "#ffffff",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "900",
   },
 
   topBlocks: {
-    paddingHorizontal: 10,
-    paddingTop: 10,
-    paddingBottom: 4,
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    paddingBottom: 2,
   },
 
   blockTitle: {
     color: "#ffffff",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "900",
-    marginBottom: 8,
+    marginBottom: 6,
   },
 
   grid: {
-    paddingHorizontal: 6,
-    paddingBottom: 12,
+    paddingHorizontal: 4,
+    paddingBottom: 10,
   },
 
   card: {
-    width: "31%",
+    width: "23%",
     marginHorizontal: "1%",
-    marginBottom: 12,
+    marginBottom: 10,
   },
 
   poster: {
-    height: 120,
-    borderRadius: 10,
+    width: "100%",
+    height: 95,
+    borderRadius: 8,
     backgroundColor: "#243a57",
-    marginBottom: 6,
-    overflow: "hidden",
-    justifyContent: "flex-start",
-    alignItems: "flex-end",
-    padding: 6,
-  },
-
-  star: {
-    color: "#ffd54a",
-    fontSize: 16,
-    fontWeight: "900",
+    marginBottom: 5,
   },
 
   title: {
     color: "#ffffff",
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "800",
   },
 
   group: {
     color: "#9fb2c7",
-    fontSize: 8,
+    fontSize: 7,
     marginTop: 2,
   },
 
   empty: {
     color: "#ffffff",
-    fontSize: 11,
+    fontSize: 10,
     textAlign: "center",
     marginTop: 20,
   },
 
   footer: {
-    padding: 10,
+    padding: 8,
   },
 
   footerBtn: {
-    height: 40,
+    height: 34,
     borderRadius: 10,
     backgroundColor: "rgba(56,215,255,0.18)",
     borderWidth: 1,
@@ -168,7 +164,7 @@ const styles = StyleSheet.create({
 
   footerBtnText: {
     color: "#38d7ff",
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "900",
   },
 });

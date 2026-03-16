@@ -1,16 +1,15 @@
-
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   SafeAreaView,
   View,
   Text,
   TouchableOpacity,
+  Image,
   StyleSheet,
 } from "react-native";
-import { COLORS, LAYOUT } from "../utils/constants";
-import { HOME_FEATURED } from "../data/mockData";
 
 export default function HomeScreen({
+  session,
   onOpenLive,
   onOpenMovies,
   onOpenSeries,
@@ -18,29 +17,41 @@ export default function HomeScreen({
   onLogout,
 }) {
   const [index, setIndex] = useState(0);
-  const [now, setNow] = useState(new Date());
+
+  const movieItems = session?.data?.movies || [];
+  const seriesItems = session?.data?.series || [];
+
+  const featured = useMemo(() => {
+    const merged = [...movieItems.slice(0, 5), ...seriesItems.slice(0, 5)];
+    return merged.length
+      ? merged
+      : [
+          {
+            id: "demo1",
+            title: "Lançamentos",
+            name: "Lançamentos",
+            group: "Filmes e Séries",
+            logo: "",
+          },
+        ];
+  }, [movieItems, seriesItems]);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setIndex((prev) => (prev + 1) % HOME_FEATURED.length);
+      setIndex((prev) => (prev + 1) % featured.length);
     }, 2500);
 
-    const clock = setInterval(() => {
-      setNow(new Date());
-    }, 1000);
+    return () => clearInterval(timer);
+  }, [featured.length]);
 
-    return () => {
-      clearInterval(timer);
-      clearInterval(clock);
-    };
-  }, []);
-
-  const featured = HOME_FEATURED[index];
+  const now = new Date();
   const time = now.toLocaleTimeString("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
   });
   const date = now.toLocaleDateString("pt-BR");
+
+  const current = featured[index] || featured[0];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -55,7 +66,7 @@ export default function HomeScreen({
       <View style={styles.content}>
         <View style={styles.sidebar}>
           <TouchableOpacity style={styles.menuItem} onPress={onOpenLive}>
-            <Text style={styles.menuText}>LIVE TV</Text>
+            <Text style={styles.menuText}>LIVE</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem} onPress={onOpenMovies}>
@@ -67,7 +78,7 @@ export default function HomeScreen({
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem} onPress={onOpenSettings}>
-            <Text style={styles.menuText}>CONFIG.</Text>
+            <Text style={styles.menuText}>CONF.</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem} onPress={onLogout}>
@@ -77,19 +88,27 @@ export default function HomeScreen({
 
         <View style={styles.main}>
           <View style={styles.carousel}>
-            <Text style={styles.carouselTitle}>{featured?.title || "Lançamentos"}</Text>
-            <Text style={styles.carouselSub}>
-              {featured?.subtitle || "Filmes e séries em destaque"}
-            </Text>
+            {current?.logo ? (
+              <Image source={{ uri: current.logo }} style={styles.cover} />
+            ) : (
+              <View style={styles.coverFallback} />
+            )}
 
-            <View style={styles.dots}>
-              {HOME_FEATURED.map((item, i) => (
-                <View
-                  key={item.id}
-                  style={[styles.dot, i === index && styles.dotActive]}
-                />
-              ))}
+            <View style={styles.info}>
+              <Text style={styles.carouselTitle} numberOfLines={2}>
+                {current?.title || current?.name || "Lançamentos"}
+              </Text>
+
+              <Text style={styles.carouselSub} numberOfLines={1}>
+                {current?.group || "Filmes e séries"}
+              </Text>
             </View>
+          </View>
+
+          <View style={styles.dots}>
+            {featured.slice(0, 5).map((item, i) => (
+              <View key={item.id || String(i)} style={[styles.dot, i === index && styles.dotActive]} />
+            ))}
           </View>
         </View>
       </View>
@@ -98,94 +117,111 @@ export default function HomeScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg },
+  container: { flex: 1, backgroundColor: "#06111d" },
   header: {
-    height: 56,
-    paddingHorizontal: 10,
+    height: 50,
+    paddingHorizontal: 8,
+    backgroundColor: "#0d1b2a",
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    backgroundColor: COLORS.panel,
+    borderBottomColor: "rgba(255,255,255,0.08)",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  logo: {
-    color: COLORS.text,
-    fontSize: 12,
-    fontWeight: "900",
-  },
-  sub: {
-    color: COLORS.muted,
-    fontSize: 9,
-    marginTop: 2,
-  },
-  clock: {
-    color: COLORS.text,
-    fontSize: 10,
-    fontWeight: "700",
-  },
-  content: {
-    flex: 1,
-    flexDirection: "row",
-  },
+  logo: { color: "#fff", fontSize: 11, fontWeight: "900" },
+  sub: { color: "#9fb2c7", fontSize: 8, marginTop: 1 },
+  clock: { color: "#fff", fontSize: 9, fontWeight: "700" },
+
+  content: { flex: 1, flexDirection: "row" },
+
   sidebar: {
-    width: 96,
+    width: 84,
+    padding: 6,
     backgroundColor: "#081624",
     borderRightWidth: 1,
-    borderRightColor: COLORS.border,
-    padding: 8,
+    borderRightColor: "rgba(255,255,255,0.08)",
   },
+
   menuItem: {
-    minHeight: 42,
-    borderRadius: 12,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: "#0d1b2a",
     borderWidth: 1,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.panel,
+    borderColor: "rgba(255,255,255,0.08)",
     justifyContent: "center",
-    paddingHorizontal: 8,
-    marginBottom: 8,
+    alignItems: "center",
+    marginBottom: 6,
   },
+
   menuText: {
-    color: COLORS.text,
-    fontSize: 11,
+    color: "#fff",
+    fontSize: 10,
     fontWeight: "800",
   },
+
   main: {
     flex: 1,
     padding: 8,
-  },
-  carousel: {
-    flex: 1,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.panel,
-    padding: 14,
     justifyContent: "center",
   },
+
+  carousel: {
+    borderRadius: 14,
+    backgroundColor: "#0d1b2a",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    padding: 10,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  cover: {
+    width: 70,
+    height: 95,
+    borderRadius: 10,
+    backgroundColor: "#243a57",
+  },
+
+  coverFallback: {
+    width: 70,
+    height: 95,
+    borderRadius: 10,
+    backgroundColor: "#243a57",
+  },
+
+  info: {
+    flex: 1,
+    marginLeft: 10,
+  },
+
   carouselTitle: {
-    color: COLORS.text,
-    fontSize: 20,
+    color: "#fff",
+    fontSize: 16,
     fontWeight: "900",
-    marginBottom: 8,
   },
+
   carouselSub: {
-    color: COLORS.muted,
-    fontSize: 12,
+    color: "#9fb2c7",
+    fontSize: 10,
+    marginTop: 6,
   },
+
   dots: {
     flexDirection: "row",
-    marginTop: 14,
+    justifyContent: "center",
+    marginTop: 10,
   },
+
   dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 20,
+    width: 8,
+    height: 8,
+    borderRadius: 10,
     backgroundColor: "rgba(255,255,255,0.20)",
-    marginRight: 6,
+    marginHorizontal: 3,
   },
+
   dotActive: {
-    width: 22,
-    backgroundColor: COLORS.primary,
+    width: 18,
+    backgroundColor: "#38d7ff",
   },
 });
