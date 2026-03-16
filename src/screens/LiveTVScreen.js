@@ -1,4 +1,3 @@
-import VideoPlayer from "../components/VideoPlayer";
 import React, { useState } from "react";
 import {
   SafeAreaView,
@@ -9,8 +8,9 @@ import {
   StyleSheet,
 } from "react-native";
 import Sidebar from "../components/Sidebar";
+import VideoPlayer from "../components/VideoPlayer";
 import { LIVE_CATEGORIES, LIVE_CHANNELS } from "../data/mockData";
-import { COLORS, IS_TV_LAYOUT } from "../utils/constants";
+import { COLORS } from "../utils/constants";
 
 function Header({ onBack, onLogout }) {
   const now = new Date();
@@ -45,7 +45,8 @@ export default function LiveTVScreen({ onBack, onLogout }) {
   const [selectedCategory, setSelectedCategory] = useState(0);
   const [selectedChannel, setSelectedChannel] = useState(0);
 
-  const channels = LIVE_CHANNELS;
+  const channels = LIVE_CHANNELS || [];
+  const current = channels[selectedChannel];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -65,7 +66,7 @@ export default function LiveTVScreen({ onBack, onLogout }) {
         <View style={styles.liveCenter}>
           <Text style={styles.contentTitle}>Lista de canais</Text>
 
-          <ScrollView>
+          <ScrollView showsVerticalScrollIndicator={false}>
             {channels.map((channel, index) => (
               <TouchableOpacity
                 key={`${channel.name}-${index}`}
@@ -78,7 +79,7 @@ export default function LiveTVScreen({ onBack, onLogout }) {
                 <View style={styles.channelLogo} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.channelName}>{channel.name}</Text>
-                  <Text style={styles.channelEpg}>{channel.epg}</Text>
+                  <Text style={styles.channelEpg}>{channel.epg || "Sem programação"}</Text>
                 </View>
               </TouchableOpacity>
             ))}
@@ -89,14 +90,17 @@ export default function LiveTVScreen({ onBack, onLogout }) {
           <Text style={styles.contentTitle}>Preview / EPG</Text>
 
           <View style={styles.playerBox}>
-            <Text style={styles.playerHint}>Pressione OK para reproduzir</Text>
+            {current?.url ? (
+              <VideoPlayer url={current.url} />
+            ) : (
+              <View style={styles.emptyPlayer}>
+                <Text style={styles.playerHint}>Canal sem URL de teste</Text>
+              </View>
+            )}
           </View>
 
-          <Text style={styles.epgText}>Canal: {channels[selectedChannel]?.name}</Text>
-          <Text style={styles.epgText}>Programa: {channels[selectedChannel]?.epg}</Text>
-          <Text style={styles.epgText}>11:15 - 11:37 • Polícia em Ação</Text>
-          <Text style={styles.epgText}>11:37 - 11:58 • Polícia em Ação</Text>
-          <Text style={styles.epgText}>11:58 - 12:20 • Polícia em Ação</Text>
+          <Text style={styles.epgText}>Canal: {current?.name || "Nenhum"}</Text>
+          <Text style={styles.epgText}>Programa: {current?.epg || "Sem programação"}</Text>
         </View>
       </View>
     </SafeAreaView>
@@ -107,9 +111,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg },
 
   header: {
-    minHeight: 76,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    minHeight: 70,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
     backgroundColor: COLORS.panel,
@@ -117,26 +121,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  headerBtn: { color: COLORS.primary, fontWeight: "800", fontSize: 14 },
-  brand: { color: COLORS.text, fontSize: 22, fontWeight: "800" },
-  brandSub: { color: COLORS.muted, fontSize: 12, marginTop: 2 },
-  headerRight: { alignItems: "flex-end", gap: 8 },
-  headerInfo: { color: COLORS.text, fontSize: 14, fontWeight: "700" },
+  headerBtn: { color: COLORS.primary, fontWeight: "800", fontSize: 12 },
+  brand: { color: COLORS.text, fontSize: 16, fontWeight: "800" },
+  brandSub: { color: COLORS.muted, fontSize: 10, marginTop: 2 },
+  headerRight: { alignItems: "flex-end" },
+  headerInfo: { color: COLORS.text, fontSize: 11, fontWeight: "700", marginBottom: 4 },
   logoutBtn: {
     backgroundColor: COLORS.primarySoft,
     borderWidth: 1,
     borderColor: COLORS.primary,
     borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
-  logoutText: { color: COLORS.primary, fontWeight: "800" },
+  logoutText: { color: COLORS.primary, fontWeight: "800", fontSize: 11 },
 
   tvWrap: {
     flex: 1,
-    flexDirection: IS_TV_LAYOUT ? "row" : "column",
-    padding: 14,
-    gap: 14,
+    flexDirection: "row",
+    padding: 10,
+    gap: 10,
   },
 
   liveCenter: {
@@ -144,30 +148,30 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.panel,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: 20,
-    padding: 14,
+    borderRadius: 18,
+    padding: 10,
   },
 
   epgPanel: {
-    width: IS_TV_LAYOUT ? 320 : "100%",
+    width: 250,
     backgroundColor: COLORS.panel,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: 20,
-    padding: 14,
+    borderRadius: 18,
+    padding: 10,
   },
 
   contentTitle: {
     color: COLORS.text,
-    fontSize: 20,
+    fontSize: 14,
     fontWeight: "900",
-    marginBottom: 12,
+    marginBottom: 10,
   },
 
   channelRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
     borderRadius: 12,
@@ -179,44 +183,48 @@ const styles = StyleSheet.create({
   },
 
   channelLogo: {
-    width: 46,
-    height: 46,
-    borderRadius: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 8,
     backgroundColor: COLORS.primarySoft,
-    marginRight: 12,
+    marginRight: 10,
   },
 
   channelName: {
     color: COLORS.text,
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: "800",
   },
 
   channelEpg: {
     color: COLORS.muted,
-    fontSize: 13,
-    marginTop: 3,
+    fontSize: 10,
+    marginTop: 2,
   },
 
   playerBox: {
     height: 220,
+    marginBottom: 12,
+  },
+
+  emptyPlayer: {
+    flex: 1,
     backgroundColor: "#09111b",
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: COLORS.border,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 14,
   },
 
   playerHint: {
     color: COLORS.muted,
-    fontSize: 14,
+    fontSize: 12,
   },
 
   epgText: {
     color: COLORS.text,
-    fontSize: 13,
-    marginBottom: 8,
+    fontSize: 11,
+    marginBottom: 6,
   },
 });

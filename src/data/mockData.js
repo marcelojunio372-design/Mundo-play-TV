@@ -1,35 +1,20 @@
-export const MOVIES = [
+export const LIVE_CHANNELS = [
   {
     id: "1",
-    title: "Filme Ação",
+    name: "A&E FHD",
+    epg: "Polícia em Ação",
     url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
   },
   {
     id: "2",
-    title: "Filme Drama",
+    name: "A&E HD",
+    epg: "Polícia em Ação",
     url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
   },
   {
     id: "3",
-    title: "Filme Lançamento",
-    url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-  },
-];
-
-export const SERIES = [
-  {
-    id: "1",
-    title: "Série Episódio 1",
-    url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-  },
-  {
-    id: "2",
-    title: "Série Episódio 2",
-    url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-  },
-  {
-    id: "3",
-    title: "Série Lançamento",
+    name: "AGRO CANAL HD",
+    epg: "Jornal Terra Viva",
     url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
   },
 ];

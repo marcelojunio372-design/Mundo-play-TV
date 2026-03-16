@@ -8,7 +8,7 @@ import {
   ScrollView,
 } from "react-native";
 import HeroCarousel from "../components/HeroCarousel";
-import { COLORS } from "../utils/constants";
+import { COLORS, TV } from "../utils/constants";
 
 const MENU_ITEMS = [
   { key: "live", label: "LIVE TV" },
@@ -41,12 +41,12 @@ export default function HomeScreen({
   const handleOpen = (key) => {
     setSelected(key);
 
-    if (key === "live") return onOpenLive();
-    if (key === "movies") return onOpenMovies();
-    if (key === "series") return onOpenSeries();
-    if (key === "subscription") return onOpenSubscription();
-    if (key === "languages") return onOpenLanguages();
-    if (key === "settings") return onOpenSettings();
+    if (key === "live") return onOpenLive?.();
+    if (key === "movies") return onOpenMovies?.();
+    if (key === "series") return onOpenSeries?.();
+    if (key === "subscription") return onOpenSubscription?.();
+    if (key === "languages") return onOpenLanguages?.();
+    if (key === "settings") return onOpenSettings?.();
   };
 
   return (
@@ -58,10 +58,7 @@ export default function HomeScreen({
         </View>
 
         <View style={styles.headerRight}>
-          <Text style={styles.headerInfo}>
-            {time}   {date}
-          </Text>
-
+          <Text style={styles.headerInfo}>{time}   {date}</Text>
           <TouchableOpacity style={styles.topBtn} onPress={onLogout}>
             <Text style={styles.topBtnText}>SAIR</Text>
           </TouchableOpacity>
@@ -86,6 +83,7 @@ export default function HomeScreen({
                   styles.menuButtonText,
                   selected === item.key && styles.menuButtonTextActive,
                 ]}
+                numberOfLines={1}
               >
                 {item.label}
               </Text>
@@ -97,31 +95,21 @@ export default function HomeScreen({
           <HeroCarousel />
 
           <View style={styles.quickRow}>
-            <TouchableOpacity
-              style={styles.quickCard}
-              onPress={onOpenMovies}
-            >
-              <Text style={styles.quickTitle}>Lançamentos de Filmes</Text>
-              <Text style={styles.quickText}>
-                Abrir catálogo com capas grandes
-              </Text>
+            <TouchableOpacity style={styles.quickCard} onPress={onOpenMovies}>
+              <Text style={styles.quickTitle}>Filmes</Text>
+              <Text style={styles.quickText}>Lançamentos e catálogo</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.quickCard}
-              onPress={onOpenSeries}
-            >
-              <Text style={styles.quickTitle}>Lançamentos de Séries</Text>
-              <Text style={styles.quickText}>
-                Abrir séries e temporadas em destaque
-              </Text>
+            <TouchableOpacity style={styles.quickCard} onPress={onOpenSeries}>
+              <Text style={styles.quickTitle}>Séries</Text>
+              <Text style={styles.quickText}>Temporadas e episódios</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.centerInfo}>
-            <Text style={styles.centerInfoTitle}>Versão TV Box / Smart TV</Text>
+            <Text style={styles.centerInfoTitle}>Modo TV Box / Smart TV</Text>
             <Text style={styles.centerInfoText}>
-              Tela fixa horizontal, menu lateral, carrossel profissional e navegação separada para Live TV, Filmes e Séries.
+              Interface horizontal fixa com menu lateral, carrossel e painel direito.
             </Text>
           </View>
         </View>
@@ -137,8 +125,8 @@ export default function HomeScreen({
           </TouchableOpacity>
 
           {rightPanelOpen && (
-            <ScrollView>
-              <Text style={styles.rightTitle}>Painel Lateral</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.rightTitle}>Painel</Text>
 
               <View style={styles.infoBox}>
                 <Text style={styles.infoLabel}>Usuário</Text>
@@ -155,21 +143,16 @@ export default function HomeScreen({
                 <Text style={styles.infoValue}>03/04/2026</Text>
               </View>
 
-              <View style={styles.infoBox}>
-                <Text style={styles.infoLabel}>Conexões</Text>
-                <Text style={styles.infoValue}>0 / 1</Text>
-              </View>
-
               <TouchableOpacity style={styles.sideAction} onPress={onOpenLive}>
-                <Text style={styles.sideActionText}>Entrar em LIVE TV</Text>
+                <Text style={styles.sideActionText}>LIVE TV</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.sideAction} onPress={onOpenMovies}>
-                <Text style={styles.sideActionText}>Entrar em FILMES</Text>
+                <Text style={styles.sideActionText}>FILMES</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.sideAction} onPress={onOpenSeries}>
-                <Text style={styles.sideActionText}>Entrar em SÉRIES</Text>
+                <Text style={styles.sideActionText}>SÉRIES</Text>
               </TouchableOpacity>
             </ScrollView>
           )}
@@ -186,8 +169,8 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    height: 90,
-    paddingHorizontal: 22,
+    height: TV.headerHeight,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
     backgroundColor: COLORS.panel,
@@ -198,14 +181,14 @@ const styles = StyleSheet.create({
 
   brand: {
     color: COLORS.text,
-    fontSize: 28,
+    fontSize: 18,
     fontWeight: "900",
   },
 
   brandSub: {
     color: COLORS.muted,
-    fontSize: 14,
-    marginTop: 4,
+    fontSize: 10,
+    marginTop: 2,
   },
 
   headerRight: {
@@ -214,23 +197,23 @@ const styles = StyleSheet.create({
 
   headerInfo: {
     color: COLORS.text,
-    fontSize: 18,
-    fontWeight: "800",
-    marginBottom: 8,
+    fontSize: 12,
+    fontWeight: "700",
+    marginBottom: 6,
   },
 
   topBtn: {
     borderWidth: 1,
     borderColor: COLORS.primary,
-    borderRadius: 18,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     backgroundColor: COLORS.primarySoft,
   },
 
   topBtnText: {
     color: COLORS.primary,
-    fontSize: 18,
+    fontSize: 12,
     fontWeight: "900",
   },
 
@@ -240,26 +223,26 @@ const styles = StyleSheet.create({
   },
 
   leftMenu: {
-    width: 250,
+    width: TV.sideWidth,
     backgroundColor: "#071726",
     borderRightWidth: 1,
     borderRightColor: COLORS.border,
-    padding: 18,
+    padding: 12,
   },
 
   leftMenuTitle: {
     color: COLORS.text,
-    fontSize: 20,
+    fontSize: 14,
     fontWeight: "900",
-    marginBottom: 18,
+    marginBottom: 12,
   },
 
   menuButton: {
-    minHeight: 62,
-    borderRadius: 16,
+    minHeight: 48,
+    borderRadius: 14,
     justifyContent: "center",
-    paddingHorizontal: 16,
-    marginBottom: 12,
+    paddingHorizontal: 14,
+    marginBottom: 10,
     backgroundColor: COLORS.panel,
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -272,7 +255,7 @@ const styles = StyleSheet.create({
 
   menuButtonText: {
     color: COLORS.text,
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "800",
   },
 
@@ -282,112 +265,112 @@ const styles = StyleSheet.create({
 
   centerContent: {
     flex: 1,
-    padding: 20,
+    padding: 12,
   },
 
   quickRow: {
     flexDirection: "row",
-    gap: 16,
-    marginBottom: 16,
+    gap: 12,
+    marginBottom: 12,
   },
 
   quickCard: {
     flex: 1,
-    minHeight: 120,
+    minHeight: 86,
     backgroundColor: COLORS.panel,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: 22,
-    padding: 20,
+    borderRadius: 18,
+    padding: 14,
     justifyContent: "center",
   },
 
   quickTitle: {
     color: COLORS.primary,
-    fontSize: 24,
+    fontSize: 16,
     fontWeight: "900",
-    marginBottom: 8,
+    marginBottom: 6,
   },
 
   quickText: {
     color: COLORS.text,
-    fontSize: 16,
+    fontSize: 12,
   },
 
   centerInfo: {
     backgroundColor: COLORS.panel,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: 22,
-    padding: 20,
+    borderRadius: 18,
+    padding: 14,
   },
 
   centerInfoTitle: {
     color: COLORS.text,
-    fontSize: 24,
+    fontSize: 16,
     fontWeight: "900",
-    marginBottom: 8,
+    marginBottom: 6,
   },
 
   centerInfoText: {
     color: COLORS.muted,
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 12,
+    lineHeight: 18,
   },
 
   rightPanel: {
-    width: 290,
+    width: TV.rightWidth,
     backgroundColor: "#08131f",
     borderLeftWidth: 1,
     borderLeftColor: COLORS.border,
-    padding: 16,
+    padding: 12,
   },
 
   rightPanelClosed: {
-    width: 92,
+    width: 82,
   },
 
   rightToggle: {
     borderWidth: 1,
     borderColor: COLORS.primary,
-    borderRadius: 14,
-    paddingVertical: 12,
+    borderRadius: 12,
+    paddingVertical: 10,
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 12,
     backgroundColor: COLORS.primarySoft,
   },
 
   rightToggleText: {
     color: COLORS.primary,
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: "900",
   },
 
   rightTitle: {
     color: COLORS.text,
-    fontSize: 22,
+    fontSize: 15,
     fontWeight: "900",
-    marginBottom: 14,
+    marginBottom: 10,
   },
 
   infoBox: {
     backgroundColor: COLORS.panel,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: 18,
-    padding: 14,
-    marginBottom: 12,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10,
   },
 
   infoLabel: {
     color: COLORS.muted,
-    fontSize: 13,
+    fontSize: 10,
     marginBottom: 4,
   },
 
   infoValue: {
     color: COLORS.text,
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "800",
   },
 
@@ -395,14 +378,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.panel,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: 16,
-    padding: 16,
-    marginTop: 10,
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 8,
   },
 
   sideActionText: {
     color: COLORS.primary,
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: "900",
   },
 });

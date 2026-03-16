@@ -11,3 +11,14 @@ export const COLORS = {
 };
 
 export const IS_TV_LAYOUT = true;
+
+export const TV = {
+  headerHeight: 72,
+  sideWidth: 210,
+  rightWidth: 230,
+  title: 18,
+  subtitle: 11,
+  menuText: 14,
+  cardTitle: 16,
+  cardText: 12,
+};

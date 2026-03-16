@@ -23,7 +23,7 @@ export default function HeroCarousel() {
   useEffect(() => {
     const timer = setInterval(() => {
       setIndex((prev) => (prev + 1) % ITEMS.length);
-    }, 3500);
+    }, 3000);
 
     return () => clearInterval(timer);
   }, []);
@@ -33,8 +33,12 @@ export default function HeroCarousel() {
   return (
     <View style={styles.wrap}>
       <View style={styles.banner}>
-        <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.subtitle}>{item.subtitle}</Text>
+        <Text style={styles.title} numberOfLines={2}>
+          {item.title}
+        </Text>
+        <Text style={styles.subtitle} numberOfLines={2}>
+          {item.subtitle}
+        </Text>
 
         <View style={styles.dotsRow}>
           {ITEMS.map((_, i) => (
@@ -52,47 +56,48 @@ export default function HeroCarousel() {
 
 const styles = StyleSheet.create({
   wrap: {
-    marginBottom: 18,
+    marginBottom: 12,
   },
 
   banner: {
-    minHeight: 220,
-    borderRadius: 26,
+    minHeight: 140,
+    borderRadius: 20,
     backgroundColor: COLORS.panel,
     borderWidth: 1,
     borderColor: COLORS.border,
-    padding: 24,
+    padding: 16,
     justifyContent: "center",
   },
 
   title: {
     color: COLORS.text,
-    fontSize: 34,
+    fontSize: 16,
     fontWeight: "900",
-    marginBottom: 10,
+    marginBottom: 6,
+    maxWidth: 380,
   },
 
   subtitle: {
     color: COLORS.muted,
-    fontSize: 18,
-    maxWidth: 620,
+    fontSize: 12,
+    maxWidth: 420,
   },
 
   dotsRow: {
     flexDirection: "row",
-    marginTop: 22,
-    gap: 10,
+    marginTop: 14,
+    gap: 8,
   },
 
   dot: {
-    width: 12,
-    height: 12,
+    width: 10,
+    height: 10,
     borderRadius: 20,
     backgroundColor: "rgba(255,255,255,0.20)",
   },
 
   dotActive: {
     backgroundColor: COLORS.primary,
-    width: 28,
+    width: 22,
   },
 });
