@@ -8,6 +8,49 @@ import {
   StyleSheet,
 } from "react-native";
 
+function pickFeaturedItems(session) {
+  const movies = session?.data?.movies || [];
+  const series = session?.data?.series || [];
+
+  const movieLaunches = movies.slice(0, 8).map((item, index) => ({
+    id: `movie_${item.id || index}`,
+    title: item.name || item.title || "Filme",
+    subtitle: item.group || "Lançamento de filme",
+    logo: item.logo || "",
+    type: "FILME",
+  }));
+
+  const seriesLaunches = series.slice(0, 8).map((item, index) => ({
+    id: `series_${item.id || index}`,
+    title: item.name || item.title || "Série",
+    subtitle: item.group || "Lançamento de série",
+    logo: item.logo || "",
+    type: "SÉRIE",
+  }));
+
+  const merged = [];
+  const max = Math.max(movieLaunches.length, seriesLaunches.length);
+
+  for (let i = 0; i < max; i++) {
+    if (movieLaunches[i]) merged.push(movieLaunches[i]);
+    if (seriesLaunches[i]) merged.push(seriesLaunches[i]);
+  }
+
+  if (merged.length === 0) {
+    return [
+      {
+        id: "fallback_1",
+        title: "Lançamentos",
+        subtitle: "Filmes e séries em destaque",
+        logo: "",
+        type: "DESTAQUE",
+      },
+    ];
+  }
+
+  return merged;
+}
+
 export default function HomeScreen({
   session,
   onOpenLive,
@@ -16,42 +59,24 @@ export default function HomeScreen({
   onOpenSettings,
   onLogout,
 }) {
-  const [index, setIndex] = useState(0);
-
-  const movieItems = session?.data?.movies || [];
-  const seriesItems = session?.data?.series || [];
-
-  const featured = useMemo(() => {
-    const merged = [...movieItems.slice(0, 5), ...seriesItems.slice(0, 5)];
-    return merged.length
-      ? merged
-      : [
-          {
-            id: "demo1",
-            title: "Lançamentos",
-            name: "Lançamentos",
-            group: "Filmes e Séries",
-            logo: "",
-          },
-        ];
-  }, [movieItems, seriesItems]);
+  const featuredItems = useMemo(() => pickFeaturedItems(session), [session]);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setIndex((prev) => (prev + 1) % featured.length);
-    }, 2500);
+      setCurrentIndex((prev) => (prev + 1) % featuredItems.length);
+    }, 3000);
 
     return () => clearInterval(timer);
-  }, [featured.length]);
+  }, [featuredItems.length]);
 
+  const current = featuredItems[currentIndex];
   const now = new Date();
   const time = now.toLocaleTimeString("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
   });
   const date = now.toLocaleDateString("pt-BR");
-
-  const current = featured[index] || featured[0];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -60,55 +85,78 @@ export default function HomeScreen({
           <Text style={styles.logo}>MUNDO PLAY TV</Text>
           <Text style={styles.sub}>IPTV Profissional</Text>
         </View>
-        <Text style={styles.clock}>{time}   {date}</Text>
+
+        <Text style={styles.clock}>
+          {time}   {date}
+        </Text>
       </View>
 
-      <View style={styles.content}>
+      <View style={styles.body}>
         <View style={styles.sidebar}>
-          <TouchableOpacity style={styles.menuItem} onPress={onOpenLive}>
-            <Text style={styles.menuText}>LIVE</Text>
+          <TouchableOpacity style={styles.menuBtn} onPress={onOpenLive}>
+            <Text style={styles.menuText}>LIVE TV</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={onOpenMovies}>
+          <TouchableOpacity style={styles.menuBtn} onPress={onOpenMovies}>
             <Text style={styles.menuText}>FILMES</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={onOpenSeries}>
+          <TouchableOpacity style={styles.menuBtn} onPress={onOpenSeries}>
             <Text style={styles.menuText}>SÉRIES</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={onOpenSettings}>
-            <Text style={styles.menuText}>CONF.</Text>
+          <TouchableOpacity style={styles.menuBtn} onPress={onOpenSettings}>
+            <Text style={styles.menuText}>CONFIG.</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={onLogout}>
+          <TouchableOpacity style={styles.menuBtn} onPress={onLogout}>
             <Text style={styles.menuText}>SAIR</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.main}>
-          <View style={styles.carousel}>
+          <View style={styles.hero}>
             {current?.logo ? (
-              <Image source={{ uri: current.logo }} style={styles.cover} />
+              <Image source={{ uri: current.logo }} style={styles.heroImage} />
             ) : (
-              <View style={styles.coverFallback} />
+              <View style={styles.heroFallback}>
+                <Text style={styles.heroFallbackText}>SEM CAPA</Text>
+              </View>
             )}
 
-            <View style={styles.info}>
-              <Text style={styles.carouselTitle} numberOfLines={2}>
-                {current?.title || current?.name || "Lançamentos"}
+            <View style={styles.heroInfo}>
+              <Text style={styles.heroBadge}>{current?.type || "DESTAQUE"}</Text>
+
+              <Text style={styles.heroTitle} numberOfLines={2}>
+                {current?.title || "Lançamentos"}
               </Text>
 
-              <Text style={styles.carouselSub} numberOfLines={1}>
-                {current?.group || "Filmes e séries"}
+              <Text style={styles.heroSubtitle} numberOfLines={2}>
+                {current?.subtitle || "Filmes e séries em destaque"}
               </Text>
             </View>
           </View>
 
-          <View style={styles.dots}>
-            {featured.slice(0, 5).map((item, i) => (
-              <View key={item.id || String(i)} style={[styles.dot, i === index && styles.dotActive]} />
-            ))}
+          <View style={styles.quickGrid}>
+            <TouchableOpacity style={styles.quickCard} onPress={onOpenLive}>
+              <Text style={styles.quickTitle}>Live TV</Text>
+              <Text style={styles.quickSub}>Canais ao vivo</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.quickCard} onPress={onOpenMovies}>
+              <Text style={styles.quickTitle}>Filmes</Text>
+              <Text style={styles.quickSub}>Catálogo e lançamentos</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.quickCard} onPress={onOpenSeries}>
+              <Text style={styles.quickTitle}>Séries</Text>
+              <Text style={styles.quickSub}>Temporadas e episódios</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.quickCard} onPress={onOpenSettings}>
+              <Text style={styles.quickTitle}>Config.</Text>
+              <Text style={styles.quickSub}>Idiomas e validade</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -117,32 +165,54 @@ export default function HomeScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#06111d" },
+  container: {
+    flex: 1,
+    backgroundColor: "#06111d",
+  },
+
   header: {
-    height: 50,
-    paddingHorizontal: 8,
+    height: 48,
     backgroundColor: "#0d1b2a",
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
+    paddingHorizontal: 8,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  logo: { color: "#fff", fontSize: 11, fontWeight: "900" },
-  sub: { color: "#9fb2c7", fontSize: 8, marginTop: 1 },
-  clock: { color: "#fff", fontSize: 9, fontWeight: "700" },
 
-  content: { flex: 1, flexDirection: "row" },
+  logo: {
+    color: "#ffffff",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+
+  sub: {
+    color: "#9fb2c7",
+    fontSize: 8,
+    marginTop: 1,
+  },
+
+  clock: {
+    color: "#ffffff",
+    fontSize: 9,
+    fontWeight: "700",
+  },
+
+  body: {
+    flex: 1,
+    flexDirection: "row",
+  },
 
   sidebar: {
     width: 84,
-    padding: 6,
     backgroundColor: "#081624",
     borderRightWidth: 1,
     borderRightColor: "rgba(255,255,255,0.08)",
+    padding: 6,
   },
 
-  menuItem: {
+  menuBtn: {
     height: 38,
     borderRadius: 10,
     backgroundColor: "#0d1b2a",
@@ -154,7 +224,7 @@ const styles = StyleSheet.create({
   },
 
   menuText: {
-    color: "#fff",
+    color: "#ffffff",
     fontSize: 10,
     fontWeight: "800",
   },
@@ -162,66 +232,92 @@ const styles = StyleSheet.create({
   main: {
     flex: 1,
     padding: 8,
-    justifyContent: "center",
   },
 
-  carousel: {
+  hero: {
+    height: 170,
     borderRadius: 14,
+    overflow: "hidden",
     backgroundColor: "#0d1b2a",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
-    padding: 10,
     flexDirection: "row",
+    marginBottom: 10,
+  },
+
+  heroImage: {
+    width: 115,
+    height: "100%",
+    resizeMode: "cover",
+    backgroundColor: "#243a57",
+  },
+
+  heroFallback: {
+    width: 115,
+    height: "100%",
+    backgroundColor: "#243a57",
     alignItems: "center",
+    justifyContent: "center",
   },
 
-  cover: {
-    width: 70,
-    height: 95,
-    borderRadius: 10,
-    backgroundColor: "#243a57",
+  heroFallbackText: {
+    color: "#ffffff",
+    fontSize: 10,
+    fontWeight: "800",
   },
 
-  coverFallback: {
-    width: 70,
-    height: 95,
-    borderRadius: 10,
-    backgroundColor: "#243a57",
-  },
-
-  info: {
+  heroInfo: {
     flex: 1,
-    marginLeft: 10,
+    padding: 12,
+    justifyContent: "center",
   },
 
-  carouselTitle: {
-    color: "#fff",
-    fontSize: 16,
+  heroBadge: {
+    color: "#38d7ff",
+    fontSize: 9,
+    fontWeight: "900",
+    marginBottom: 6,
+  },
+
+  heroTitle: {
+    color: "#ffffff",
+    fontSize: 18,
+    fontWeight: "900",
+    lineHeight: 22,
+  },
+
+  heroSubtitle: {
+    color: "#9fb2c7",
+    fontSize: 10,
+    lineHeight: 14,
+    marginTop: 8,
+  },
+
+  quickGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+
+  quickCard: {
+    width: "48.5%",
+    backgroundColor: "#0d1b2a",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 8,
+  },
+
+  quickTitle: {
+    color: "#38d7ff",
+    fontSize: 12,
     fontWeight: "900",
   },
 
-  carouselSub: {
-    color: "#9fb2c7",
-    fontSize: 10,
-    marginTop: 6,
-  },
-
-  dots: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 10,
-  },
-
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 10,
-    backgroundColor: "rgba(255,255,255,0.20)",
-    marginHorizontal: 3,
-  },
-
-  dotActive: {
-    width: 18,
-    backgroundColor: "#38d7ff",
+  quickSub: {
+    color: "#ffffff",
+    fontSize: 9,
+    marginTop: 4,
   },
 });
