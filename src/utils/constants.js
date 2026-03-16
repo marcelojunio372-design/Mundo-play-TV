@@ -1,9 +1,3 @@
-import { Dimensions, Platform } from "react-native";
-
-const { width, height } = Dimensions.get("window");
-
-const isTVLike = width >= 900 || height >= 600;
-
 export const COLORS = {
   bg: "#06111d",
   panel: "#0d1b2a",
@@ -16,19 +10,14 @@ export const COLORS = {
 };
 
 export const LAYOUT = {
-  isTV: isTVLike,
-  isMobile: !isTVLike,
-  sidebarWidth: isTVLike ? 250 : 96,
-  rightPanelWidth: isTVLike ? 320 : 0,
-  headerHeight: isTVLike ? 76 : 64,
-  posterWidth: isTVLike ? 150 : 110,
-  posterHeight: isTVLike ? 210 : 160,
-  gap: isTVLike ? 14 : 10,
-  topTitle: isTVLike ? 28 : 18,
-  menuText: isTVLike ? 18 : 12,
-};
-
-export const APP_CONFIG = {
-  appName: "MUNDO PLAY TV",
-  tagline: "IPTV Profissional",
+  isTV: false,
+  isMobile: true,
+  sidebarWidth: 96,
+  rightPanelWidth: 0,
+  headerHeight: 56,
+  posterWidth: 92,
+  posterHeight: 128,
+  gap: 8,
+  topTitle: 18,
+  menuText: 11,
 };

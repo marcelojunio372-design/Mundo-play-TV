@@ -8,22 +8,17 @@ import {
   StyleSheet,
   Alert,
 } from "react-native";
-
 import { loadM3U } from "../services/m3uService";
 import { loginXtream } from "../services/xtreamService";
 import { loginMAC } from "../services/macService";
 
 export default function LoginScreen({ onLogin }) {
   const [mode, setMode] = useState("m3u");
-
   const [m3u, setM3u] = useState("");
-
   const [server, setServer] = useState("");
   const [user, setUser] = useState("");
   const [pass, setPass] = useState("");
-
   const [mac, setMac] = useState("");
-
   const [loading, setLoading] = useState(false);
 
   async function connect() {
@@ -31,42 +26,18 @@ export default function LoginScreen({ onLogin }) {
       setLoading(true);
 
       if (mode === "m3u") {
-        if (!m3u.trim()) {
-          throw new Error("Cole a URL M3U");
-        }
-
         const data = await loadM3U(m3u);
-
-        onLogin({
-          type: "m3u",
-          data,
-        });
+        onLogin({ type: "m3u", data });
       }
 
       if (mode === "xtream") {
-        if (!server.trim() || !user.trim() || !pass.trim()) {
-          throw new Error("Preencha servidor, usuário e senha");
-        }
-
         const data = await loginXtream(server, user, pass);
-
-        onLogin({
-          type: "xtream",
-          data,
-        });
+        onLogin({ type: "xtream", data });
       }
 
       if (mode === "mac") {
-        if (!server.trim() || !mac.trim()) {
-          throw new Error("Preencha portal e MAC");
-        }
-
         const data = await loginMAC(server, mac);
-
-        onLogin({
-          type: "mac",
-          data,
-        });
+        onLogin({ type: "mac", data });
       }
     } catch (e) {
       Alert.alert("Erro", e.message || "Falha ao conectar");
@@ -77,35 +48,31 @@ export default function LoginScreen({ onLogin }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.loginBox}>
+      <View style={styles.box}>
         <Text style={styles.logo}>MUNDO PLAY TV</Text>
         <Text style={styles.sub}>Entrar no aplicativo</Text>
 
-        <View style={styles.topModes}>
+        <View style={styles.tabs}>
           <TouchableOpacity
-            style={[styles.modeBtn, mode === "xtream" && styles.modeBtnActive]}
+            style={[styles.tab, mode === "xtream" && styles.tabActive]}
             onPress={() => setMode("xtream")}
           >
-            <Text style={[styles.modeText, mode === "xtream" && styles.modeTextActive]}>
-              Usuário / Senha
-            </Text>
+            <Text style={styles.tabText}>Usuário / Senha</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.modeBtn, mode === "m3u" && styles.modeBtnActive]}
+            style={[styles.tab, mode === "m3u" && styles.tabActive]}
             onPress={() => setMode("m3u")}
           >
-            <Text style={[styles.modeText, mode === "m3u" && styles.modeTextActive]}>
-              M3U
-            </Text>
+            <Text style={styles.tabText}>M3U</Text>
           </TouchableOpacity>
         </View>
 
         {mode === "m3u" && (
           <TextInput
-            placeholder="Cole aqui sua URL M3U"
+            placeholder="Cole sua URL M3U"
             placeholderTextColor="#8ea3b8"
-            style={styles.bigInput}
+            style={styles.input}
             value={m3u}
             onChangeText={setM3u}
             autoCapitalize="none"
@@ -114,27 +81,21 @@ export default function LoginScreen({ onLogin }) {
         )}
 
         {mode === "xtream" && (
-          <View style={styles.form}>
+          <>
             <TextInput
               placeholder="Servidor"
               placeholderTextColor="#8ea3b8"
               style={styles.input}
               value={server}
               onChangeText={setServer}
-              autoCapitalize="none"
-              autoCorrect={false}
             />
-
             <TextInput
               placeholder="Usuário"
               placeholderTextColor="#8ea3b8"
               style={styles.input}
               value={user}
               onChangeText={setUser}
-              autoCapitalize="none"
-              autoCorrect={false}
             />
-
             <TextInput
               placeholder="Senha"
               placeholderTextColor="#8ea3b8"
@@ -142,59 +103,41 @@ export default function LoginScreen({ onLogin }) {
               value={pass}
               onChangeText={setPass}
               secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
             />
-          </View>
+          </>
         )}
 
-        <TouchableOpacity style={styles.connectBtn} onPress={connect} disabled={loading}>
-          <Text style={styles.connectText}>
-            {loading ? "CONECTANDO..." : "CONECTAR"}
-          </Text>
+        <TouchableOpacity style={styles.btn} onPress={connect} disabled={loading}>
+          <Text style={styles.btnText}>{loading ? "CONECTANDO..." : "CONECTAR"}</Text>
         </TouchableOpacity>
 
         <View style={styles.footer}>
           <TouchableOpacity
-            style={[styles.macFooterBtn, mode === "mac" && styles.macFooterBtnActive]}
+            style={[styles.macBtn, mode === "mac" && styles.tabActive]}
             onPress={() => setMode("mac")}
           >
-            <Text
-              style={[
-                styles.macFooterText,
-                mode === "mac" && styles.macFooterTextActive,
-              ]}
-            >
-              MAC
-            </Text>
+            <Text style={styles.macText}>MAC</Text>
           </TouchableOpacity>
-
-          {mode === "mac" && (
-            <View style={styles.macForm}>
-              <TextInput
-                placeholder="Portal"
-                placeholderTextColor="#8ea3b8"
-                style={styles.input}
-                value={server}
-                onChangeText={setServer}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-
-              <TextInput
-                placeholder="00:1A:79:00:00:00"
-                placeholderTextColor="#8ea3b8"
-                style={styles.input}
-                value={mac}
-                onChangeText={setMac}
-                autoCapitalize="characters"
-                autoCorrect={false}
-              />
-            </View>
-          )}
         </View>
 
-        <Text style={styles.bottomText}>Login IPTV profissional</Text>
+        {mode === "mac" && (
+          <>
+            <TextInput
+              placeholder="Portal"
+              placeholderTextColor="#8ea3b8"
+              style={styles.input}
+              value={server}
+              onChangeText={setServer}
+            />
+            <TextInput
+              placeholder="00:1A:79:00:00:00"
+              placeholderTextColor="#8ea3b8"
+              style={styles.input}
+              value={mac}
+              onChangeText={setMac}
+            />
+          </>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -206,156 +149,90 @@ const styles = StyleSheet.create({
     backgroundColor: "#06111d",
     alignItems: "center",
     justifyContent: "center",
-    padding: 18,
+    padding: 14,
   },
-
-  loginBox: {
+  box: {
     width: "100%",
-    maxWidth: 980,
+    maxWidth: 420,
     backgroundColor: "#0d1b2a",
-    borderRadius: 26,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
-    padding: 24,
+    padding: 16,
   },
-
   logo: {
     color: "#40d8ff",
-    fontSize: 34,
+    fontSize: 20,
     fontWeight: "900",
     textAlign: "center",
   },
-
   sub: {
     color: "#ffffff",
-    fontSize: 18,
+    fontSize: 13,
     textAlign: "center",
-    marginTop: 10,
-    marginBottom: 22,
+    marginTop: 6,
+    marginBottom: 14,
   },
-
-  topModes: {
+  tabs: {
     flexDirection: "row",
-    justifyContent: "center",
-    gap: 14,
-    marginBottom: 18,
-  },
-
-  modeBtn: {
-    minWidth: 160,
-    height: 54,
-    borderRadius: 16,
-    backgroundColor: "#122338",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 16,
-  },
-
-  modeBtnActive: {
-    backgroundColor: "rgba(64,216,255,0.18)",
-    borderColor: "#40d8ff",
-  },
-
-  modeText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-
-  modeTextActive: {
-    color: "#ffffff",
-  },
-
-  bigInput: {
-    width: "100%",
-    minHeight: 112,
-    backgroundColor: "#102235",
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    paddingHorizontal: 18,
-    paddingTop: 18,
-    color: "#ffffff",
-    fontSize: 17,
-    marginBottom: 18,
-  },
-
-  form: {
-    marginBottom: 18,
-  },
-
-  macForm: {
-    width: "100%",
-    marginTop: 14,
-  },
-
-  input: {
-    width: "100%",
-    height: 52,
-    backgroundColor: "#102235",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    paddingHorizontal: 14,
-    color: "#ffffff",
-    fontSize: 16,
+    gap: 8,
     marginBottom: 12,
   },
-
-  connectBtn: {
-    width: "100%",
-    height: 68,
-    borderRadius: 18,
+  tab: {
+    flex: 1,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: "#122338",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tabActive: {
+    borderWidth: 1,
+    borderColor: "#40d8ff",
+    backgroundColor: "rgba(64,216,255,0.18)",
+  },
+  tabText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  input: {
+    height: 46,
+    backgroundColor: "#102235",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    color: "#fff",
+    marginBottom: 10,
+  },
+  btn: {
+    height: 52,
+    borderRadius: 14,
     backgroundColor: "#40d8ff",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 4,
+    marginTop: 2,
   },
-
-  connectText: {
+  btnText: {
     color: "#07111b",
-    fontSize: 22,
+    fontSize: 17,
     fontWeight: "900",
   },
-
   footer: {
-    marginTop: 18,
+    marginTop: 12,
     alignItems: "flex-start",
   },
-
-  macFooterBtn: {
-    minWidth: 120,
-    height: 44,
-    borderRadius: 12,
+  macBtn: {
+    height: 36,
+    minWidth: 80,
+    borderRadius: 10,
     backgroundColor: "#122338",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
   },
-
-  macFooterBtnActive: {
-    backgroundColor: "rgba(64,216,255,0.18)",
-    borderColor: "#40d8ff",
-  },
-
-  macFooterText: {
-    color: "#ffffff",
-    fontSize: 15,
+  macText: {
+    color: "#fff",
+    fontSize: 12,
     fontWeight: "800",
-  },
-
-  macFooterTextActive: {
-    color: "#40d8ff",
-  },
-
-  bottomText: {
-    color: "#8ea3b8",
-    textAlign: "center",
-    fontSize: 13,
-    marginTop: 16,
   },
 });

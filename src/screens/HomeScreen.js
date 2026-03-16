@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import {
   SafeAreaView,
@@ -6,7 +7,7 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
-import { APP_CONFIG, COLORS, LAYOUT } from "../utils/constants";
+import { COLORS, LAYOUT } from "../utils/constants";
 import { HOME_FEATURED } from "../data/mockData";
 
 export default function HomeScreen({
@@ -22,7 +23,7 @@ export default function HomeScreen({
   useEffect(() => {
     const timer = setInterval(() => {
       setIndex((prev) => (prev + 1) % HOME_FEATURED.length);
-    }, 3000);
+    }, 2500);
 
     const clock = setInterval(() => {
       setNow(new Date());
@@ -35,25 +36,20 @@ export default function HomeScreen({
   }, []);
 
   const featured = HOME_FEATURED[index];
-
   const time = now.toLocaleTimeString("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
   });
-
   const date = now.toLocaleDateString("pt-BR");
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.logo}>{APP_CONFIG.appName}</Text>
-          <Text style={styles.sub}>{APP_CONFIG.tagline}</Text>
+          <Text style={styles.logo}>MUNDO PLAY TV</Text>
+          <Text style={styles.sub}>IPTV Profissional</Text>
         </View>
-
-        <View style={styles.headerRight}>
-          <Text style={styles.clock}>{time}   {date}</Text>
-        </View>
+        <Text style={styles.clock}>{time}   {date}</Text>
       </View>
 
       <View style={styles.content}>
@@ -71,7 +67,7 @@ export default function HomeScreen({
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem} onPress={onOpenSettings}>
-            <Text style={styles.menuText}>CONFIGURAÇÃO</Text>
+            <Text style={styles.menuText}>CONFIG.</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem} onPress={onLogout}>
@@ -81,8 +77,10 @@ export default function HomeScreen({
 
         <View style={styles.main}>
           <View style={styles.carousel}>
-            <Text style={styles.carouselTitle}>{featured.title}</Text>
-            <Text style={styles.carouselSub}>{featured.subtitle}</Text>
+            <Text style={styles.carouselTitle}>{featured?.title || "Lançamentos"}</Text>
+            <Text style={styles.carouselSub}>
+              {featured?.subtitle || "Filmes e séries em destaque"}
+            </Text>
 
             <View style={styles.dots}>
               {HOME_FEATURED.map((item, i) => (
@@ -100,14 +98,10 @@ export default function HomeScreen({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
-
+  container: { flex: 1, backgroundColor: COLORS.bg },
   header: {
-    height: LAYOUT.headerHeight,
-    paddingHorizontal: LAYOUT.isTV ? 22 : 12,
+    height: 56,
+    paddingHorizontal: 10,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
     backgroundColor: COLORS.panel,
@@ -115,103 +109,83 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-
   logo: {
     color: COLORS.text,
-    fontSize: LAYOUT.topTitle,
+    fontSize: 12,
     fontWeight: "900",
   },
-
   sub: {
     color: COLORS.muted,
-    fontSize: LAYOUT.isTV ? 14 : 10,
-    marginTop: 4,
+    fontSize: 9,
+    marginTop: 2,
   },
-
-  headerRight: {
-    alignItems: "flex-end",
-  },
-
   clock: {
     color: COLORS.text,
-    fontSize: LAYOUT.isTV ? 16 : 11,
-    fontWeight: "800",
+    fontSize: 10,
+    fontWeight: "700",
   },
-
   content: {
     flex: 1,
     flexDirection: "row",
   },
-
   sidebar: {
-    width: LAYOUT.sidebarWidth,
+    width: 96,
     backgroundColor: "#081624",
     borderRightWidth: 1,
     borderRightColor: COLORS.border,
-    padding: LAYOUT.isTV ? 18 : 10,
+    padding: 8,
   },
-
   menuItem: {
-    minHeight: LAYOUT.isTV ? 62 : 44,
+    minHeight: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.panel,
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    marginBottom: 8,
+  },
+  menuText: {
+    color: COLORS.text,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  main: {
+    flex: 1,
+    padding: 8,
+  },
+  carousel: {
+    flex: 1,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: COLORS.border,
     backgroundColor: COLORS.panel,
-    justifyContent: "center",
-    paddingHorizontal: LAYOUT.isTV ? 18 : 12,
-    marginBottom: 12,
-  },
-
-  menuText: {
-    color: COLORS.text,
-    fontSize: LAYOUT.menuText,
-    fontWeight: "800",
-  },
-
-  main: {
-    flex: 1,
-    padding: LAYOUT.isTV ? 18 : 10,
-  },
-
-  carousel: {
-    flex: 1,
-    borderRadius: 26,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.panel,
-    padding: LAYOUT.isTV ? 26 : 16,
+    padding: 14,
     justifyContent: "center",
   },
-
   carouselTitle: {
     color: COLORS.text,
-    fontSize: LAYOUT.isTV ? 34 : 20,
+    fontSize: 20,
     fontWeight: "900",
-    marginBottom: 10,
-    maxWidth: LAYOUT.isTV ? 500 : "100%",
+    marginBottom: 8,
   },
-
   carouselSub: {
     color: COLORS.muted,
-    fontSize: LAYOUT.isTV ? 18 : 12,
-    maxWidth: LAYOUT.isTV ? 600 : "100%",
+    fontSize: 12,
   },
-
   dots: {
     flexDirection: "row",
-    marginTop: 20,
+    marginTop: 14,
   },
-
   dot: {
-    width: 12,
-    height: 12,
+    width: 10,
+    height: 10,
     borderRadius: 20,
     backgroundColor: "rgba(255,255,255,0.20)",
-    marginRight: 8,
+    marginRight: 6,
   },
-
   dotActive: {
-    width: 28,
+    width: 22,
     backgroundColor: COLORS.primary,
   },
 });
