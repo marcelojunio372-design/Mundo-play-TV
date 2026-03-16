@@ -10,7 +10,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v3
@@ -33,7 +33,7 @@ jobs:
           ./gradlew assembleRelease
 
       - name: Upload APK
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: mundo-play-tv-apk
           path: android/app/build/outputs/apk/release/app-release.apk
