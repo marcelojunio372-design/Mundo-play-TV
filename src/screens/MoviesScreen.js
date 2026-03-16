@@ -1,94 +1,65 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   SafeAreaView,
   View,
   Text,
   TouchableOpacity,
+  ScrollView,
   StyleSheet,
-  FlatList,
-  Image,
 } from "react-native";
-import { MOVIE_CATEGORIES, MOVIE_POSTERS } from "../data/mockData";
+import Sidebar from "../components/Sidebar";
+import ContentCard from "../components/ContentCard";
+import { MOVIE_CATEGORIES, MOVIES } from "../data/mockData";
+import { COLORS } from "../utils/constants";
 
-export default function MoviesScreen({ navigation }) {
-  const [selectedCategory, setSelectedCategory] = useState(MOVIE_CATEGORIES[0]);
-  const [items, setItems] = useState([]);
-
-  useEffect(() => {
-    const loadOnlyMovies = () => {
-      const next = MOVIE_POSTERS[selectedCategory.id] || MOVIE_POSTERS.all || [];
-      setItems(next);
-    };
-
-    loadOnlyMovies();
-  }, [selectedCategory]);
-
-  function renderCategory({ item }) {
-    const active = item.id === selectedCategory.id;
-
-    return (
-      <TouchableOpacity
-        style={[styles.categoryItem, active && styles.categoryItemActive]}
-        onPress={() => setSelectedCategory(item)}
-      >
-        <Text style={[styles.categoryName, active && styles.categoryNameActive]}>
-          {item.name}
-        </Text>
-        <Text style={[styles.categoryCount, active && styles.categoryNameActive]}>
-          {item.count}
-        </Text>
+function Header({ onBack, onLogout }) {
+  return (
+    <View style={styles.header}>
+      <TouchableOpacity onPress={onBack}>
+        <Text style={styles.headerBtn}>VOLTAR</Text>
       </TouchableOpacity>
-    );
-  }
 
-  function renderPoster({ item }) {
-    return (
-      <TouchableOpacity style={styles.posterCard}>
-        <View style={styles.ratingBadge}>
-          <Text style={styles.ratingText}>{item.rating}</Text>
-        </View>
-        <Image source={{ uri: item.image }} style={styles.posterImage} />
-        <Text numberOfLines={2} style={styles.posterTitle}>
-          {item.title}
-        </Text>
-        <Text style={styles.posterYear}>({item.year})</Text>
+      <View>
+        <Text style={styles.brand}>FILMES</Text>
+        <Text style={styles.brandSub}>Catálogo por categoria</Text>
+      </View>
+
+      <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
+        <Text style={styles.logoutText}>SAIR</Text>
       </TouchableOpacity>
-    );
-  }
+    </View>
+  );
+}
+
+export default function MoviesScreen({ onBack, onLogout }) {
+  const [selectedCategory, setSelectedCategory] = useState(0);
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.logo}>EPIC</Text>
-        </TouchableOpacity>
-        <Text style={styles.close}>✕</Text>
-        <Text style={styles.title}>TODOS OS CANAIS</Text>
-      </View>
+      <Header onBack={onBack} onLogout={onLogout} />
 
-      <View style={styles.content}>
-        <View style={styles.leftColumn}>
-          <View style={styles.searchHeader}>
-            <Text style={styles.searchText}>🔍 Pesquisa em categorias</Text>
-          </View>
+      <View style={styles.contentWrap}>
+        <Sidebar
+          title="Categorias"
+          items={MOVIE_CATEGORIES}
+          selectedIndex={selectedCategory}
+          onSelect={setSelectedCategory}
+        />
 
-          <FlatList
-            data={MOVIE_CATEGORIES}
-            keyExtractor={(item) => item.id}
-            renderItem={renderCategory}
-            showsVerticalScrollIndicator={false}
-          />
-        </View>
+        <View style={styles.contentPanel}>
+          <Text style={styles.contentTitle}>Todos os filmes</Text>
 
-        <View style={styles.rightColumn}>
-          <FlatList
-            data={items}
-            keyExtractor={(item) => item.id}
-            renderItem={renderPoster}
-            numColumns={5}
-            showsVerticalScrollIndicator={false}
-            columnWrapperStyle={styles.posterRow}
-          />
+          <ScrollView>
+            <View style={styles.posterGrid}>
+              {MOVIES.map((item, index) => (
+                <ContentCard
+                  key={`${item.title}-${index}`}
+                  title={item.title}
+                  rating={item.rating}
+                />
+              ))}
+            </View>
+          </ScrollView>
         </View>
       </View>
     </SafeAreaView>
@@ -96,121 +67,58 @@ export default function MoviesScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#17103d",
-    paddingHorizontal: 16,
-    paddingTop: 10,
-  },
+  container: { flex: 1, backgroundColor: COLORS.bg },
+
   header: {
+    minHeight: 76,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    backgroundColor: COLORS.panel,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+  },
+  headerBtn: { color: COLORS.primary, fontWeight: "800", fontSize: 14 },
+  brand: { color: COLORS.text, fontSize: 22, fontWeight: "800" },
+  brandSub: { color: COLORS.muted, fontSize: 12, marginTop: 2 },
+  logoutBtn: {
+    backgroundColor: COLORS.primarySoft,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  logoutText: { color: COLORS.primary, fontWeight: "800" },
+
+  contentWrap: {
+    flex: 1,
+    flexDirection: "row",
+    padding: 14,
+    gap: 14,
+  },
+
+  contentPanel: {
+    flex: 1,
+    backgroundColor: COLORS.panel,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 20,
+    padding: 14,
+  },
+
+  contentTitle: {
+    color: COLORS.text,
+    fontSize: 20,
+    fontWeight: "900",
     marginBottom: 12,
   },
-  logo: {
-    color: "#7df4ff",
-    fontSize: 24,
-    fontWeight: "900",
-  },
-  close: {
-    color: "#d9f6ff",
-    fontSize: 28,
-    marginLeft: 26,
-  },
-  title: {
-    color: "#e7f9ff",
-    fontSize: 26,
-    fontWeight: "900",
-    marginLeft: "auto",
-    marginRight: 20,
-  },
-  content: {
-    flex: 1,
+
+  posterGrid: {
     flexDirection: "row",
-  },
-  leftColumn: {
-    width: "33%",
-    marginRight: 14,
-  },
-  rightColumn: {
-    flex: 1,
-  },
-  searchHeader: {
-    backgroundColor: "#25204d",
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 10,
-  },
-  searchText: {
-    color: "#dff8ff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  categoryItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#221c49",
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#3f3768",
-  },
-  categoryItemActive: {
-    backgroundColor: "#68f6ff",
-  },
-  categoryName: {
-    color: "#f0f7ff",
-    fontSize: 15,
-    fontWeight: "700",
-    flex: 1,
-  },
-  categoryNameActive: {
-    color: "#11316e",
-  },
-  categoryCount: {
-    color: "#f0f7ff",
-    fontSize: 15,
-    fontWeight: "800",
-    marginLeft: 12,
-  },
-  posterRow: {
-    justifyContent: "space-between",
-  },
-  posterCard: {
-    width: "18.8%",
-    marginBottom: 18,
-  },
-  ratingBadge: {
-    position: "absolute",
-    top: 6,
-    left: 6,
-    zIndex: 2,
-    backgroundColor: "#59dfff",
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-  },
-  ratingText: {
-    color: "#143c80",
-    fontSize: 12,
-    fontWeight: "900",
-  },
-  posterImage: {
-    width: "100%",
-    height: 220,
-    borderRadius: 10,
-    backgroundColor: "#2a2456",
-  },
-  posterTitle: {
-    color: "#ffffff",
-    fontSize: 15,
-    fontWeight: "700",
-    marginTop: 8,
-  },
-  posterYear: {
-    color: "#c8d7ff",
-    fontSize: 13,
-    marginTop: 3,
+    flexWrap: "wrap",
+    gap: 12,
   },
 });

@@ -6,144 +6,90 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
+import { COLORS } from "../utils/constants";
 
-export default function SubscriptionScreen({ navigation, session, onLogout }) {
+export default function SubscriptionScreen({ onBack, onLogout }) {
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.leftTitle}>| Subscription Info</Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={onBack}>
+          <Text style={styles.headerBtn}>VOLTAR</Text>
+        </TouchableOpacity>
 
-      <View style={styles.card}>
-        <Text style={styles.title}>Subscription Info</Text>
+        <Text style={styles.brand}>ASSINATURA</Text>
 
-        <View style={styles.row}>
-          <Text style={styles.label}>Usuario:</Text>
-          <Text style={styles.value}>{session.username}</Text>
-        </View>
-
-        <View style={styles.row}>
-          <Text style={styles.label}>Estado da conta:</Text>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{session.accountStatus}</Text>
-          </View>
-        </View>
-
-        <View style={styles.row}>
-          <Text style={styles.label}>Vencimento:</Text>
-          <Text style={styles.value}>{session.expirationDate}</Text>
-        </View>
-
-        <View style={styles.row}>
-          <Text style={styles.label}>Teste:</Text>
-          <Text style={styles.value}>{session.isTrial}</Text>
-        </View>
-
-        <View style={styles.row}>
-          <Text style={styles.label}>Conexões ativas:</Text>
-          <Text style={styles.value}>{session.activeConnections}</Text>
-        </View>
-
-        <View style={styles.row}>
-          <Text style={styles.label}>Criado em:</Text>
-          <Text style={styles.value}>{session.createdAt}</Text>
-        </View>
-
-        <View style={styles.row}>
-          <Text style={styles.label}>Conexões máximas:</Text>
-          <Text style={styles.value}>{session.maxConnections}</Text>
-        </View>
+        <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
+          <Text style={styles.logoutText}>SAIR</Text>
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.buttons}>
-        <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.primaryText}>VOLTAR</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.secondaryBtn} onPress={onLogout}>
-          <Text style={styles.secondaryText}>SAIR</Text>
-        </TouchableOpacity>
+      <View style={styles.centeredScreen}>
+        <View style={styles.infoCard}>
+          <Text style={styles.contentTitle}>Subscription Info</Text>
+          <Text style={styles.infoLine}>Usuário: Marcelo123</Text>
+          <Text style={styles.infoLine}>Estado da conta: Ativo</Text>
+          <Text style={styles.infoLine}>Vencimento: 03/04/2026</Text>
+          <Text style={styles.infoLine}>Teste: Não</Text>
+          <Text style={styles.infoLine}>Conexões ativas: 0</Text>
+          <Text style={styles.infoLine}>Conexões máximas: 1</Text>
+        </View>
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#15103a",
-    padding: 28,
-  },
-  leftTitle: {
-    color: "#d7f6ff",
-    fontSize: 24,
-    fontWeight: "700",
-    marginBottom: 24,
-  },
-  card: {
-    backgroundColor: "#2b2456",
-    borderRadius: 20,
-    padding: 28,
-  },
-  title: {
-    color: "#ffffff",
-    fontSize: 34,
-    fontWeight: "900",
-    textAlign: "center",
-    marginBottom: 30,
-  },
-  row: {
+  container: { flex: 1, backgroundColor: COLORS.bg },
+  header: {
+    minHeight: 76,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    backgroundColor: COLORS.panel,
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 18,
+    justifyContent: "space-between",
   },
-  label: {
-    width: 320,
-    color: "#dce7ff",
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  value: {
-    color: "#ffffff",
-    fontSize: 18,
-    fontWeight: "800",
-  },
-  badge: {
-    backgroundColor: "#6bf0c9",
+  headerBtn: { color: COLORS.primary, fontWeight: "800", fontSize: 14 },
+  brand: { color: COLORS.text, fontSize: 22, fontWeight: "800" },
+  logoutBtn: {
+    backgroundColor: COLORS.primarySoft,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingVertical: 8,
   },
-  badgeText: {
-    color: "#ffffff",
-    fontSize: 18,
-    fontWeight: "900",
-  },
-  buttons: {
-    flexDirection: "row",
-    marginTop: 24,
-    gap: 16,
-  },
-  primaryBtn: {
+  logoutText: { color: COLORS.primary, fontWeight: "800" },
+
+  centeredScreen: {
     flex: 1,
-    backgroundColor: "#67f4ff",
-    paddingVertical: 18,
-    borderRadius: 12,
     alignItems: "center",
+    justifyContent: "center",
+    padding: 18,
   },
-  secondaryBtn: {
-    flex: 1,
-    backgroundColor: "#31395b",
-    paddingVertical: 18,
-    borderRadius: 12,
-    alignItems: "center",
+
+  infoCard: {
+    width: "100%",
+    maxWidth: 700,
+    backgroundColor: COLORS.panel,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 22,
+    padding: 20,
   },
-  primaryText: {
-    color: "#ffffff",
-    fontWeight: "900",
+
+  contentTitle: {
+    color: COLORS.text,
     fontSize: 20,
-  },
-  secondaryText: {
-    color: "#ffffff",
     fontWeight: "900",
-    fontSize: 20,
+    marginBottom: 12,
+  },
+
+  infoLine: {
+    color: COLORS.text,
+    fontSize: 16,
+    marginBottom: 10,
   },
 });
