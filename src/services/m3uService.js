@@ -1,5 +1,3 @@
-import { Alert } from "react-native";
-
 function safeText(value) {
   if (value === null || value === undefined) return "";
   return String(value).trim();
@@ -19,7 +17,7 @@ function extractAttr(line = "", attr = "") {
 
 function extractGroup(extinf = "") {
   const g1 = extractAttr(extinf, "group-title");
-  if (g1) return g1;
+  if (g1) return safeText(g1);
 
   const parts = extinf.split(",");
   if (parts.length > 1) return safeText(parts[1]);
@@ -41,24 +39,54 @@ function extractLogo(extinf = "") {
   );
 }
 
+function extractYear(name = "", group = "") {
+  const text = `${name} ${group}`;
+  const match = text.match(/\b(19\d{2}|20\d{2})\b/);
+  return match ? match[1] : "";
+}
+
+function extractDescription(extinf = "", name = "", group = "") {
+  const plot =
+    extractAttr(extinf, "plot") ||
+    extractAttr(extinf, "description") ||
+    extractAttr(extinf, "tvg-description");
+
+  if (plot) return safeText(plot);
+
+  if (/temporada|epis[oó]dio|s\d{1,2}e\d{1,2}/i.test(`${name} ${group}`)) {
+    return "Conteúdo de série.";
+  }
+
+  if (/movie|filme|cinema|lançamento/i.test(`${name} ${group}`)) {
+    return "Conteúdo de filme.";
+  }
+
+  return "";
+}
+
 function inferType(name = "", group = "", url = "") {
-  const text = `${name} ${group} ${url}`.toLowerCase();
+  const text = `${name} ${group}`.toLowerCase();
+  const link = safeText(url).toLowerCase();
 
-  const isSeries =
-    /s\d{1,2}e\d{1,2}|temporada|epis[oó]dio|novelas|séries|series|serie/.test(text);
+  const byMovieUrl =
+    /\/movie\/|type=movie|action=get_vod_stream|\/vod\//i.test(link);
 
-  const isMovie =
-    /filmes|filme|movie|cinema|lançamento|lancamento|ação|acao|com[eé]dia|drama|terror|suspense|romance|anima[cç][aã]o/.test(
+  const bySeriesUrl =
+    /\/series\/|type=series|action=get_series|action=get_series_info/i.test(link);
+
+  const byEpisodePattern =
+    /s\d{1,2}e\d{1,2}|temporada|epis[oó]dio|season|novelas|séries|series|cap[ií]tulo/i.test(
       text
     );
 
-  const isLive =
-    /tv|ao vivo|canal|abertos|esportes|not[ií]cias|document[aá]rios|religiosos|variedades|globo|sbt|record|band/.test(
+  const byLivePattern =
+    /tv|ao vivo|canal|abertos|esportes|not[ií]cias|document[aá]rios|religiosos|variedades|globo|sbt|record|band|discovery|fhd|hd|sd|uhd|4k/i.test(
       text
     );
 
-  if (isSeries && !isLive) return "series";
-  if (isMovie && !isLive) return "movie";
+  if (byMovieUrl) return "movie";
+  if (bySeriesUrl) return "series";
+  if (byEpisodePattern && !byLivePattern) return "series";
   return "live";
 }
 
@@ -118,16 +146,18 @@ export async function loadM3U(url) {
     const group = extractGroup(extinf);
     const logo = extractLogo(extinf);
     const type = inferType(name, group, streamUrl);
+    const year = extractYear(name, group);
+    const description = extractDescription(extinf, name, group);
 
     const item = {
-      id: `${type}_${i}_${name}`,
+      id: `${type}_${i}_${name}`.replace(/\s+/g, "_"),
       name,
       group,
       logo,
       url: streamUrl,
       type,
-      year: "",
-      description: "",
+      year,
+      description,
     };
 
     if (type === "movie") {
