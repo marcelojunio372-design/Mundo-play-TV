@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -20,29 +20,63 @@ export default function HomeScreen({
   onOpenSettings,
   onReload,
   onLogout,
+  onSelectMovie,
+  onSelectSeries,
 }) {
   const movies = session?.data?.movies || [];
   const series = session?.data?.series || [];
 
   const featured = useMemo(() => {
-    const combined = [...movies.slice(0, 3), ...series.slice(0, 3)];
-    return combined.length
-      ? combined
-      : [
-          {
-            name: "MUNDO PLAY TV",
-            description: "Streaming profissional",
-            logo: "",
-            group: "Destaques",
-          },
-        ];
+    const movieItems = movies.slice(0, 5).map((item) => ({
+      ...item,
+      mediaType: "movie",
+    }));
+
+    const seriesItems = series.slice(0, 5).map((item) => ({
+      ...item,
+      mediaType: "series",
+    }));
+
+    const combined = [...movieItems, ...seriesItems];
+
+    if (combined.length > 0) return combined;
+
+    return [
+      {
+        id: "fallback_home",
+        name: "MUNDO PLAY TV",
+        description: "Streaming profissional",
+        logo: "",
+        group: "Lançamentos e destaques",
+        year: "",
+        mediaType: "movie",
+      },
+    ];
   }, [movies, series]);
 
   const [index, setIndex] = useState(0);
+
   const item = featured[index] || featured[0];
 
-  const nextBanner = () => {
-    setIndex((prev) => (prev + 1) % featured.length);
+  useEffect(() => {
+    if (!featured.length) return;
+
+    const timer = setInterval(() => {
+      setIndex((prev) => (prev + 1) % featured.length);
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, [featured]);
+
+  const openFeatured = () => {
+    if (!item) return;
+
+    if (item.mediaType === "series") {
+      onSelectSeries?.(item);
+      return;
+    }
+
+    onSelectMovie?.(item);
   };
 
   return (
@@ -52,6 +86,7 @@ export default function HomeScreen({
           <Text style={styles.brand}>MUNDO PLAY TV</Text>
           <Text style={styles.subbrand}>IPTV Profissional</Text>
         </View>
+
         <View>
           <Text style={styles.datetime}>
             {new Date().toLocaleTimeString("pt-BR", {
@@ -96,7 +131,11 @@ export default function HomeScreen({
         </View>
 
         <View style={styles.main}>
-          <TouchableOpacity activeOpacity={0.9} onPress={nextBanner}>
+          <TouchableOpacity
+            activeOpacity={0.92}
+            style={styles.heroTouch}
+            onPress={openFeatured}
+          >
             <ImageBackground
               source={item?.logo ? { uri: item.logo } : undefined}
               style={styles.hero}
@@ -104,39 +143,29 @@ export default function HomeScreen({
             >
               <View style={styles.heroOverlay}>
                 <Text style={styles.heroType}>
-                  {series.includes(item) ? "SÉRIE" : "FILME"}
+                  {item?.mediaType === "series" ? "SÉRIE" : "FILME"}
                 </Text>
+
                 <Text style={styles.heroTitle} numberOfLines={2}>
                   {item?.name || "MUNDO PLAY TV"}
                 </Text>
-                <Text style={styles.heroSub} numberOfLines={2}>
-                  {item?.group || "Lançamentos e destaques"}
+
+                <Text style={styles.heroMeta} numberOfLines={1}>
+                  {(item?.year || "-") + " • " + (item?.group || "Destaques")}
                 </Text>
+
+                <Text style={styles.heroDesc} numberOfLines={4}>
+                  {item?.description || "Lançamentos e destaques da sua lista."}
+                </Text>
+
+                <View style={styles.heroAction}>
+                  <Text style={styles.heroActionText}>
+                    TOQUE PARA ABRIR
+                  </Text>
+                </View>
               </View>
             </ImageBackground>
           </TouchableOpacity>
-
-          <View style={styles.grid}>
-            <TouchableOpacity style={styles.card} onPress={onOpenLive}>
-              <Text style={styles.cardTitle}>Live TV</Text>
-              <Text style={styles.cardText}>Canais ao vivo</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.card} onPress={onOpenMovies}>
-              <Text style={styles.cardTitle}>Filmes</Text>
-              <Text style={styles.cardText}>Catálogo e detalhes</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.card} onPress={onOpenSeries}>
-              <Text style={styles.cardTitle}>Séries</Text>
-              <Text style={styles.cardText}>Temporadas e episódios</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.card} onPress={onOpenSettings}>
-              <Text style={styles.cardTitle}>Config.</Text>
-              <Text style={styles.cardText}>Idiomas e validade</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </View>
     </SafeAreaView>
@@ -211,71 +240,69 @@ const styles = StyleSheet.create({
     padding: 10,
   },
 
+  heroTouch: {
+    flex: 1,
+  },
+
   hero: {
-    height: isPhone ? 130 : 220,
+    flex: 1,
     borderRadius: 18,
     overflow: "hidden",
     backgroundColor: "#0c2133",
-    marginBottom: 12,
   },
 
   heroImage: {
-    borderRadius: 18,
-    opacity: 0.55,
+    opacity: 0.58,
   },
 
   heroOverlay: {
     flex: 1,
-    justifyContent: "center",
-    padding: 18,
-    backgroundColor: "rgba(4,13,22,0.45)",
+    justifyContent: "flex-end",
+    padding: isPhone ? 18 : 28,
+    backgroundColor: "rgba(4,13,22,0.38)",
   },
 
   heroType: {
     color: "#38d7ff",
-    fontSize: isPhone ? 10 : 14,
+    fontSize: isPhone ? 11 : 15,
     fontWeight: "900",
-    marginBottom: 4,
+    marginBottom: 6,
   },
 
   heroTitle: {
     color: "#fff",
-    fontSize: isPhone ? 22 : 34,
+    fontSize: isPhone ? 24 : 38,
     fontWeight: "900",
   },
 
-  heroSub: {
-    color: "#c4d1de",
-    fontSize: isPhone ? 10 : 14,
-    marginTop: 6,
+  heroMeta: {
+    color: "#d4dde7",
+    fontSize: isPhone ? 11 : 15,
+    marginTop: 8,
   },
 
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
+  heroDesc: {
+    color: "#eef3f8",
+    fontSize: isPhone ? 12 : 16,
+    lineHeight: isPhone ? 18 : 24,
+    marginTop: 12,
+    maxWidth: "70%",
   },
 
-  card: {
-    width: "48.5%",
-    minHeight: isPhone ? 84 : 110,
-    borderRadius: 16,
-    backgroundColor: "#0b1b2b",
+  heroAction: {
+    alignSelf: "flex-start",
+    marginTop: 16,
+    backgroundColor: "rgba(56,215,255,0.16)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    padding: 16,
-    marginBottom: 10,
+    borderColor: "#38d7ff",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
   },
 
-  cardTitle: {
+  heroActionText: {
     color: "#38d7ff",
-    fontSize: isPhone ? 14 : 22,
+    fontSize: isPhone ? 11 : 13,
     fontWeight: "900",
-  },
-
-  cardText: {
-    color: "#d7e0ea",
-    fontSize: isPhone ? 10 : 14,
-    marginTop: 6,
   },
 });
