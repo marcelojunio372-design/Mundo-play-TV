@@ -4,108 +4,84 @@ import {
   View,
   Text,
   TouchableOpacity,
-  FlatList,
-  Image,
   StyleSheet,
-  Modal,
-  ScrollView,
+  FlatList,
+  Dimensions,
+  Image,
 } from "react-native";
-import VideoPlayer from "../components/VideoPlayer";
 
-function buildSeriesCategories(series) {
-  const grouped = {};
+const { width } = Dimensions.get("window");
+const isPhone = width < 900;
 
-  series.forEach((item) => {
-    const group = item.group || "OUTROS";
-    if (!grouped[group]) grouped[group] = [];
-    grouped[group].push(item);
+function buildCategories(items) {
+  const groups = {};
+  items.forEach((item) => {
+    const key = String(item.group || "OUTROS").trim();
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(item);
   });
 
-  const categories = [
-    { id: "all", name: "TODAS", items: series },
-    { id: "fav", name: "FAVORITOS", items: [] },
-    { id: "last", name: "VISTO POR ÚLTIMO", items: [] },
+  return [
+    { name: "Tudo", items },
+    { name: "Favoritos", items: [] },
+    { name: "Visto por último", items: [] },
+    ...Object.keys(groups)
+      .sort((a, b) => a.localeCompare(b))
+      .map((group) => ({ name: group, items: groups[group] })),
   ];
-
-  Object.keys(grouped).forEach((group, index) => {
-    categories.push({
-      id: `series_group_${index}`,
-      name: group.toUpperCase(),
-      items: grouped[group],
-    });
-  });
-
-  return categories;
 }
 
-export default function SeriesScreen({ session, onBack, onOpenSettings, onLogout }) {
-  const rawSeries = session?.data?.series || [];
-
-  const series = useMemo(() => {
-    return rawSeries.filter((item) => {
-      const group = (item.group || "").toLowerCase();
-      const name = (item.name || "").toLowerCase();
-
-      const seemsLive =
-        /tv|ao vivo|canal|abertos|esportes|not[ií]cias|document[aá]rios|religiosos|variedades/.test(group) &&
-        !/s[eé]ries|series|serie|temporada|epis[oó]dio|novelas/.test(group);
-
-      if (seemsLive) return false;
-      if (/filme|movie|cinema/.test(group) && !/serie|série|series|novela/.test(group)) return false;
-
-      return /s\d{1,2}e\d{1,2}|temporada|epis[oó]dio/.test(name) || true;
-    });
-  }, [rawSeries]);
-
-  const categories = useMemo(() => buildSeriesCategories(series), [series]);
-
+export default function SeriesScreen({
+  session,
+  onBack,
+  onOpenLive,
+  onOpenMovies,
+  onOpenSeries,
+  onSelectSeries,
+}) {
+  const series = session?.data?.series || [];
+  const categories = useMemo(() => buildCategories(series), [series]);
   const [selectedCategory, setSelectedCategory] = useState(0);
-  const [selectedSeries, setSelectedSeries] = useState(null);
-  const [showDetails, setShowDetails] = useState(false);
-  const [selectedEpisode, setSelectedEpisode] = useState(null);
-  const [showPlayer, setShowPlayer] = useState(false);
-
-  const visibleSeries = categories[selectedCategory]?.items || [];
-
-  const episodes = useMemo(() => {
-    if (!selectedSeries) return [];
-    return Array.from({ length: 10 }).map((_, i) => ({
-      id: i + 1,
-      name: `Episódio ${i + 1}`,
-      url: selectedSeries.url,
-    }));
-  }, [selectedSeries]);
+  const visibleSeries = categories[selectedCategory]?.items || series;
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack}>
-          <Text style={styles.headerBtn}>VOLTAR</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.headerTitle}>SÉRIES</Text>
-
-        <TouchableOpacity onPress={onLogout}>
-          <Text style={styles.headerBtn}>SAIR</Text>
-        </TouchableOpacity>
+      <View style={styles.topnav}>
+        <TouchableOpacity onPress={onBack}><Text style={styles.navText}>Casa</Text></TouchableOpacity>
+        <Text style={styles.sep}>|</Text>
+        <TouchableOpacity onPress={onOpenLive}><Text style={styles.navText}>TV ao Vivo</Text></TouchableOpacity>
+        <Text style={styles.sep}>|</Text>
+        <TouchableOpacity onPress={onOpenMovies}><Text style={styles.navText}>Filmes</Text></TouchableOpacity>
+        <Text style={styles.sep}>|</Text>
+        <TouchableOpacity onPress={onOpenSeries}><Text style={styles.navTextActive}>Séries</Text></TouchableOpacity>
       </View>
 
       <View style={styles.content}>
         <View style={styles.leftPanel}>
+          <View style={styles.leftHeader}>
+            <Text style={styles.leftIcon}>🎬</Text>
+            <Text style={styles.leftTitle}>voltar</Text>
+          </View>
+
           <FlatList
             data={categories}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item, index) => `${item.name}_${index}`}
             renderItem={({ item, index }) => {
-              const active = selectedCategory === index;
+              const active = index === selectedCategory;
               return (
                 <TouchableOpacity
                   style={[styles.categoryRow, active && styles.categoryActive]}
                   onPress={() => setSelectedCategory(index)}
                 >
-                  <Text style={[styles.categoryText, active && styles.categoryTextActive]} numberOfLines={1}>
+                  <Text
+                    style={[styles.categoryText, active && styles.categoryTextActive]}
+                    numberOfLines={1}
+                  >
                     {item.name}
                   </Text>
-                  <Text style={[styles.categoryCount, active && styles.categoryTextActive]}>
+                  <Text
+                    style={[styles.categoryCount, active && styles.categoryTextActive]}
+                  >
                     {item.items.length}
                   </Text>
                 </TouchableOpacity>
@@ -114,297 +90,95 @@ export default function SeriesScreen({ session, onBack, onOpenSettings, onLogout
           />
         </View>
 
-        <View style={styles.gridPanel}>
+        <View style={styles.rightPanel}>
+          <Text style={styles.totalLabel}>
+            {categories[selectedCategory]?.name || "Tudo"} ({visibleSeries.length})
+          </Text>
+
           <FlatList
             data={visibleSeries}
             keyExtractor={(item, index) => item.id || `${item.name}_${index}`}
-            numColumns={3}
+            numColumns={isPhone ? 3 : 5}
+            columnWrapperStyle={styles.rowWrap}
             renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.card}
-                onPress={() => {
-                  setSelectedSeries(item);
-                  setShowDetails(true);
-                }}
-              >
-                {item.logo ? (
-                  <Image source={{ uri: item.logo }} style={styles.poster} />
-                ) : (
-                  <View style={styles.posterFallback} />
-                )}
-
+              <TouchableOpacity style={styles.card} onPress={() => onSelectSeries(item)}>
+                <Image
+                  source={item.logo ? { uri: item.logo } : undefined}
+                  style={styles.poster}
+                />
                 <Text style={styles.cardTitle} numberOfLines={2}>
-                  {item.name || "Sem nome"}
-                </Text>
-
-                <Text style={styles.cardSub} numberOfLines={1}>
-                  {item.group || "Série"}
+                  {item.name}
                 </Text>
               </TouchableOpacity>
             )}
           />
         </View>
       </View>
-
-      <Modal visible={showDetails} transparent animationType="fade">
-        <View style={styles.overlay}>
-          <View style={styles.modalBox}>
-            <ScrollView>
-              {selectedSeries?.logo ? (
-                <Image source={{ uri: selectedSeries.logo }} style={styles.detailCover} />
-              ) : (
-                <View style={styles.detailCoverFallback} />
-              )}
-
-              <Text style={styles.detailTitle}>{selectedSeries?.name || "Sem nome"}</Text>
-              <Text style={styles.detailText}>Ano: {selectedSeries?.year || "-"}</Text>
-              <Text style={styles.detailText}>Grupo: {selectedSeries?.group || "-"}</Text>
-              <Text style={styles.detailText}>
-                Descrição: {selectedSeries?.description || "Sem descrição na lista"}
-              </Text>
-
-              <Text style={styles.episodeTitle}>EPISÓDIOS</Text>
-
-              {episodes.map((ep) => (
-                <TouchableOpacity
-                  key={ep.id}
-                  style={styles.episodeBtn}
-                  onPress={() => {
-                    setSelectedEpisode(ep);
-                    setShowDetails(false);
-                    setShowPlayer(true);
-                  }}
-                >
-                  <Text style={styles.episodeBtnText}>{ep.name}</Text>
-                </TouchableOpacity>
-              ))}
-
-              <TouchableOpacity
-                style={styles.secondBtn}
-                onPress={() => setShowDetails(false)}
-              >
-                <Text style={styles.secondBtnText}>FECHAR</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal visible={showPlayer} animationType="slide">
-        <SafeAreaView style={styles.playerScreen}>
-          <View style={styles.playerHeader}>
-            <TouchableOpacity
-              style={styles.secondBtn}
-              onPress={() => setShowPlayer(false)}
-            >
-              <Text style={styles.secondBtnText}>FECHAR PLAYER</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.playerWrap}>
-            <VideoPlayer
-              url={selectedEpisode?.url || selectedSeries?.url}
-              title={selectedEpisode?.name || selectedSeries?.name}
-              brand="MUNDO PLAY TV"
-            />
-          </View>
-        </SafeAreaView>
-      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#06111d" },
-
-  header: {
-    height: 42,
-    backgroundColor: "#0d1b2a",
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.08)",
-    paddingHorizontal: 8,
+  container: { flex: 1, backgroundColor: "#040914" },
+  topnav: {
+    height: isPhone ? 42 : 58,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.1)",
   },
+  navText: { color: "#d7d7d7", fontSize: isPhone ? 11 : 16 },
+  navTextActive: { color: "#ffe04f", fontSize: isPhone ? 11 : 16, fontWeight: "900" },
+  sep: { color: "#ccc", marginHorizontal: 12 },
 
-  headerBtn: { color: "#38d7ff", fontSize: 8, fontWeight: "900" },
-  headerTitle: { color: "#fff", fontSize: 13, fontWeight: "900" },
-
-  content: { flex: 1, flexDirection: "row", padding: 4 },
+  content: { flex: 1, flexDirection: "row" },
 
   leftPanel: {
-    width: 96,
-    paddingRight: 4,
+    width: isPhone ? 120 : 260,
+    backgroundColor: "#261425",
+    borderRightWidth: 1,
+    borderRightColor: "rgba(255,255,255,0.1)",
   },
+  leftHeader: {
+    height: isPhone ? 70 : 110,
+    justifyContent: "center",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.08)",
+  },
+  leftIcon: { color: "#fff", fontSize: isPhone ? 28 : 50, marginBottom: 6 },
+  leftTitle: { color: "#fff", fontSize: isPhone ? 10 : 14 },
 
   categoryRow: {
-    minHeight: 32,
-    paddingHorizontal: 6,
+    minHeight: isPhone ? 34 : 50,
+    paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.06)",
+    borderBottomColor: "rgba(255,255,255,0.08)",
   },
+  categoryActive: { backgroundColor: "rgba(255,224,79,0.12)" },
+  categoryText: { color: "#f4f4f4", fontSize: isPhone ? 9 : 13, flex: 1, marginRight: 8 },
+  categoryTextActive: { color: "#ffe04f" },
+  categoryCount: { color: "#f4f4f4", fontSize: isPhone ? 9 : 13 },
 
-  categoryActive: {
-    backgroundColor: "#6de9ea",
-    borderRadius: 4,
+  rightPanel: { flex: 1, padding: 10 },
+  totalLabel: {
+    color: "#d9d9d9",
+    textAlign: "right",
+    fontSize: isPhone ? 12 : 18,
+    marginBottom: 10,
   },
-
-  categoryText: {
-    color: "#fff",
-    fontSize: 7,
-    fontWeight: "800",
-    flex: 1,
-    marginRight: 4,
-  },
-
-  categoryTextActive: { color: "#0d2340" },
-  categoryCount: { color: "#fff", fontSize: 7, fontWeight: "800" },
-
-  gridPanel: {
-    flex: 1,
-    paddingHorizontal: 4,
-  },
-
-  card: {
-    width: "31%",
-    marginHorizontal: "1%",
-    marginBottom: 8,
-  },
-
+  rowWrap: { justifyContent: "space-between", marginBottom: 10 },
+  card: { width: isPhone ? "31.8%" : "18.6%" },
   poster: {
     width: "100%",
-    height: 92,
+    aspectRatio: 0.7,
     borderRadius: 8,
-    backgroundColor: "#243a57",
-    marginBottom: 4,
-  },
-
-  posterFallback: {
-    width: "100%",
-    height: 92,
-    borderRadius: 8,
-    backgroundColor: "#243a57",
-    marginBottom: 4,
-  },
-
-  cardTitle: {
-    color: "#fff",
-    fontSize: 8,
-    fontWeight: "800",
-  },
-
-  cardSub: {
-    color: "#9fb2c7",
-    fontSize: 7,
-    marginTop: 2,
-  },
-
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.75)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 12,
-  },
-
-  modalBox: {
-    width: "94%",
-    maxHeight: "92%",
-    backgroundColor: "#0d1b2a",
-    borderRadius: 12,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-
-  detailCover: {
-    width: "100%",
-    height: 180,
-    borderRadius: 10,
-    backgroundColor: "#243a57",
-    marginBottom: 10,
-  },
-
-  detailCoverFallback: {
-    width: "100%",
-    height: 180,
-    borderRadius: 10,
-    backgroundColor: "#243a57",
-    marginBottom: 10,
-  },
-
-  detailTitle: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "900",
-    marginBottom: 8,
-  },
-
-  detailText: {
-    color: "#c8d4e2",
-    fontSize: 9,
-    marginBottom: 6,
-    lineHeight: 14,
-  },
-
-  episodeTitle: {
-    color: "#38d7ff",
-    fontSize: 10,
-    fontWeight: "900",
-    marginTop: 8,
-    marginBottom: 8,
-  },
-
-  episodeBtn: {
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: "rgba(56,215,255,0.14)",
-    borderWidth: 1,
-    borderColor: "#38d7ff",
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: "#2a3550",
     marginBottom: 6,
   },
-
-  episodeBtnText: {
-    color: "#38d7ff",
-    fontSize: 8,
-    fontWeight: "900",
-  },
-
-  secondBtn: {
-    height: 34,
-    borderRadius: 8,
-    backgroundColor: "rgba(56,215,255,0.14)",
-    borderWidth: 1,
-    borderColor: "#38d7ff",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 8,
-    paddingHorizontal: 10,
-  },
-
-  secondBtnText: {
-    color: "#38d7ff",
-    fontSize: 9,
-    fontWeight: "900",
-  },
-
-  playerScreen: {
-    flex: 1,
-    backgroundColor: "#06111d",
-  },
-
-  playerHeader: {
-    padding: 10,
-  },
-
-  playerWrap: {
-    paddingHorizontal: 10,
-    paddingBottom: 10,
-  },
+  cardTitle: { color: "#f0f0f0", fontSize: isPhone ? 9 : 12 },
 });

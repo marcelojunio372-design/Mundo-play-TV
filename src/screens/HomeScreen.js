@@ -1,54 +1,16 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   SafeAreaView,
   View,
   Text,
   TouchableOpacity,
-  Image,
   StyleSheet,
+  Dimensions,
+  ImageBackground,
 } from "react-native";
 
-function buildFeatured(session) {
-  const movies = (session?.data?.movies || []).filter((item) => item.logo);
-  const series = (session?.data?.series || []).filter((item) => item.logo);
-
-  const mixed = [];
-  const max = Math.max(movies.length, series.length, 6);
-
-  for (let i = 0; i < max; i++) {
-    if (movies[i]) {
-      mixed.push({
-        id: `movie_${movies[i].id || i}`,
-        title: movies[i].name || "Filme",
-        subtitle: movies[i].group || "Filmes",
-        logo: movies[i].logo || "",
-        type: "FILME",
-      });
-    }
-
-    if (series[i]) {
-      mixed.push({
-        id: `series_${series[i].id || i}`,
-        title: series[i].name || "Série",
-        subtitle: series[i].group || "Séries",
-        logo: series[i].logo || "",
-        type: "SÉRIE",
-      });
-    }
-  }
-
-  return mixed.length
-    ? mixed.slice(0, 20)
-    : [
-        {
-          id: "fallback_1",
-          title: "Sem destaques",
-          subtitle: "Lista vazia",
-          logo: "",
-          type: "INFO",
-        },
-      ];
-}
+const { width } = Dimensions.get("window");
+const isPhone = width < 900;
 
 export default function HomeScreen({
   session,
@@ -59,114 +21,102 @@ export default function HomeScreen({
   onReload,
   onLogout,
 }) {
-  const featuredItems = useMemo(() => buildFeatured(session), [session]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [now, setNow] = useState(new Date());
+  const movies = session?.data?.movies || [];
+  const series = session?.data?.series || [];
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % featuredItems.length);
-    }, 3500);
+  const featured = useMemo(() => {
+    const combined = [...movies.slice(0, 3), ...series.slice(0, 3)];
+    return combined.length
+      ? combined
+      : [{ name: "MUNDO PLAY TV", description: "Streaming profissional", logo: "" }];
+  }, [movies, series]);
 
-    const clock = setInterval(() => {
-      setNow(new Date());
-    }, 1000);
+  const [index, setIndex] = useState(0);
+  const item = featured[index] || featured[0];
 
-    return () => {
-      clearInterval(timer);
-      clearInterval(clock);
-    };
-  }, [featuredItems.length]);
-
-  const current = featuredItems[currentIndex] || featuredItems[0];
-  const time = now.toLocaleTimeString("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  const date = now.toLocaleDateString("pt-BR");
+  const nextBanner = () => {
+    setIndex((prev) => (prev + 1) % featured.length);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.logo}>MUNDO PLAY TV</Text>
-          <Text style={styles.sub}>IPTV Profissional</Text>
-        </View>
-
-        <Text style={styles.clock}>
-          {time}   {date}
-        </Text>
+      <View style={styles.topbar}>
+        <Text style={styles.brand}>MUNDO PLAY TV</Text>
+        <Text style={styles.subbrand}>IPTV Profissional</Text>
       </View>
 
-      <View style={styles.body}>
+      <View style={styles.content}>
         <View style={styles.sidebar}>
-          <TouchableOpacity style={styles.menuBtn} onPress={onOpenLive}>
-            <Text style={styles.menuText}>LIVE TV</Text>
+          <TouchableOpacity style={styles.sideBtn} onPress={onOpenLive}>
+            <Text style={styles.sideBtnText}>LIVE TV</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuBtn} onPress={onOpenMovies}>
-            <Text style={styles.menuText}>FILMES</Text>
+          <TouchableOpacity style={styles.sideBtn} onPress={onOpenMovies}>
+            <Text style={styles.sideBtnText}>FILMES</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuBtn} onPress={onOpenSeries}>
-            <Text style={styles.menuText}>SÉRIES</Text>
+          <TouchableOpacity style={styles.sideBtn} onPress={onOpenSeries}>
+            <Text style={styles.sideBtnText}>SÉRIES</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuBtn} onPress={onOpenSettings}>
-            <Text style={styles.menuText}>CONFIG.</Text>
+          <TouchableOpacity style={styles.sideBtn} onPress={onOpenSettings}>
+            <Text style={styles.sideBtnText}>CONFIG.</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuBtn} onPress={onReload}>
-            <Text style={styles.menuText}>RECARREGAR</Text>
+          <TouchableOpacity
+            style={styles.sideBtn}
+            onPress={async () => {
+              await onReload?.();
+            }}
+          >
+            <Text style={styles.sideBtnText}>RECARREGAR</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuBtn} onPress={onLogout}>
-            <Text style={styles.menuText}>SAIR</Text>
+          <TouchableOpacity style={styles.sideBtn} onPress={onLogout}>
+            <Text style={styles.sideBtnText}>SAIR</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.main}>
-          <View style={styles.hero}>
-            {current?.logo ? (
-              <Image source={{ uri: current.logo }} style={styles.heroImage} />
-            ) : (
-              <View style={styles.heroFallback}>
-                <Text style={styles.heroFallbackText}>SEM CAPA</Text>
+          <TouchableOpacity onPress={nextBanner} activeOpacity={0.9}>
+            <ImageBackground
+              source={item?.logo ? { uri: item.logo } : undefined}
+              style={styles.hero}
+              imageStyle={styles.heroImage}
+            >
+              <View style={styles.heroOverlay}>
+                <Text style={styles.heroType}>
+                  {series.includes(item) ? "SÉRIE" : "FILME"}
+                </Text>
+                <Text style={styles.heroTitle} numberOfLines={2}>
+                  {item?.name || "MUNDO PLAY TV"}
+                </Text>
+                <Text style={styles.heroSub} numberOfLines={2}>
+                  {item?.group || "Lançamentos e destaques"}
+                </Text>
               </View>
-            )}
+            </ImageBackground>
+          </TouchableOpacity>
 
-            <View style={styles.heroInfo}>
-              <Text style={styles.heroBadge}>{current?.type || "DESTAQUE"}</Text>
-
-              <Text style={styles.heroTitle} numberOfLines={2}>
-                {current?.title || "Lançamentos"}
-              </Text>
-
-              <Text style={styles.heroSubtitle} numberOfLines={2}>
-                {current?.subtitle || "Filmes e séries da lista"}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.quickGrid}>
-            <TouchableOpacity style={styles.quickCard} onPress={onOpenLive}>
-              <Text style={styles.quickTitle}>Live TV</Text>
-              <Text style={styles.quickSub}>Canais ao vivo</Text>
+          <View style={styles.grid}>
+            <TouchableOpacity style={styles.card} onPress={onOpenLive}>
+              <Text style={styles.cardTitle}>Live TV</Text>
+              <Text style={styles.cardText}>Canais ao vivo</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.quickCard} onPress={onOpenMovies}>
-              <Text style={styles.quickTitle}>Filmes</Text>
-              <Text style={styles.quickSub}>Detalhes e play</Text>
+            <TouchableOpacity style={styles.card} onPress={onOpenMovies}>
+              <Text style={styles.cardTitle}>Filmes</Text>
+              <Text style={styles.cardText}>Catálogo e detalhes</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.quickCard} onPress={onOpenSeries}>
-              <Text style={styles.quickTitle}>Séries</Text>
-              <Text style={styles.quickSub}>Detalhes e play</Text>
+            <TouchableOpacity style={styles.card} onPress={onOpenSeries}>
+              <Text style={styles.cardTitle}>Séries</Text>
+              <Text style={styles.cardText}>Temporadas e episódios</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.quickCard} onPress={onOpenSettings}>
-              <Text style={styles.quickTitle}>Config.</Text>
-              <Text style={styles.quickSub}>Idiomas e validade</Text>
+            <TouchableOpacity style={styles.card} onPress={onOpenSettings}>
+              <Text style={styles.cardTitle}>Config.</Text>
+              <Text style={styles.cardText}>Idiomas e validade</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -176,159 +126,88 @@ export default function HomeScreen({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#06111d",
-  },
-
-  header: {
-    height: 44,
-    backgroundColor: "#0d1b2a",
+  container: { flex: 1, backgroundColor: "#07111e" },
+  topbar: {
+    height: isPhone ? 54 : 70,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    backgroundColor: "#0c1c2c",
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
-    paddingHorizontal: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
   },
+  brand: { color: "#fff", fontSize: isPhone ? 16 : 24, fontWeight: "900" },
+  subbrand: { color: "#9eb3c7", fontSize: isPhone ? 8 : 12, marginTop: 2 },
 
-  logo: {
-    color: "#ffffff",
-    fontSize: 10,
-    fontWeight: "900",
-  },
-
-  sub: {
-    color: "#9fb2c7",
-    fontSize: 7,
-    marginTop: 1,
-  },
-
-  clock: {
-    color: "#ffffff",
-    fontSize: 8,
-    fontWeight: "700",
-  },
-
-  body: {
-    flex: 1,
-    flexDirection: "row",
-  },
+  content: { flex: 1, flexDirection: "row" },
 
   sidebar: {
-    width: 78,
-    backgroundColor: "#081624",
-    borderRightWidth: 1,
-    borderRightColor: "rgba(255,255,255,0.08)",
-    padding: 6,
+    width: isPhone ? 96 : 150,
+    padding: 10,
+    backgroundColor: "#061522",
   },
-
-  menuBtn: {
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: "#0d1b2a",
+  sideBtn: {
+    height: isPhone ? 42 : 54,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "#0b1b2b",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 6,
-  },
-
-  menuText: {
-    color: "#ffffff",
-    fontSize: 8,
-    fontWeight: "800",
-  },
-
-  main: {
-    flex: 1,
-    padding: 8,
-  },
-
-  hero: {
-    height: 130,
-    borderRadius: 14,
-    overflow: "hidden",
-    backgroundColor: "#0d1b2a",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    flexDirection: "row",
     marginBottom: 10,
   },
-
-  heroImage: {
-    width: 95,
-    height: "100%",
-    resizeMode: "cover",
-    backgroundColor: "#243a57",
+  sideBtnText: {
+    color: "#fff",
+    fontSize: isPhone ? 10 : 14,
+    fontWeight: "900",
   },
 
-  heroFallback: {
-    width: 95,
-    height: "100%",
-    backgroundColor: "#243a57",
-    alignItems: "center",
-    justifyContent: "center",
+  main: { flex: 1, padding: 10 },
+  hero: {
+    height: isPhone ? 130 : 220,
+    borderRadius: 18,
+    overflow: "hidden",
+    backgroundColor: "#0c2133",
+    marginBottom: 12,
   },
-
-  heroFallbackText: {
-    color: "#ffffff",
-    fontSize: 8,
-    fontWeight: "800",
-  },
-
-  heroInfo: {
+  heroImage: { borderRadius: 18, opacity: 0.55 },
+  heroOverlay: {
     flex: 1,
-    padding: 10,
     justifyContent: "center",
+    padding: 18,
+    backgroundColor: "rgba(4,13,22,0.45)",
   },
-
-  heroBadge: {
+  heroType: {
     color: "#38d7ff",
-    fontSize: 8,
+    fontSize: isPhone ? 10 : 14,
     fontWeight: "900",
-    marginBottom: 5,
+    marginBottom: 4,
   },
-
   heroTitle: {
-    color: "#ffffff",
-    fontSize: 14,
+    color: "#fff",
+    fontSize: isPhone ? 22 : 34,
     fontWeight: "900",
-    lineHeight: 18,
   },
-
-  heroSubtitle: {
-    color: "#9fb2c7",
-    fontSize: 8,
-    lineHeight: 12,
+  heroSub: {
+    color: "#c4d1de",
+    fontSize: isPhone ? 10 : 14,
     marginTop: 6,
   },
 
-  quickGrid: {
+  grid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
   },
-
-  quickCard: {
+  card: {
     width: "48.5%",
-    backgroundColor: "#0d1b2a",
+    minHeight: isPhone ? 84 : 110,
+    borderRadius: 16,
+    backgroundColor: "#0b1b2b",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
-    borderRadius: 12,
-    padding: 8,
-    marginBottom: 8,
+    padding: 16,
+    marginBottom: 10,
   },
-
-  quickTitle: {
-    color: "#38d7ff",
-    fontSize: 10,
-    fontWeight: "900",
-  },
-
-  quickSub: {
-    color: "#ffffff",
-    fontSize: 8,
-    marginTop: 4,
-  },
+  cardTitle: { color: "#38d7ff", fontSize: isPhone ? 14 : 22, fontWeight: "900" },
+  cardText: { color: "#d7e0ea", fontSize: isPhone ? 10 : 14, marginTop: 6 },
 });

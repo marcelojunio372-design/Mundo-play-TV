@@ -1,51 +1,47 @@
 import React, { useState } from "react";
-import { Alert } from "react-native";
 import LoginScreen from "../screens/LoginScreen";
 import HomeScreen from "../screens/HomeScreen";
 import LiveTVScreen from "../screens/LiveTVScreen";
 import MoviesScreen from "../screens/MoviesScreen";
+import MovieDetailsScreen from "../screens/MovieDetailsScreen";
 import SeriesScreen from "../screens/SeriesScreen";
+import SeriesDetailsScreen from "../screens/SeriesDetailsScreen";
+import SeasonEpisodesScreen from "../screens/SeasonEpisodesScreen";
 import SettingsScreen from "../screens/SettingsScreen";
+import { loadM3U } from "../services/m3uService";
 
 export default function AppNavigator() {
-  const [loggedIn, setLoggedIn] = useState(false);
-  const [screen, setScreen] = useState("home");
   const [session, setSession] = useState(null);
+  const [screen, setScreen] = useState("home");
+  const [selectedMovie, setSelectedMovie] = useState(null);
+  const [selectedSeries, setSelectedSeries] = useState(null);
+  const [selectedSeason, setSelectedSeason] = useState(null);
 
   const handleLogin = (payload) => {
     setSession(payload);
-    setLoggedIn(true);
     setScreen("home");
   };
 
   const handleLogout = () => {
-    setLoggedIn(false);
     setSession(null);
     setScreen("home");
+    setSelectedMovie(null);
+    setSelectedSeries(null);
+    setSelectedSeason(null);
   };
 
   const handleReload = async () => {
+    if (!session?.url) return false;
     try {
-      if (!session?.url) {
-        Alert.alert("Erro", "URL da lista não encontrada");
-        return;
-      }
-
-      const { loadM3U } = require("../services/m3uService");
       const data = await loadM3U(session.url);
-
-      setSession({
-        ...session,
-        data,
-      });
-
-      Alert.alert("Sucesso", "Lista recarregada!");
+      setSession((prev) => ({ ...prev, data }));
+      return true;
     } catch (e) {
-      Alert.alert("Erro", "Falha ao recarregar lista");
+      return false;
     }
   };
 
-  if (!loggedIn) {
+  if (!session) {
     return <LoginScreen onLogin={handleLogin} />;
   }
 
@@ -65,8 +61,22 @@ export default function AppNavigator() {
       <MoviesScreen
         session={session}
         onBack={() => setScreen("home")}
-        onOpenSettings={() => setScreen("settings")}
-        onLogout={handleLogout}
+        onOpenLive={() => setScreen("live")}
+        onOpenMovies={() => setScreen("movies")}
+        onOpenSeries={() => setScreen("series")}
+        onSelectMovie={(movie) => {
+          setSelectedMovie(movie);
+          setScreen("movieDetails");
+        }}
+      />
+    );
+  }
+
+  if (screen === "movieDetails") {
+    return (
+      <MovieDetailsScreen
+        movie={selectedMovie}
+        onBack={() => setScreen("movies")}
       />
     );
   }
@@ -76,8 +86,36 @@ export default function AppNavigator() {
       <SeriesScreen
         session={session}
         onBack={() => setScreen("home")}
-        onOpenSettings={() => setScreen("settings")}
-        onLogout={handleLogout}
+        onOpenLive={() => setScreen("live")}
+        onOpenMovies={() => setScreen("movies")}
+        onOpenSeries={() => setScreen("series")}
+        onSelectSeries={(series) => {
+          setSelectedSeries(series);
+          setScreen("seriesDetails");
+        }}
+      />
+    );
+  }
+
+  if (screen === "seriesDetails") {
+    return (
+      <SeriesDetailsScreen
+        series={selectedSeries}
+        onBack={() => setScreen("series")}
+        onOpenSeason={(season) => {
+          setSelectedSeason(season);
+          setScreen("seasonEpisodes");
+        }}
+      />
+    );
+  }
+
+  if (screen === "seasonEpisodes") {
+    return (
+      <SeasonEpisodesScreen
+        series={selectedSeries}
+        season={selectedSeason}
+        onBack={() => setScreen("seriesDetails")}
       />
     );
   }
@@ -88,6 +126,7 @@ export default function AppNavigator() {
         session={session}
         onBack={() => setScreen("home")}
         onLogout={handleLogout}
+        onReload={handleReload}
       />
     );
   }
