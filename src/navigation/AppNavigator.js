@@ -144,6 +144,14 @@ export default function AppNavigator() {
       onOpenSettings={() => setScreen("settings")}
       onReload={handleReload}
       onLogout={handleLogout}
+      onSelectMovie={(movie) => {
+        setSelectedMovie(movie);
+        setScreen("movieDetails");
+      }}
+      onSelectSeries={(series) => {
+        setSelectedSeries(series);
+        setScreen("seriesDetails");
+      }}
     />
   );
 }
