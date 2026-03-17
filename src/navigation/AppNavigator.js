@@ -69,3 +69,38 @@ export default function AppNavigator() {
         onLogout={handleLogout}
       />
     );
+  }
+
+  if (screen === "series") {
+    return (
+      <SeriesScreen
+        session={session}
+        onBack={() => setScreen("home")}
+        onOpenSettings={() => setScreen("settings")}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  if (screen === "settings") {
+    return (
+      <SettingsScreen
+        session={session}
+        onBack={() => setScreen("home")}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  return (
+    <HomeScreen
+      session={session}
+      onOpenLive={() => setScreen("live")}
+      onOpenMovies={() => setScreen("movies")}
+      onOpenSeries={() => setScreen("series")}
+      onOpenSettings={() => setScreen("settings")}
+      onReload={handleReload}
+      onLogout={handleLogout}
+    />
+  );
+}
