@@ -55,7 +55,6 @@ export default function HomeScreen({
   }, [movies, series]);
 
   const [index, setIndex] = useState(0);
-
   const item = featured[index] || featured[0];
 
   useEffect(() => {
@@ -154,14 +153,12 @@ export default function HomeScreen({
                   {(item?.year || "-") + " • " + (item?.group || "Destaques")}
                 </Text>
 
-                <Text style={styles.heroDesc} numberOfLines={4}>
+                <Text style={styles.heroDesc} numberOfLines={3}>
                   {item?.description || "Lançamentos e destaques da sua lista."}
                 </Text>
 
                 <View style={styles.heroAction}>
-                  <Text style={styles.heroActionText}>
-                    TOQUE PARA ABRIR
-                  </Text>
+                  <Text style={styles.heroActionText}>TOQUE PARA ABRIR</Text>
                 </View>
               </View>
             </ImageBackground>
@@ -179,7 +176,7 @@ const styles = StyleSheet.create({
   },
 
   topbar: {
-    height: isPhone ? 54 : 70,
+    height: isPhone ? 52 : 70,
     backgroundColor: "#0c1c2c",
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
@@ -191,7 +188,7 @@ const styles = StyleSheet.create({
 
   brand: {
     color: "#fff",
-    fontSize: isPhone ? 16 : 24,
+    fontSize: isPhone ? 15 : 24,
     fontWeight: "900",
   },
 
@@ -213,13 +210,13 @@ const styles = StyleSheet.create({
   },
 
   sidebar: {
-    width: isPhone ? 96 : 150,
+    width: isPhone ? 88 : 150,
     backgroundColor: "#061522",
-    padding: 10,
+    padding: isPhone ? 8 : 10,
   },
 
   sideBtn: {
-    height: isPhone ? 42 : 54,
+    height: isPhone ? 38 : 54,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
@@ -231,78 +228,78 @@ const styles = StyleSheet.create({
 
   sideBtnText: {
     color: "#fff",
-    fontSize: isPhone ? 10 : 14,
+    fontSize: isPhone ? 9 : 14,
     fontWeight: "900",
   },
 
   main: {
     flex: 1,
-    padding: 10,
+    padding: isPhone ? 8 : 12,
   },
 
   heroTouch: {
-    flex: 1,
+    width: "100%",
   },
 
   hero: {
-    flex: 1,
+    height: isPhone ? 210 : 360,
     borderRadius: 18,
     overflow: "hidden",
     backgroundColor: "#0c2133",
   },
 
   heroImage: {
-    opacity: 0.58,
+    opacity: 0.62,
   },
 
   heroOverlay: {
     flex: 1,
     justifyContent: "flex-end",
-    padding: isPhone ? 18 : 28,
+    padding: isPhone ? 14 : 28,
     backgroundColor: "rgba(4,13,22,0.38)",
   },
 
   heroType: {
     color: "#38d7ff",
-    fontSize: isPhone ? 11 : 15,
+    fontSize: isPhone ? 10 : 15,
     fontWeight: "900",
-    marginBottom: 6,
+    marginBottom: 4,
   },
 
   heroTitle: {
     color: "#fff",
-    fontSize: isPhone ? 24 : 38,
+    fontSize: isPhone ? 16 : 38,
     fontWeight: "900",
   },
 
   heroMeta: {
     color: "#d4dde7",
-    fontSize: isPhone ? 11 : 15,
-    marginTop: 8,
+    fontSize: isPhone ? 9 : 15,
+    marginTop: 6,
   },
 
   heroDesc: {
     color: "#eef3f8",
-    fontSize: isPhone ? 12 : 16,
-    lineHeight: isPhone ? 18 : 24,
-    marginTop: 12,
-    maxWidth: "70%",
+    fontSize: isPhone ? 10 : 16,
+    lineHeight: isPhone ? 14 : 24,
+    marginTop: 8,
+    maxWidth: isPhone ? "90%" : "70%",
   },
 
   heroAction: {
     alignSelf: "flex-start",
-    marginTop: 16,
+    marginTop: 12,
     backgroundColor: "rgba(56,215,255,0.16)",
     borderWidth: 1,
     borderColor: "#38d7ff",
     borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingVertical: isPhone ? 7 : 10,
+    paddingHorizontal: isPhone ? 10 : 14,
   },
 
   heroActionText: {
     color: "#38d7ff",
-    fontSize: isPhone ? 11 : 13,
+    fontSize: isPhone ? 10 : 13,
     fontWeight: "900",
   },
 });

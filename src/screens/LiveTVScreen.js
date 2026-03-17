@@ -41,8 +41,6 @@ export default function LiveTVScreen({
   onOpenLive,
   onOpenMovies,
   onOpenSeries,
-  onOpenSettings,
-  onLogout,
 }) {
   const channels = session?.data?.live || [];
   const categories = useMemo(() => buildCategories(channels), [channels]);
@@ -122,13 +120,19 @@ export default function LiveTVScreen({
                   onPress={() => handleSelectCategory(index)}
                 >
                   <Text
-                    style={[styles.categoryText, active && styles.categoryTextActive]}
+                    style={[
+                      styles.categoryText,
+                      active && styles.categoryTextActive,
+                    ]}
                     numberOfLines={1}
                   >
                     {item.name}
                   </Text>
                   <Text
-                    style={[styles.categoryCount, active && styles.categoryTextActive]}
+                    style={[
+                      styles.categoryCount,
+                      active && styles.categoryTextActive,
+                    ]}
                   >
                     {item.items.length}
                   </Text>
@@ -156,7 +160,10 @@ export default function LiveTVScreen({
 
                   <View style={styles.channelTextWrap}>
                     <Text
-                      style={[styles.channelName, active && styles.channelNameActive]}
+                      style={[
+                        styles.channelName,
+                        active && styles.channelNameActive,
+                      ]}
                       numberOfLines={1}
                     >
                       {item.name || "Sem nome"}
@@ -199,18 +206,9 @@ export default function LiveTVScreen({
               Grupo: {selectedChannel?.group || "-"}
             </Text>
             <Text style={styles.epgDesc} numberOfLines={5}>
-              Preview do canal ao vivo. Toque nos controles do player ou use tela cheia para ampliar.
+              Preview do canal ao vivo. Toque nos controles do player ou use
+              tela cheia para ampliar.
             </Text>
-          </View>
-
-          <View style={styles.bottomActions}>
-            <TouchableOpacity style={styles.actionBtn} onPress={onOpenSettings}>
-              <Text style={styles.actionBtnText}>CONFIG.</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.actionBtn} onPress={onLogout}>
-              <Text style={styles.actionBtnText}>SAIR</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -425,28 +423,5 @@ const styles = StyleSheet.create({
     color: "#d7e1ec",
     fontSize: isPhone ? 8 : 11,
     lineHeight: isPhone ? 12 : 16,
-  },
-
-  bottomActions: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 6,
-  },
-
-  actionBtn: {
-    flex: 1,
-    minHeight: isPhone ? 32 : 40,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#38d7ff",
-    backgroundColor: "rgba(56,215,255,0.10)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  actionBtnText: {
-    color: "#38d7ff",
-    fontSize: isPhone ? 8 : 10,
-    fontWeight: "900",
   },
 });

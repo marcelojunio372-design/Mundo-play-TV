@@ -17,7 +17,7 @@ export default function LoginScreen({ onLogin }) {
   const [serverUrl, setServerUrl] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [mac, setMac] = useState("00:1A:79:12:34:56");
+  const [mac] = useState("00:1A:79:12:34:56");
   const [loading, setLoading] = useState(false);
 
   const normalizeUrl = (url) => {
@@ -25,6 +25,15 @@ export default function LoginScreen({ onLogin }) {
     if (!value) return "";
     if (value.startsWith("http://") || value.startsWith("https://")) return value;
     return `http://${value}`;
+  };
+
+  const loadWithTimeout = async (url) => {
+    return await Promise.race([
+      loadM3U(String(url || "").trim()),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout")), 15000)
+      ),
+    ]);
   };
 
   const handleM3U = async () => {
@@ -37,7 +46,8 @@ export default function LoginScreen({ onLogin }) {
 
     try {
       setLoading(true);
-      const data = await loadM3U(finalUrl);
+
+      const data = await loadWithTimeout(finalUrl);
 
       onLogin({
         type: "m3u",
@@ -46,7 +56,10 @@ export default function LoginScreen({ onLogin }) {
         data,
       });
     } catch (e) {
-      Alert.alert("Erro", "Falha ao carregar a lista M3U");
+      Alert.alert(
+        "Erro",
+        "Falha ao carregar a lista M3U ou tempo de resposta excedido"
+      );
     } finally {
       setLoading(false);
     }
@@ -66,7 +79,8 @@ export default function LoginScreen({ onLogin }) {
 
     try {
       setLoading(true);
-      const data = await loadM3U(playlistUrl);
+
+      const data = await loadWithTimeout(playlistUrl);
 
       onLogin({
         type: "xtream",
@@ -78,24 +92,13 @@ export default function LoginScreen({ onLogin }) {
         data,
       });
     } catch (e) {
-      Alert.alert("Erro", "Falha ao carregar login usuário/senha");
+      Alert.alert(
+        "Erro",
+        "Falha ao carregar login usuário/senha ou tempo de resposta excedido"
+      );
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleMac = async () => {
-    const macValue = String(mac || "").trim();
-
-    if (!macValue) {
-      Alert.alert("Erro", "Informe o MAC");
-      return;
-    }
-
-    Alert.alert(
-      "Aviso",
-      "MAC precisa de backend/portal específico. Use M3U ou usuário/senha nesta versão."
-    );
   };
 
   const handleConnect = async () => {
@@ -103,7 +106,8 @@ export default function LoginScreen({ onLogin }) {
 
     if (mode === "m3u") return handleM3U();
     if (mode === "xtream") return handleXtream();
-    return handleMac();
+
+    Alert.alert("Aviso", "Use M3U ou usuário/senha");
   };
 
   return (
@@ -118,7 +122,12 @@ export default function LoginScreen({ onLogin }) {
               style={[styles.tab, mode === "xtream" && styles.tabActive]}
               onPress={() => setMode("xtream")}
             >
-              <Text style={[styles.tabText, mode === "xtream" && styles.tabTextActive]}>
+              <Text
+                style={[
+                  styles.tabText,
+                  mode === "xtream" && styles.tabTextActive,
+                ]}
+              >
                 Usuário / Senha
               </Text>
             </TouchableOpacity>
@@ -127,17 +136,10 @@ export default function LoginScreen({ onLogin }) {
               style={[styles.tab, mode === "m3u" && styles.tabActive]}
               onPress={() => setMode("m3u")}
             >
-              <Text style={[styles.tabText, mode === "m3u" && styles.tabTextActive]}>
+              <Text
+                style={[styles.tabText, mode === "m3u" && styles.tabTextActive]}
+              >
                 M3U
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.tab, mode === "mac" && styles.tabActive]}
-              onPress={() => setMode("mac")}
-            >
-              <Text style={[styles.tabText, mode === "mac" && styles.tabTextActive]}>
-                MAC
               </Text>
             </TouchableOpacity>
           </View>
@@ -182,17 +184,6 @@ export default function LoginScreen({ onLogin }) {
             </>
           )}
 
-          {mode === "mac" && (
-            <TextInput
-              style={styles.input}
-              placeholder="MAC"
-              placeholderTextColor="#7d8ea3"
-              value={mac}
-              onChangeText={setMac}
-              autoCapitalize="characters"
-            />
-          )}
-
           <TouchableOpacity style={styles.btn} onPress={handleConnect}>
             <Text style={styles.btnText}>
               {loading ? "CONECTANDO..." : "CONECTAR"}
@@ -210,13 +201,18 @@ export default function LoginScreen({ onLogin }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#06111d" },
+  container: {
+    flex: 1,
+    backgroundColor: "#06111d",
+  },
+
   wrap: {
     flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 16,
   },
+
   card: {
     width: "100%",
     maxWidth: 520,
@@ -226,12 +222,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
+
   logo: {
     color: "#38d7ff",
     fontSize: 22,
     fontWeight: "900",
     textAlign: "center",
   },
+
   sub: {
     color: "#d4dee8",
     fontSize: 12,
@@ -239,11 +237,13 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: 14,
   },
+
   tabs: {
     flexDirection: "row",
     gap: 8,
     marginBottom: 14,
   },
+
   tab: {
     flex: 1,
     minHeight: 40,
@@ -253,19 +253,23 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 8,
   },
+
   tabActive: {
     backgroundColor: "rgba(56,215,255,0.16)",
     borderWidth: 1,
     borderColor: "#38d7ff",
   },
+
   tabText: {
     color: "#fff",
     fontSize: 10,
     fontWeight: "800",
   },
+
   tabTextActive: {
     color: "#38d7ff",
   },
+
   input: {
     width: "100%",
     minHeight: 48,
@@ -275,6 +279,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     marginBottom: 10,
   },
+
   btn: {
     minHeight: 50,
     borderRadius: 14,
@@ -283,25 +288,27 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 6,
   },
+
   btnText: {
     color: "#00131f",
     fontSize: 12,
     fontWeight: "900",
   },
+
   footerRow: {
     marginTop: 16,
     alignItems: "flex-start",
   },
+
   footerMac: {
     color: "#38d7ff",
     fontSize: 10,
     fontWeight: "900",
     marginBottom: 6,
   },
+
   footer: {
     color: "#8fa4ba",
     fontSize: 10,
   },
 });
-
-

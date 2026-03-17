@@ -42,18 +42,33 @@ export default function SeriesScreen({
   const series = session?.data?.series || [];
   const categories = useMemo(() => buildCategories(series), [series]);
   const [selectedCategory, setSelectedCategory] = useState(0);
+
   const visibleSeries = categories[selectedCategory]?.items || series;
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topnav}>
-        <TouchableOpacity onPress={onBack}><Text style={styles.navText}>Casa</Text></TouchableOpacity>
+        <TouchableOpacity onPress={onBack}>
+          <Text style={styles.navText}>Casa</Text>
+        </TouchableOpacity>
+
         <Text style={styles.sep}>|</Text>
-        <TouchableOpacity onPress={onOpenLive}><Text style={styles.navText}>TV ao Vivo</Text></TouchableOpacity>
+
+        <TouchableOpacity onPress={onOpenLive}>
+          <Text style={styles.navText}>TV ao Vivo</Text>
+        </TouchableOpacity>
+
         <Text style={styles.sep}>|</Text>
-        <TouchableOpacity onPress={onOpenMovies}><Text style={styles.navText}>Filmes</Text></TouchableOpacity>
+
+        <TouchableOpacity onPress={onOpenMovies}>
+          <Text style={styles.navText}>Filmes</Text>
+        </TouchableOpacity>
+
         <Text style={styles.sep}>|</Text>
-        <TouchableOpacity onPress={onOpenSeries}><Text style={styles.navTextActive}>Séries</Text></TouchableOpacity>
+
+        <TouchableOpacity onPress={onOpenSeries}>
+          <Text style={styles.navTextActive}>Séries</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.content}>
@@ -74,13 +89,20 @@ export default function SeriesScreen({
                   onPress={() => setSelectedCategory(index)}
                 >
                   <Text
-                    style={[styles.categoryText, active && styles.categoryTextActive]}
+                    style={[
+                      styles.categoryText,
+                      active && styles.categoryTextActive,
+                    ]}
                     numberOfLines={1}
                   >
                     {item.name}
                   </Text>
+
                   <Text
-                    style={[styles.categoryCount, active && styles.categoryTextActive]}
+                    style={[
+                      styles.categoryCount,
+                      active && styles.categoryTextActive,
+                    ]}
                   >
                     {item.items.length}
                   </Text>
@@ -101,13 +123,25 @@ export default function SeriesScreen({
             numColumns={isPhone ? 3 : 5}
             columnWrapperStyle={styles.rowWrap}
             renderItem={({ item }) => (
-              <TouchableOpacity style={styles.card} onPress={() => onSelectSeries(item)}>
+              <TouchableOpacity
+                style={styles.card}
+                onPress={() => onSelectSeries(item)}
+              >
                 <Image
                   source={item.logo ? { uri: item.logo } : undefined}
                   style={styles.poster}
                 />
+
                 <Text style={styles.cardTitle} numberOfLines={2}>
                   {item.name}
+                </Text>
+
+                <Text style={styles.cardMeta} numberOfLines={1}>
+                  {item.year || "-"}
+                </Text>
+
+                <Text style={styles.cardGroup} numberOfLines={1}>
+                  {item.group || "Séries"}
                 </Text>
               </TouchableOpacity>
             )}
@@ -119,7 +153,11 @@ export default function SeriesScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#040914" },
+  container: {
+    flex: 1,
+    backgroundColor: "#040914",
+  },
+
   topnav: {
     height: isPhone ? 42 : 58,
     flexDirection: "row",
@@ -128,57 +166,131 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.1)",
   },
-  navText: { color: "#d7d7d7", fontSize: isPhone ? 11 : 16 },
-  navTextActive: { color: "#ffe04f", fontSize: isPhone ? 11 : 16, fontWeight: "900" },
-  sep: { color: "#ccc", marginHorizontal: 12 },
 
-  content: { flex: 1, flexDirection: "row" },
+  navText: {
+    color: "#d7d7d7",
+    fontSize: isPhone ? 11 : 16,
+  },
+
+  navTextActive: {
+    color: "#ffe04f",
+    fontSize: isPhone ? 11 : 16,
+    fontWeight: "900",
+  },
+
+  sep: {
+    color: "#ccc",
+    marginHorizontal: 12,
+  },
+
+  content: {
+    flex: 1,
+    flexDirection: "row",
+  },
 
   leftPanel: {
-    width: isPhone ? 120 : 260,
+    width: isPhone ? 108 : 260,
     backgroundColor: "#261425",
     borderRightWidth: 1,
     borderRightColor: "rgba(255,255,255,0.1)",
   },
+
   leftHeader: {
-    height: isPhone ? 70 : 110,
+    height: isPhone ? 58 : 110,
     justifyContent: "center",
     alignItems: "center",
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
   },
-  leftIcon: { color: "#fff", fontSize: isPhone ? 28 : 50, marginBottom: 6 },
-  leftTitle: { color: "#fff", fontSize: isPhone ? 10 : 14 },
+
+  leftIcon: {
+    color: "#fff",
+    fontSize: isPhone ? 22 : 50,
+    marginBottom: 4,
+  },
+
+  leftTitle: {
+    color: "#fff",
+    fontSize: isPhone ? 9 : 14,
+  },
 
   categoryRow: {
-    minHeight: isPhone ? 34 : 50,
-    paddingHorizontal: 12,
+    minHeight: isPhone ? 32 : 50,
+    paddingHorizontal: isPhone ? 8 : 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
   },
-  categoryActive: { backgroundColor: "rgba(255,224,79,0.12)" },
-  categoryText: { color: "#f4f4f4", fontSize: isPhone ? 9 : 13, flex: 1, marginRight: 8 },
-  categoryTextActive: { color: "#ffe04f" },
-  categoryCount: { color: "#f4f4f4", fontSize: isPhone ? 9 : 13 },
 
-  rightPanel: { flex: 1, padding: 10 },
+  categoryActive: {
+    backgroundColor: "rgba(255,224,79,0.12)",
+  },
+
+  categoryText: {
+    color: "#f4f4f4",
+    fontSize: isPhone ? 8 : 13,
+    flex: 1,
+    marginRight: 8,
+  },
+
+  categoryTextActive: {
+    color: "#ffe04f",
+    fontWeight: "900",
+  },
+
+  categoryCount: {
+    color: "#f4f4f4",
+    fontSize: isPhone ? 8 : 13,
+  },
+
+  rightPanel: {
+    flex: 1,
+    padding: isPhone ? 8 : 10,
+  },
+
   totalLabel: {
     color: "#d9d9d9",
     textAlign: "right",
-    fontSize: isPhone ? 12 : 18,
-    marginBottom: 10,
+    fontSize: isPhone ? 10 : 18,
+    marginBottom: 8,
   },
-  rowWrap: { justifyContent: "space-between", marginBottom: 10 },
-  card: { width: isPhone ? "31.8%" : "18.6%" },
+
+  rowWrap: {
+    justifyContent: "space-between",
+    marginBottom: isPhone ? 8 : 10,
+  },
+
+  card: {
+    width: isPhone ? "31.5%" : "18.6%",
+    marginBottom: isPhone ? 8 : 12,
+  },
+
   poster: {
     width: "100%",
     aspectRatio: 0.7,
     borderRadius: 8,
     backgroundColor: "#2a3550",
-    marginBottom: 6,
+    marginBottom: 5,
   },
-  cardTitle: { color: "#f0f0f0", fontSize: isPhone ? 9 : 12 },
+
+  cardTitle: {
+    color: "#f0f0f0",
+    fontSize: isPhone ? 8.5 : 12,
+    fontWeight: "700",
+    lineHeight: isPhone ? 11 : 16,
+  },
+
+  cardMeta: {
+    color: "#c9d3df",
+    fontSize: isPhone ? 7 : 10,
+    marginTop: 2,
+  },
+
+  cardGroup: {
+    color: "#9fb1c7",
+    fontSize: isPhone ? 7 : 10,
+    marginTop: 1,
+  },
 });

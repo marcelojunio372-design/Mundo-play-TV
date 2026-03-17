@@ -41,7 +41,7 @@ export default function MovieDetailsScreen({ movie, onBack }) {
         imageStyle={styles.bgImage}
       >
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Text style={styles.backText}>↩</Text>
+          <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
 
         <View style={styles.overlay}>
@@ -63,11 +63,11 @@ export default function MovieDetailsScreen({ movie, onBack }) {
 
             <Text style={styles.title}>{movie.name}</Text>
 
-            <Text style={styles.meta}>
-              {movie.year || "-"} • {movie.group || "Filmes"}
+            <Text style={styles.meta} numberOfLines={2}>
+              {(movie.year || "-") + " • " + (movie.group || "Filmes")}
             </Text>
 
-            <Text style={styles.desc}>
+            <Text style={styles.desc} numberOfLines={8}>
               {movie.description || "Sem descrição na lista."}
             </Text>
           </View>
@@ -104,10 +104,12 @@ export default function MovieDetailsScreen({ movie, onBack }) {
 
           <View style={styles.playerInfo}>
             <Text style={styles.playerInfoTitle}>{movie.name}</Text>
-            <Text style={styles.playerInfoMeta}>
-              {movie.year || "-"} • {movie.group || "Filmes"}
+
+            <Text style={styles.playerInfoMeta} numberOfLines={2}>
+              {(movie.year || "-") + " • " + (movie.group || "Filmes")}
             </Text>
-            <Text style={styles.playerInfoDesc}>
+
+            <Text style={styles.playerInfoDesc} numberOfLines={5}>
               {movie.description || "Sem descrição na lista."}
             </Text>
           </View>
@@ -128,72 +130,70 @@ const styles = StyleSheet.create({
   },
 
   bgImage: {
-    opacity: 0.22,
+    opacity: 0.18,
   },
 
   backBtn: {
     position: "absolute",
-    top: 18,
-    left: 18,
-    zIndex: 10,
+    top: 16,
+    left: 16,
+    zIndex: 20,
   },
 
   backText: {
     color: "#fff",
-    fontSize: isPhone ? 22 : 30,
+    fontSize: isPhone ? 24 : 30,
     fontWeight: "900",
   },
 
   overlay: {
     flex: 1,
-    flexDirection: isPhone ? "column" : "row",
-    alignItems: isPhone ? "flex-start" : "center",
-    paddingHorizontal: isPhone ? 20 : 70,
-    paddingTop: isPhone ? 70 : 0,
-    backgroundColor: "rgba(10,8,16,0.58)",
+    flexDirection: isPhone ? "row" : "row",
+    alignItems: "flex-end",
+    paddingHorizontal: isPhone ? 14 : 60,
+    paddingBottom: isPhone ? 18 : 26,
+    backgroundColor: "rgba(8,11,18,0.55)",
   },
 
   poster: {
-    width: isPhone ? 140 : 200,
-    height: isPhone ? 210 : 300,
-    borderRadius: 12,
+    width: isPhone ? 92 : 200,
+    height: isPhone ? 138 : 300,
+    borderRadius: 14,
     backgroundColor: "#26354b",
   },
 
   infoWrap: {
     flex: 1,
-    marginLeft: isPhone ? 0 : 28,
-    marginTop: isPhone ? 20 : 0,
-    width: "100%",
-    backgroundColor: "rgba(60,36,72,0.55)",
-    padding: 20,
-    borderRadius: 14,
+    marginLeft: isPhone ? 14 : 28,
+    backgroundColor: "rgba(44,22,58,0.58)",
+    padding: isPhone ? 14 : 20,
+    borderRadius: 16,
   },
 
   actionBar: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 18,
+    marginBottom: 14,
   },
 
   actionBtn: {
-    height: 42,
-    paddingHorizontal: 18,
+    height: isPhone ? 40 : 42,
+    paddingHorizontal: isPhone ? 14 : 18,
     backgroundColor: "rgba(255,255,255,0.08)",
     justifyContent: "center",
-    marginRight: 12,
+    marginRight: 10,
     borderRadius: 10,
   },
 
   actionBtnText: {
     color: "#fff",
-    fontSize: isPhone ? 12 : 16,
+    fontSize: isPhone ? 11 : 16,
     fontWeight: "700",
   },
 
   iconBtn: {
-    width: 42,
-    height: 42,
+    width: isPhone ? 40 : 42,
+    height: isPhone ? 40 : 42,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.08)",
@@ -207,21 +207,21 @@ const styles = StyleSheet.create({
 
   title: {
     color: "#fff",
-    fontSize: isPhone ? 24 : 36,
+    fontSize: isPhone ? 18 : 36,
     fontWeight: "900",
   },
 
   meta: {
     color: "#d9d0de",
-    fontSize: isPhone ? 12 : 16,
-    marginTop: 8,
+    fontSize: isPhone ? 10 : 16,
+    marginTop: 6,
   },
 
   desc: {
     color: "#f1edf4",
-    fontSize: isPhone ? 12 : 16,
-    marginTop: 18,
-    lineHeight: isPhone ? 18 : 25,
+    fontSize: isPhone ? 10 : 16,
+    marginTop: 12,
+    lineHeight: isPhone ? 15 : 25,
   },
 
   playerScreen: {
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
 
   playerBox: {
     width: "100%",
-    height: isPhone ? height * 0.34 : height * 0.55,
+    height: isPhone ? height * 0.32 : height * 0.55,
     backgroundColor: "#000",
   },
 

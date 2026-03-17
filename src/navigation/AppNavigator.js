@@ -20,6 +20,9 @@ export default function AppNavigator() {
   const handleLogin = (payload) => {
     setSession(payload);
     setScreen("home");
+    setSelectedMovie(null);
+    setSelectedSeries(null);
+    setSelectedSeason(null);
   };
 
   const handleLogout = () => {
