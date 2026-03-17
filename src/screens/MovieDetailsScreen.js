@@ -10,7 +10,7 @@ import {
   Dimensions,
   Modal,
 } from "react-native";
-import { Video } from "expo-av";
+import { Video, ResizeMode } from "expo-av";
 
 const { width, height } = Dimensions.get("window");
 const isPhone = width < 900;
@@ -18,17 +18,19 @@ const isPhone = width < 900;
 export default function MovieDetailsScreen({ movie, onBack }) {
   const videoRef = useRef(null);
   const [showPlayer, setShowPlayer] = useState(false);
+  const [statusText, setStatusText] = useState("");
 
   if (!movie) return null;
 
   const openPlayer = () => {
-    if (!movie.url) return;
+    if (!movie?.url) return;
+    setStatusText("");
     setShowPlayer(true);
   };
 
   const closePlayer = async () => {
     try {
-      await videoRef.current?.pauseAsync?.();
+      await videoRef.current?.stopAsync?.();
     } catch (e) {}
     setShowPlayer(false);
   };
@@ -63,11 +65,11 @@ export default function MovieDetailsScreen({ movie, onBack }) {
 
             <Text style={styles.title}>{movie.name}</Text>
 
-            <Text style={styles.meta} numberOfLines={2}>
+            <Text style={styles.meta}>
               {(movie.year || "-") + " • " + (movie.group || "Filmes")}
             </Text>
 
-            <Text style={styles.desc} numberOfLines={8}>
+            <Text style={styles.desc}>
               {movie.description || "Sem descrição na lista."}
             </Text>
           </View>
@@ -79,6 +81,7 @@ export default function MovieDetailsScreen({ movie, onBack }) {
         animationType="fade"
         transparent={false}
         onRequestClose={closePlayer}
+        statusBarTranslucent
       >
         <SafeAreaView style={styles.playerScreen}>
           <View style={styles.playerTop}>
@@ -96,20 +99,34 @@ export default function MovieDetailsScreen({ movie, onBack }) {
               ref={videoRef}
               source={{ uri: movie.url }}
               style={styles.video}
-              resizeMode="contain"
+              resizeMode={ResizeMode.CONTAIN}
               useNativeControls
               shouldPlay
+              isLooping={false}
+              onLoadStart={() => setStatusText("Carregando vídeo...")}
+              onLoad={() => setStatusText("")}
+              onReadyForDisplay={() => setStatusText("")}
+              onError={(error) => {
+                const msg =
+                  typeof error === "string"
+                    ? error
+                    : error?.errorString || "Falha ao reproduzir este vídeo.";
+                setStatusText(msg);
+              }}
             />
+            {!!statusText && (
+              <View style={styles.statusOverlay}>
+                <Text style={styles.statusText}>{statusText}</Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.playerInfo}>
             <Text style={styles.playerInfoTitle}>{movie.name}</Text>
-
-            <Text style={styles.playerInfoMeta} numberOfLines={2}>
+            <Text style={styles.playerInfoMeta}>
               {(movie.year || "-") + " • " + (movie.group || "Filmes")}
             </Text>
-
-            <Text style={styles.playerInfoDesc} numberOfLines={5}>
+            <Text style={styles.playerInfoDesc}>
               {movie.description || "Sem descrição na lista."}
             </Text>
           </View>
@@ -130,70 +147,72 @@ const styles = StyleSheet.create({
   },
 
   bgImage: {
-    opacity: 0.18,
+    opacity: 0.22,
   },
 
   backBtn: {
     position: "absolute",
-    top: 16,
-    left: 16,
-    zIndex: 20,
+    top: 18,
+    left: 18,
+    zIndex: 10,
   },
 
   backText: {
     color: "#fff",
-    fontSize: isPhone ? 24 : 30,
+    fontSize: isPhone ? 22 : 30,
     fontWeight: "900",
   },
 
   overlay: {
     flex: 1,
-    flexDirection: isPhone ? "row" : "row",
-    alignItems: "flex-end",
-    paddingHorizontal: isPhone ? 14 : 60,
-    paddingBottom: isPhone ? 18 : 26,
-    backgroundColor: "rgba(8,11,18,0.55)",
+    flexDirection: isPhone ? "column" : "row",
+    alignItems: isPhone ? "flex-start" : "center",
+    paddingHorizontal: isPhone ? 20 : 70,
+    paddingTop: isPhone ? 70 : 0,
+    backgroundColor: "rgba(10,8,16,0.58)",
   },
 
   poster: {
-    width: isPhone ? 92 : 200,
-    height: isPhone ? 138 : 300,
-    borderRadius: 14,
+    width: isPhone ? 140 : 200,
+    height: isPhone ? 210 : 300,
+    borderRadius: 12,
     backgroundColor: "#26354b",
   },
 
   infoWrap: {
     flex: 1,
-    marginLeft: isPhone ? 14 : 28,
-    backgroundColor: "rgba(44,22,58,0.58)",
-    padding: isPhone ? 14 : 20,
-    borderRadius: 16,
+    marginLeft: isPhone ? 0 : 28,
+    marginTop: isPhone ? 20 : 0,
+    width: "100%",
+    backgroundColor: "rgba(60,36,72,0.55)",
+    padding: 20,
+    borderRadius: 14,
   },
 
   actionBar: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 14,
+    marginBottom: 18,
   },
 
   actionBtn: {
-    height: isPhone ? 40 : 42,
-    paddingHorizontal: isPhone ? 14 : 18,
+    height: 42,
+    paddingHorizontal: 18,
     backgroundColor: "rgba(255,255,255,0.08)",
     justifyContent: "center",
-    marginRight: 10,
+    marginRight: 12,
     borderRadius: 10,
   },
 
   actionBtnText: {
     color: "#fff",
-    fontSize: isPhone ? 11 : 16,
+    fontSize: isPhone ? 12 : 16,
     fontWeight: "700",
   },
 
   iconBtn: {
-    width: isPhone ? 40 : 42,
-    height: isPhone ? 40 : 42,
+    width: 42,
+    height: 42,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.08)",
@@ -207,21 +226,21 @@ const styles = StyleSheet.create({
 
   title: {
     color: "#fff",
-    fontSize: isPhone ? 18 : 36,
+    fontSize: isPhone ? 24 : 36,
     fontWeight: "900",
   },
 
   meta: {
     color: "#d9d0de",
-    fontSize: isPhone ? 10 : 16,
-    marginTop: 6,
+    fontSize: isPhone ? 12 : 16,
+    marginTop: 8,
   },
 
   desc: {
     color: "#f1edf4",
-    fontSize: isPhone ? 10 : 16,
-    marginTop: 12,
-    lineHeight: isPhone ? 15 : 25,
+    fontSize: isPhone ? 12 : 16,
+    marginTop: 18,
+    lineHeight: isPhone ? 18 : 25,
   },
 
   playerScreen: {
@@ -261,14 +280,29 @@ const styles = StyleSheet.create({
 
   playerBox: {
     width: "100%",
-    height: isPhone ? height * 0.32 : height * 0.55,
+    height: isPhone ? height * 0.34 : height * 0.55,
     backgroundColor: "#000",
+    position: "relative",
   },
 
   video: {
     width: "100%",
     height: "100%",
     backgroundColor: "#000",
+  },
+
+  statusOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 10,
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+
+  statusText: {
+    color: "#fff",
+    fontSize: 12,
   },
 
   playerInfo: {

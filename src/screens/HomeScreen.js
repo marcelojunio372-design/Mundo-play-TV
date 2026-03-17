@@ -9,7 +9,7 @@ import {
   ImageBackground,
 } from "react-native";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 const isPhone = width < 900;
 
 export default function HomeScreen({
@@ -45,17 +45,16 @@ export default function HomeScreen({
       {
         id: "fallback_home",
         name: "MUNDO PLAY TV",
-        description: "Streaming profissional",
+        description: "Lançamentos e destaques da sua lista.",
         logo: "",
-        group: "Lançamentos e destaques",
-        year: "",
+        group: "Destaques",
+        year: "-",
         mediaType: "movie",
       },
     ];
   }, [movies, series]);
 
   const [index, setIndex] = useState(0);
-  const item = featured[index] || featured[0];
 
   useEffect(() => {
     if (!featured.length) return;
@@ -66,6 +65,8 @@ export default function HomeScreen({
 
     return () => clearInterval(timer);
   }, [featured]);
+
+  const item = featured[index] || featured[0];
 
   const openFeatured = () => {
     if (!item) return;
@@ -141,24 +142,26 @@ export default function HomeScreen({
               imageStyle={styles.heroImage}
             >
               <View style={styles.heroOverlay}>
-                <Text style={styles.heroType}>
-                  {item?.mediaType === "series" ? "SÉRIE" : "FILME"}
-                </Text>
+                <View style={styles.heroInfoBox}>
+                  <Text style={styles.heroType}>
+                    {item?.mediaType === "series" ? "SÉRIE" : "FILME"}
+                  </Text>
 
-                <Text style={styles.heroTitle} numberOfLines={2}>
-                  {item?.name || "MUNDO PLAY TV"}
-                </Text>
+                  <Text style={styles.heroTitle} numberOfLines={2}>
+                    {item?.name || "MUNDO PLAY TV"}
+                  </Text>
 
-                <Text style={styles.heroMeta} numberOfLines={1}>
-                  {(item?.year || "-") + " • " + (item?.group || "Destaques")}
-                </Text>
+                  <Text style={styles.heroMeta} numberOfLines={1}>
+                    {(item?.year || "-") + " • " + (item?.group || "Destaques")}
+                  </Text>
 
-                <Text style={styles.heroDesc} numberOfLines={3}>
-                  {item?.description || "Lançamentos e destaques da sua lista."}
-                </Text>
+                  <Text style={styles.heroDesc} numberOfLines={4}>
+                    {item?.description || "Lançamentos e destaques da sua lista."}
+                  </Text>
 
-                <View style={styles.heroAction}>
-                  <Text style={styles.heroActionText}>TOQUE PARA ABRIR</Text>
+                  <View style={styles.heroAction}>
+                    <Text style={styles.heroActionText}>TOQUE PARA ABRIR</Text>
+                  </View>
                 </View>
               </View>
             </ImageBackground>
@@ -176,7 +179,7 @@ const styles = StyleSheet.create({
   },
 
   topbar: {
-    height: isPhone ? 52 : 70,
+    height: isPhone ? 54 : 70,
     backgroundColor: "#0c1c2c",
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
@@ -188,7 +191,7 @@ const styles = StyleSheet.create({
 
   brand: {
     color: "#fff",
-    fontSize: isPhone ? 15 : 24,
+    fontSize: isPhone ? 16 : 24,
     fontWeight: "900",
   },
 
@@ -210,13 +213,13 @@ const styles = StyleSheet.create({
   },
 
   sidebar: {
-    width: isPhone ? 88 : 150,
+    width: isPhone ? 96 : 150,
     backgroundColor: "#061522",
-    padding: isPhone ? 8 : 10,
+    padding: 10,
   },
 
   sideBtn: {
-    height: isPhone ? 38 : 54,
+    height: isPhone ? 42 : 54,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
@@ -228,78 +231,85 @@ const styles = StyleSheet.create({
 
   sideBtnText: {
     color: "#fff",
-    fontSize: isPhone ? 9 : 14,
+    fontSize: isPhone ? 10 : 14,
     fontWeight: "900",
   },
 
   main: {
     flex: 1,
-    padding: isPhone ? 8 : 12,
+    padding: 10,
   },
 
   heroTouch: {
-    width: "100%",
+    flex: 1,
   },
 
   hero: {
-    height: isPhone ? 210 : 360,
+    flex: 1,
     borderRadius: 18,
     overflow: "hidden",
     backgroundColor: "#0c2133",
   },
 
   heroImage: {
-    opacity: 0.62,
+    opacity: 0.78,
   },
 
   heroOverlay: {
     flex: 1,
     justifyContent: "flex-end",
-    padding: isPhone ? 14 : 28,
-    backgroundColor: "rgba(4,13,22,0.38)",
+    padding: isPhone ? 18 : 28,
+    backgroundColor: "rgba(4,13,22,0.18)",
+  },
+
+  heroInfoBox: {
+    width: isPhone ? "92%" : "62%",
+    backgroundColor: "rgba(8,14,24,0.38)",
+    borderRadius: 18,
+    padding: isPhone ? 16 : 22,
   },
 
   heroType: {
     color: "#38d7ff",
-    fontSize: isPhone ? 10 : 15,
+    fontSize: isPhone ? 11 : 15,
     fontWeight: "900",
-    marginBottom: 4,
+    marginBottom: 6,
   },
 
   heroTitle: {
     color: "#fff",
-    fontSize: isPhone ? 16 : 38,
+    fontSize: isPhone ? 24 : 38,
     fontWeight: "900",
   },
 
   heroMeta: {
     color: "#d4dde7",
-    fontSize: isPhone ? 9 : 15,
-    marginTop: 6,
+    fontSize: isPhone ? 11 : 15,
+    marginTop: 8,
   },
 
   heroDesc: {
-    color: "#eef3f8",
-    fontSize: isPhone ? 10 : 16,
-    lineHeight: isPhone ? 14 : 24,
-    marginTop: 8,
-    maxWidth: isPhone ? "90%" : "70%",
+    color: "#f3f7fb",
+    fontSize: isPhone ? 12 : 16,
+    lineHeight: isPhone ? 18 : 24,
+    marginTop: 12,
   },
 
   heroAction: {
     alignSelf: "flex-start",
-    marginTop: 12,
+    marginTop: 16,
     backgroundColor: "rgba(56,215,255,0.16)",
     borderWidth: 1,
     borderColor: "#38d7ff",
     borderRadius: 10,
-    paddingVertical: isPhone ? 7 : 10,
-    paddingHorizontal: isPhone ? 10 : 14,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
   },
 
   heroActionText: {
     color: "#38d7ff",
-    fontSize: isPhone ? 10 : 13,
+    fontSize: isPhone ? 11 : 13,
     fontWeight: "900",
   },
 });
+

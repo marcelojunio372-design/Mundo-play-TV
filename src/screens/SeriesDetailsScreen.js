@@ -76,11 +76,11 @@ export default function SeriesDetailsScreen({ series, onBack, onOpenSeason }) {
               {series.name}
             </Text>
 
-            <Text style={styles.meta} numberOfLines={2}>
+            <Text style={styles.meta} numberOfLines={1}>
               {(series.year || "-") + " • " + (series.group || "Séries")}
             </Text>
 
-            <Text style={styles.desc} numberOfLines={7}>
+            <Text style={styles.desc} numberOfLines={6}>
               {series.description || "Sem descrição na lista."}
             </Text>
 
@@ -105,70 +105,72 @@ const styles = StyleSheet.create({
   },
 
   bgImage: {
-    opacity: 0.18,
+    opacity: 0.22,
   },
 
   backBtn: {
     position: "absolute",
-    top: 16,
-    left: 16,
-    zIndex: 20,
+    top: 18,
+    left: 18,
+    zIndex: 10,
   },
 
   backText: {
     color: "#fff",
-    fontSize: isPhone ? 24 : 30,
+    fontSize: isPhone ? 22 : 30,
     fontWeight: "900",
   },
 
   overlay: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "flex-end",
-    paddingHorizontal: isPhone ? 14 : 60,
-    paddingBottom: isPhone ? 18 : 26,
-    backgroundColor: "rgba(8,11,18,0.55)",
+    flexDirection: isPhone ? "column" : "row",
+    alignItems: isPhone ? "flex-start" : "center",
+    paddingHorizontal: isPhone ? 20 : 70,
+    paddingTop: isPhone ? 70 : 0,
+    backgroundColor: "rgba(10,8,16,0.58)",
   },
 
   poster: {
-    width: isPhone ? 92 : 200,
-    height: isPhone ? 138 : 300,
-    borderRadius: 14,
+    width: isPhone ? 140 : 200,
+    height: isPhone ? 210 : 300,
+    borderRadius: 12,
     backgroundColor: "#26354b",
   },
 
   infoWrap: {
     flex: 1,
-    marginLeft: isPhone ? 14 : 28,
-    backgroundColor: "rgba(44,22,58,0.58)",
-    padding: isPhone ? 14 : 20,
-    borderRadius: 16,
+    marginLeft: isPhone ? 0 : 28,
+    marginTop: isPhone ? 20 : 0,
+    width: "100%",
+    backgroundColor: "rgba(60,36,72,0.55)",
+    padding: 20,
+    borderRadius: 14,
   },
 
   actionBar: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 14,
+    marginBottom: 18,
   },
 
   actionBtn: {
-    height: isPhone ? 40 : 42,
-    paddingHorizontal: isPhone ? 14 : 18,
+    height: 42,
+    paddingHorizontal: 18,
     backgroundColor: "rgba(255,255,255,0.08)",
     justifyContent: "center",
-    marginRight: 10,
+    marginRight: 12,
     borderRadius: 10,
   },
 
   actionBtnText: {
     color: "#fff",
-    fontSize: isPhone ? 11 : 16,
+    fontSize: isPhone ? 12 : 16,
     fontWeight: "700",
   },
 
   iconBtn: {
-    width: isPhone ? 40 : 42,
-    height: isPhone ? 40 : 42,
+    width: 42,
+    height: 42,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.08)",
@@ -182,27 +184,27 @@ const styles = StyleSheet.create({
 
   title: {
     color: "#fff",
-    fontSize: isPhone ? 18 : 36,
+    fontSize: isPhone ? 24 : 36,
     fontWeight: "900",
   },
 
   meta: {
     color: "#d9d0de",
-    fontSize: isPhone ? 10 : 16,
-    marginTop: 6,
+    fontSize: isPhone ? 12 : 16,
+    marginTop: 8,
   },
 
   desc: {
     color: "#f1edf4",
-    fontSize: isPhone ? 10 : 16,
-    marginTop: 12,
-    lineHeight: isPhone ? 15 : 25,
+    fontSize: isPhone ? 12 : 16,
+    marginTop: 18,
+    lineHeight: isPhone ? 18 : 25,
   },
 
   episodesInfo: {
     color: "#38d7ff",
-    fontSize: isPhone ? 10 : 15,
-    marginTop: 12,
+    fontSize: isPhone ? 12 : 15,
+    marginTop: 18,
     fontWeight: "700",
   },
 });
