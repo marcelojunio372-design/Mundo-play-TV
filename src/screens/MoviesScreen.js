@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -9,8 +9,38 @@ import {
   StyleSheet,
 } from "react-native";
 
+function buildMovieCategories(movies) {
+  const grouped = {};
+
+  movies.forEach((item) => {
+    const group = item.group || "OUTROS";
+    if (!grouped[group]) grouped[group] = [];
+    grouped[group].push(item);
+  });
+
+  const categories = [
+    { id: "all", name: "TODOS OS FILMES", items: movies },
+    { id: "fav", name: "FAVORITOS", items: [] },
+    { id: "last", name: "RECENTEMENTE", items: [] },
+  ];
+
+  Object.keys(grouped).forEach((group, index) => {
+    categories.push({
+      id: `movie_group_${index}`,
+      name: group.toUpperCase(),
+      items: grouped[group],
+    });
+  });
+
+  return categories;
+}
+
 export default function MoviesScreen({ session, onBack, onOpenSettings, onLogout }) {
   const movies = session?.data?.movies || [];
+  const categories = useMemo(() => buildMovieCategories(movies), [movies]);
+
+  const [selectedCategory, setSelectedCategory] = useState(0);
+  const visibleMovies = categories[selectedCategory]?.items || [];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -26,45 +56,73 @@ export default function MoviesScreen({ session, onBack, onOpenSettings, onLogout
         </TouchableOpacity>
       </View>
 
-      <View style={styles.topBlocks}>
-        <Text style={styles.blockTitle}>VISTO POR ÚLTIMO</Text>
-        <Text style={styles.blockTitle}>FAVORITOS</Text>
-        <Text style={styles.blockTitle}>TODOS ({movies.length})</Text>
-      </View>
+      <View style={styles.content}>
+        <View style={styles.leftPanel}>
+          <FlatList
+            data={categories}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item, index }) => {
+              const active = selectedCategory === index;
 
-      <FlatList
-        data={movies}
-        keyExtractor={(item, index) => item.id || String(index)}
-        numColumns={4}
-        initialNumToRender={24}
-        maxToRenderPerBatch={24}
-        windowSize={10}
-        contentContainerStyle={styles.grid}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            {item.logo ? (
-              <Image source={{ uri: item.logo }} style={styles.poster} />
-            ) : (
-              <View style={styles.poster} />
+              return (
+                <TouchableOpacity
+                  style={[styles.categoryRow, active && styles.categoryActive]}
+                  onPress={() => setSelectedCategory(index)}
+                >
+                  <Text
+                    style={[styles.categoryText, active && styles.categoryTextActive]}
+                    numberOfLines={1}
+                  >
+                    {item.name}
+                  </Text>
+
+                  <Text
+                    style={[styles.categoryCount, active && styles.categoryTextActive]}
+                  >
+                    {item.items.length}
+                  </Text>
+                </TouchableOpacity>
+              );
+            }}
+          />
+        </View>
+
+        <View style={styles.rightPanel}>
+          <FlatList
+            data={visibleMovies}
+            keyExtractor={(item, index) => item.id || `${item.name}_${index}`}
+            numColumns={4}
+            initialNumToRender={24}
+            maxToRenderPerBatch={24}
+            windowSize={10}
+            contentContainerStyle={styles.grid}
+            renderItem={({ item }) => (
+              <View style={styles.card}>
+                {item.logo ? (
+                  <Image source={{ uri: item.logo }} style={styles.poster} />
+                ) : (
+                  <View style={styles.posterFallback} />
+                )}
+
+                <Text style={styles.title} numberOfLines={2}>
+                  {item.name || item.title || "Sem nome"}
+                </Text>
+
+                <Text style={styles.group} numberOfLines={1}>
+                  {item.group || "Filme"}
+                </Text>
+              </View>
             )}
-
-            <Text style={styles.title} numberOfLines={2}>
-              {item.name || item.title || "Sem nome"}
-            </Text>
-
-            <Text style={styles.group} numberOfLines={1}>
-              {item.group || "Filme"}
-            </Text>
-          </View>
-        )}
-        ListEmptyComponent={
-          <Text style={styles.empty}>Nenhum filme encontrado na lista.</Text>
-        }
-      />
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>Nenhum filme encontrado.</Text>
+            }
+          />
+        </View>
+      </View>
 
       <View style={styles.footer}>
         <TouchableOpacity style={styles.footerBtn} onPress={onOpenSettings}>
-          <Text style={styles.footerBtnText}>CONF.</Text>
+          <Text style={styles.footerBtnText}>CONFIG.</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -97,22 +155,57 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 
-  topBlocks: {
-    paddingHorizontal: 8,
-    paddingTop: 8,
-    paddingBottom: 2,
+  content: {
+    flex: 1,
+    flexDirection: "row",
+    padding: 4,
   },
 
-  blockTitle: {
+  leftPanel: {
+    width: 102,
+    paddingRight: 4,
+  },
+
+  categoryRow: {
+    minHeight: 36,
+    paddingHorizontal: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+
+  categoryActive: {
+    backgroundColor: "#6de9ea",
+    borderRadius: 4,
+  },
+
+  categoryText: {
     color: "#ffffff",
-    fontSize: 10,
-    fontWeight: "900",
-    marginBottom: 6,
+    fontSize: 8,
+    fontWeight: "800",
+    flex: 1,
+    marginRight: 4,
+  },
+
+  categoryTextActive: {
+    color: "#0d2340",
+  },
+
+  categoryCount: {
+    color: "#ffffff",
+    fontSize: 8,
+    fontWeight: "800",
+  },
+
+  rightPanel: {
+    flex: 1,
+    paddingLeft: 4,
   },
 
   grid: {
-    paddingHorizontal: 4,
-    paddingBottom: 10,
+    paddingBottom: 8,
   },
 
   card: {
@@ -126,12 +219,20 @@ const styles = StyleSheet.create({
     height: 95,
     borderRadius: 8,
     backgroundColor: "#243a57",
-    marginBottom: 5,
+    marginBottom: 4,
+  },
+
+  posterFallback: {
+    width: "100%",
+    height: 95,
+    borderRadius: 8,
+    backgroundColor: "#243a57",
+    marginBottom: 4,
   },
 
   title: {
     color: "#ffffff",
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: "800",
   },
 
@@ -141,20 +242,20 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  empty: {
-    color: "#ffffff",
-    fontSize: 10,
+  emptyText: {
+    color: "#fff",
+    fontSize: 9,
     textAlign: "center",
     marginTop: 20,
   },
 
   footer: {
-    padding: 8,
+    padding: 6,
   },
 
   footerBtn: {
-    height: 34,
-    borderRadius: 10,
+    height: 32,
+    borderRadius: 8,
     backgroundColor: "rgba(56,215,255,0.18)",
     borderWidth: 1,
     borderColor: "#38d7ff",
@@ -164,7 +265,7 @@ const styles = StyleSheet.create({
 
   footerBtnText: {
     color: "#38d7ff",
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: "900",
   },
 });
