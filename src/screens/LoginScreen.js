@@ -27,15 +27,6 @@ export default function LoginScreen({ onLogin }) {
     return `http://${value}`;
   };
 
-  const loadWithTimeout = async (url) => {
-    return await Promise.race([
-      loadM3U(String(url || "").trim()),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout")), 15000)
-      ),
-    ]);
-  };
-
   const handleM3U = async () => {
     const finalUrl = normalizeUrl(m3uUrl);
 
@@ -47,7 +38,7 @@ export default function LoginScreen({ onLogin }) {
     try {
       setLoading(true);
 
-      const data = await loadWithTimeout(finalUrl);
+      const data = await loadM3U(finalUrl);
 
       onLogin({
         type: "m3u",
@@ -56,10 +47,7 @@ export default function LoginScreen({ onLogin }) {
         data,
       });
     } catch (e) {
-      Alert.alert(
-        "Erro",
-        "Falha ao carregar a lista M3U ou tempo de resposta excedido"
-      );
+      Alert.alert("Erro", "Falha ao carregar a lista M3U");
     } finally {
       setLoading(false);
     }
@@ -80,7 +68,7 @@ export default function LoginScreen({ onLogin }) {
     try {
       setLoading(true);
 
-      const data = await loadWithTimeout(playlistUrl);
+      const data = await loadM3U(playlistUrl);
 
       onLogin({
         type: "xtream",
@@ -92,10 +80,7 @@ export default function LoginScreen({ onLogin }) {
         data,
       });
     } catch (e) {
-      Alert.alert(
-        "Erro",
-        "Falha ao carregar login usuário/senha ou tempo de resposta excedido"
-      );
+      Alert.alert("Erro", "Falha ao carregar login usuário/senha");
     } finally {
       setLoading(false);
     }
@@ -152,6 +137,7 @@ export default function LoginScreen({ onLogin }) {
               value={m3uUrl}
               onChangeText={setM3uUrl}
               autoCapitalize="none"
+              autoCorrect={false}
             />
           )}
 
@@ -164,6 +150,7 @@ export default function LoginScreen({ onLogin }) {
                 value={serverUrl}
                 onChangeText={setServerUrl}
                 autoCapitalize="none"
+                autoCorrect={false}
               />
               <TextInput
                 style={styles.input}
@@ -172,6 +159,7 @@ export default function LoginScreen({ onLogin }) {
                 value={username}
                 onChangeText={setUsername}
                 autoCapitalize="none"
+                autoCorrect={false}
               />
               <TextInput
                 style={styles.input}
@@ -180,6 +168,8 @@ export default function LoginScreen({ onLogin }) {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
               />
             </>
           )}
