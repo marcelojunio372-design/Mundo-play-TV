@@ -32,6 +32,7 @@ export default function AppNavigator() {
 
   const handleReload = async () => {
     if (!session?.url) return false;
+
     try {
       const data = await loadM3U(session.url);
       setSession((prev) => ({ ...prev, data }));
@@ -49,7 +50,10 @@ export default function AppNavigator() {
     return (
       <LiveTVScreen
         session={session}
-        onBack={() => setScreen("home")}
+        onOpenHome={() => setScreen("home")}
+        onOpenLive={() => setScreen("live")}
+        onOpenMovies={() => setScreen("movies")}
+        onOpenSeries={() => setScreen("series")}
         onOpenSettings={() => setScreen("settings")}
         onLogout={handleLogout}
       />

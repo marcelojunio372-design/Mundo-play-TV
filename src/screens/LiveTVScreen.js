@@ -7,79 +7,119 @@ import {
   FlatList,
   StyleSheet,
   Dimensions,
+  TextInput,
 } from "react-native";
 import { Video } from "expo-av";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 const isPhone = width < 900;
+
+function buildCategories(channels) {
+  const groups = {};
+
+  channels.forEach((item) => {
+    const key = String(item.group || "OUTROS").trim();
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(item);
+  });
+
+  return [
+    { name: "Tudo", items: channels },
+    { name: "Favoritos", items: [] },
+    ...Object.keys(groups)
+      .sort((a, b) => a.localeCompare(b))
+      .map((group) => ({
+        name: group,
+        items: groups[group],
+      })),
+  ];
+}
 
 export default function LiveTVScreen({
   session,
-  onBack,
+  onOpenHome,
+  onOpenLive,
+  onOpenMovies,
+  onOpenSeries,
   onOpenSettings,
   onLogout,
 }) {
-  const liveItems = session?.data?.live || [];
-
-  const categories = useMemo(() => {
-    const grouped = {};
-    liveItems.forEach((item) => {
-      const group = String(item.group || "OUTROS").trim().toUpperCase();
-      if (!grouped[group]) grouped[group] = [];
-      grouped[group].push(item);
-    });
-
-    const result = [
-      { id: "all", name: "TODOS", items: liveItems },
-      { id: "fav", name: "FAVORITOS", items: [] },
-    ];
-
-    Object.keys(grouped)
-      .sort((a, b) => a.localeCompare(b))
-      .forEach((group, index) => {
-        result.push({
-          id: `group_${index}`,
-          name: group,
-          items: grouped[group],
-        });
-      });
-
-    return result;
-  }, [liveItems]);
+  const channels = session?.data?.live || [];
+  const categories = useMemo(() => buildCategories(channels), [channels]);
 
   const [selectedCategory, setSelectedCategory] = useState(0);
-  const [selectedChannel, setSelectedChannel] = useState(
-    liveItems.length ? liveItems[0] : null
-  );
+  const [selectedChannelIndex, setSelectedChannelIndex] = useState(0);
+  const [search, setSearch] = useState("");
 
-  const visibleChannels = categories[selectedCategory]?.items || [];
   const videoRef = useRef(null);
 
-  const handleSelectChannel = (item) => {
-    setSelectedChannel(item);
+  const baseChannels = categories[selectedCategory]?.items || channels;
+  const visibleChannels = baseChannels.filter((item) =>
+    String(item.name || "")
+      .toLowerCase()
+      .includes(search.toLowerCase())
+  );
+
+  const selectedChannel =
+    visibleChannels[selectedChannelIndex] || visibleChannels[0] || null;
+
+  const handleSelectCategory = (index) => {
+    setSelectedCategory(index);
+    setSelectedChannelIndex(0);
+    setSearch("");
+  };
+
+  const handleSelectChannel = (index) => {
+    setSelectedChannelIndex(index);
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>| Ao vivo</Text>
+      <View style={styles.topnav}>
+        <TouchableOpacity onPress={onOpenHome}>
+          <Text style={styles.topLink}>Casa</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.topSep}>|</Text>
+
+        <TouchableOpacity onPress={onOpenLive}>
+          <Text style={styles.topLinkActive}>TV ao Vivo</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.topSep}>|</Text>
+
+        <TouchableOpacity onPress={onOpenMovies}>
+          <Text style={styles.topLink}>Filmes</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.topSep}>|</Text>
+
+        <TouchableOpacity onPress={onOpenSeries}>
+          <Text style={styles.topLink}>Séries</Text>
+        </TouchableOpacity>
+
+        <View style={styles.searchWrap}>
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="buscar"
+            placeholderTextColor="#94a7bb"
+            style={styles.searchInput}
+          />
+        </View>
       </View>
 
-      <View style={styles.content}>
-        {/* ESQUERDA */}
+      <View style={styles.main}>
         <View style={styles.leftPanel}>
           <FlatList
             data={categories}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item, index) => `${item.name}_${index}`}
             renderItem={({ item, index }) => {
               const active = index === selectedCategory;
               return (
                 <TouchableOpacity
                   style={[styles.categoryRow, active && styles.categoryActive]}
-                  onPress={() => {
-                    setSelectedCategory(index);
-                    if (item.items.length) setSelectedChannel(item.items[0]);
-                  }}
+                  onPress={() => handleSelectCategory(index)}
                 >
                   <Text
                     style={[styles.categoryText, active && styles.categoryTextActive]}
@@ -98,32 +138,31 @@ export default function LiveTVScreen({
           />
         </View>
 
-        {/* MEIO */}
         <View style={styles.centerPanel}>
           <FlatList
             data={visibleChannels}
             keyExtractor={(item, index) => item.id || `${item.name}_${index}`}
-            renderItem={({ item }) => {
-              const active = selectedChannel?.id === item.id;
+            renderItem={({ item, index }) => {
+              const active = index === selectedChannelIndex;
+
               return (
                 <TouchableOpacity
                   style={[styles.channelRow, active && styles.channelRowActive]}
-                  onPress={() => handleSelectChannel(item)}
+                  onPress={() => handleSelectChannel(index)}
                 >
-                  <View style={styles.logoBox}>
-                    <Text style={styles.logoText}>
-                      {String(item.name || "?").slice(0, 2).toUpperCase()}
-                    </Text>
+                  <View style={styles.channelNumberBox}>
+                    <Text style={styles.channelNumber}>{index + 1}</Text>
                   </View>
 
-                  <View style={styles.channelInfo}>
+                  <View style={styles.channelTextWrap}>
                     <Text
                       style={[styles.channelName, active && styles.channelNameActive]}
                       numberOfLines={1}
                     >
-                      {item.name}
+                      {item.name || "Sem nome"}
                     </Text>
-                    <Text style={styles.channelGroup} numberOfLines={1}>
+
+                    <Text style={styles.channelSub} numberOfLines={1}>
                       {item.group || "Canal"}
                     </Text>
                   </View>
@@ -133,60 +172,46 @@ export default function LiveTVScreen({
           />
         </View>
 
-        {/* DIREITA */}
         <View style={styles.rightPanel}>
-          <Text style={styles.previewTitle}>MUNDO PLAY TV</Text>
-          <Text style={styles.previewChannel} numberOfLines={2}>
-            {selectedChannel?.name || "Sem canal"}
-          </Text>
-
           <View style={styles.previewBox}>
-            {selectedChannel?.url && (
+            {selectedChannel?.url ? (
               <Video
                 ref={videoRef}
                 source={{ uri: selectedChannel.url }}
                 style={styles.previewVideo}
                 resizeMode="contain"
+                useNativeControls
                 shouldPlay={false}
-                useNativeControls={false}
               />
+            ) : (
+              <View style={styles.previewEmpty}>
+                <Text style={styles.previewEmptyText}>Selecione um canal</Text>
+              </View>
             )}
           </View>
 
-          <View style={styles.playerButtons}>
-            <TouchableOpacity
-              style={styles.smallBtn}
-              onPress={() => videoRef.current?.playAsync()}
-            >
-              <Text style={styles.smallBtnText}>PLAY</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.smallBtn}
-              onPress={() => videoRef.current?.pauseAsync()}
-            >
-              <Text style={styles.smallBtnText}>PAUSE</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.smallBtn}
-              onPress={() => videoRef.current?.presentFullscreenPlayer()}
-            >
-              <Text style={styles.smallBtnText}>FULL</Text>
-            </TouchableOpacity>
+          <View style={styles.epgBox}>
+            <Text style={styles.epgTime}>Agora</Text>
+            <Text style={styles.epgTitle} numberOfLines={2}>
+              {selectedChannel?.name || "Sem canal selecionado"}
+            </Text>
+            <Text style={styles.epgSub} numberOfLines={2}>
+              Grupo: {selectedChannel?.group || "-"}
+            </Text>
+            <Text style={styles.epgDesc} numberOfLines={5}>
+              Preview do canal ao vivo. Toque nos controles do player ou use tela cheia para ampliar.
+            </Text>
           </View>
 
-          <TouchableOpacity style={styles.actionBtn} onPress={onBack}>
-            <Text style={styles.actionBtnText}>VOLTAR</Text>
-          </TouchableOpacity>
+          <View style={styles.bottomActions}>
+            <TouchableOpacity style={styles.actionBtn} onPress={onOpenSettings}>
+              <Text style={styles.actionBtnText}>CONFIG.</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionBtn} onPress={onOpenSettings}>
-            <Text style={styles.actionBtnText}>CONFIG.</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.actionBtn} onPress={onLogout}>
-            <Text style={styles.actionBtnText}>SAIR</Text>
-          </TouchableOpacity>
+            <TouchableOpacity style={styles.actionBtn} onPress={onLogout}>
+              <Text style={styles.actionBtnText}>SAIR</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </SafeAreaView>
@@ -194,177 +219,234 @@ export default function LiveTVScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0d1038" },
-
-  header: {
-    height: 40,
-    justifyContent: "center",
-    paddingHorizontal: 8,
-    backgroundColor: "#4f4f96",
+  container: {
+    flex: 1,
+    backgroundColor: "#0a1031",
   },
 
-  headerTitle: {
-    color: "#fff",
-    fontSize: 10,
+  topnav: {
+    height: isPhone ? 42 : 58,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "#10163a",
+  },
+
+  topLink: {
+    color: "#dbdbdb",
+    fontSize: isPhone ? 10 : 14,
+  },
+
+  topLinkActive: {
+    color: "#ffe24f",
+    fontSize: isPhone ? 10 : 14,
     fontWeight: "900",
   },
 
-  content: {
-    flex: 1,
-    flexDirection: "row",
-    padding: 4,
+  topSep: {
+    color: "#98a5b5",
+    marginHorizontal: 8,
+    fontSize: isPhone ? 10 : 14,
   },
 
-  /* ESQUERDA */
+  searchWrap: {
+    marginLeft: "auto",
+    width: isPhone ? 90 : 180,
+  },
+
+  searchInput: {
+    height: isPhone ? 28 : 36,
+    borderRadius: 8,
+    backgroundColor: "#1a224d",
+    color: "#fff",
+    paddingHorizontal: 10,
+    fontSize: isPhone ? 9 : 12,
+  },
+
+  main: {
+    flex: 1,
+    flexDirection: "row",
+  },
+
   leftPanel: {
-    width: isPhone ? 70 : 160,
+    width: isPhone ? 108 : 220,
+    backgroundColor: "#2a1530",
+    borderRightWidth: 1,
+    borderRightColor: "rgba(255,255,255,0.08)",
   },
 
   categoryRow: {
-    height: isPhone ? 26 : 40,
-    paddingHorizontal: 5,
-    marginBottom: 2,
-    borderRadius: 5,
+    minHeight: isPhone ? 34 : 46,
+    paddingHorizontal: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.08)",
   },
 
   categoryActive: {
-    backgroundColor: "#73edf0",
+    backgroundColor: "rgba(255,226,79,0.12)",
   },
 
   categoryText: {
-    color: "#fff",
-    fontSize: isPhone ? 6 : 9,
-    fontWeight: "800",
+    color: "#f4f4f4",
+    fontSize: isPhone ? 8 : 12,
+    flex: 1,
+    marginRight: 6,
   },
 
   categoryTextActive: {
-    color: "#13233c",
-  },
-
-  categoryCount: {
-    color: "#fff",
-    fontSize: isPhone ? 6 : 9,
+    color: "#ffe24f",
     fontWeight: "900",
   },
 
-  /* MEIO */
+  categoryCount: {
+    color: "#f4f4f4",
+    fontSize: isPhone ? 8 : 12,
+  },
+
   centerPanel: {
-    flex: 1,
-    paddingHorizontal: 2,
+    width: isPhone ? 128 : 260,
+    backgroundColor: "#11183d",
+    borderRightWidth: 1,
+    borderRightColor: "rgba(255,255,255,0.08)",
   },
 
   channelRow: {
-    height: isPhone ? 28 : 40,
+    minHeight: isPhone ? 34 : 44,
     flexDirection: "row",
     alignItems: "center",
+    paddingHorizontal: 8,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
   },
 
   channelRowActive: {
-    backgroundColor: "rgba(115,237,240,0.16)",
+    backgroundColor: "rgba(115,237,240,0.14)",
   },
 
-  logoBox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    backgroundColor: "#213d75",
+  channelNumberBox: {
+    width: isPhone ? 24 : 34,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 5,
+    marginRight: 6,
   },
 
-  logoText: {
-    color: "#fff",
-    fontSize: 6,
+  channelNumber: {
+    color: "#f2f2f2",
+    fontSize: isPhone ? 7 : 10,
     fontWeight: "900",
+  },
+
+  channelTextWrap: {
+    flex: 1,
   },
 
   channelName: {
     color: "#fff",
-    fontSize: 7,
-    fontWeight: "900",
+    fontSize: isPhone ? 7.5 : 11,
+    fontWeight: "800",
   },
 
   channelNameActive: {
     color: "#9efcff",
   },
 
-  channelGroup: {
-    color: "#c7d2eb",
-    fontSize: 5.5,
+  channelSub: {
+    color: "#c6d2e8",
+    fontSize: isPhone ? 6 : 9,
+    marginTop: 1,
   },
 
-  /* DIREITA */
   rightPanel: {
-    width: isPhone ? 90 : 200,
-  },
-
-  previewTitle: {
-    color: "#47d9ff",
-    fontSize: 7,
-    fontWeight: "900",
-  },
-
-  previewChannel: {
-    color: "#fff",
-    fontSize: 6,
-    marginBottom: 4,
+    flex: 1,
+    backgroundColor: "#0b1338",
+    padding: 8,
   },
 
   previewBox: {
     width: "100%",
-    height: 70,
-    borderRadius: 6,
+    height: isPhone ? height * 0.22 : 240,
+    borderRadius: 8,
     overflow: "hidden",
     backgroundColor: "#000",
-    marginBottom: 6,
+    marginBottom: 8,
   },
 
   previewVideo: {
     width: "100%",
     height: "100%",
+    backgroundColor: "#000",
   },
 
-  playerButtons: {
-    flexDirection: "row",
+  previewEmpty: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#000",
+  },
+
+  previewEmptyText: {
+    color: "#c8d4e2",
+    fontSize: isPhone ? 9 : 12,
+  },
+
+  epgBox: {
+    backgroundColor: "#10183f",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
+  },
+
+  epgTime: {
+    color: "#ffd94d",
+    fontSize: isPhone ? 8 : 11,
+    fontWeight: "900",
+    marginBottom: 4,
+  },
+
+  epgTitle: {
+    color: "#fff",
+    fontSize: isPhone ? 10 : 14,
+    fontWeight: "900",
+    marginBottom: 4,
+  },
+
+  epgSub: {
+    color: "#c4d1df",
+    fontSize: isPhone ? 8 : 11,
     marginBottom: 6,
   },
 
-  smallBtn: {
-    flex: 1,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#38d7ff",
-    alignItems: "center",
-    justifyContent: "center",
-    marginHorizontal: 1,
+  epgDesc: {
+    color: "#d7e1ec",
+    fontSize: isPhone ? 8 : 11,
+    lineHeight: isPhone ? 12 : 16,
   },
 
-  smallBtnText: {
-    color: "#38d7ff",
-    fontSize: 6,
-    fontWeight: "900",
+  bottomActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 6,
   },
 
   actionBtn: {
-    height: 28,
-    borderRadius: 6,
+    flex: 1,
+    minHeight: isPhone ? 32 : 40,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: "#38d7ff",
+    backgroundColor: "rgba(56,215,255,0.10)",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 5,
   },
 
   actionBtnText: {
     color: "#38d7ff",
-    fontSize: 7,
+    fontSize: isPhone ? 8 : 10,
     fontWeight: "900",
   },
 });

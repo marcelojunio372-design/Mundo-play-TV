@@ -15,7 +15,6 @@ const isPhone = width < 900;
 
 function buildCategories(items) {
   const groups = {};
-
   items.forEach((item) => {
     const key = String(item.group || "OUTROS").trim();
     if (!groups[key]) groups[key] = [];
@@ -28,10 +27,7 @@ function buildCategories(items) {
     { name: "Visto por último", items: [] },
     ...Object.keys(groups)
       .sort((a, b) => a.localeCompare(b))
-      .map((group) => ({
-        name: group,
-        items: groups[group],
-      })),
+      .map((group) => ({ name: group, items: groups[group] })),
   ];
 }
 
@@ -46,33 +42,18 @@ export default function MoviesScreen({
   const movies = session?.data?.movies || [];
   const categories = useMemo(() => buildCategories(movies), [movies]);
   const [selectedCategory, setSelectedCategory] = useState(0);
-
   const visibleMovies = categories[selectedCategory]?.items || movies;
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topnav}>
-        <TouchableOpacity onPress={onBack}>
-          <Text style={styles.navText}>Casa</Text>
-        </TouchableOpacity>
-
+        <TouchableOpacity onPress={onBack}><Text style={styles.navText}>Casa</Text></TouchableOpacity>
         <Text style={styles.sep}>|</Text>
-
-        <TouchableOpacity onPress={onOpenLive}>
-          <Text style={styles.navText}>TV ao Vivo</Text>
-        </TouchableOpacity>
-
+        <TouchableOpacity onPress={onOpenLive}><Text style={styles.navText}>TV ao Vivo</Text></TouchableOpacity>
         <Text style={styles.sep}>|</Text>
-
-        <TouchableOpacity onPress={onOpenMovies}>
-          <Text style={styles.navTextActive}>Filmes</Text>
-        </TouchableOpacity>
-
+        <TouchableOpacity onPress={onOpenMovies}><Text style={styles.navTextActive}>Filmes</Text></TouchableOpacity>
         <Text style={styles.sep}>|</Text>
-
-        <TouchableOpacity onPress={onOpenSeries}>
-          <Text style={styles.navText}>Séries</Text>
-        </TouchableOpacity>
+        <TouchableOpacity onPress={onOpenSeries}><Text style={styles.navText}>Séries</Text></TouchableOpacity>
       </View>
 
       <View style={styles.content}>
@@ -87,7 +68,6 @@ export default function MoviesScreen({
             keyExtractor={(item, index) => `${item.name}_${index}`}
             renderItem={({ item, index }) => {
               const active = index === selectedCategory;
-
               return (
                 <TouchableOpacity
                   style={[styles.categoryRow, active && styles.categoryActive]}
@@ -99,7 +79,6 @@ export default function MoviesScreen({
                   >
                     {item.name}
                   </Text>
-
                   <Text
                     style={[styles.categoryCount, active && styles.categoryTextActive]}
                   >
@@ -122,10 +101,7 @@ export default function MoviesScreen({
             numColumns={isPhone ? 3 : 5}
             columnWrapperStyle={styles.rowWrap}
             renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.card}
-                onPress={() => onSelectMovie(item)}
-              >
+              <TouchableOpacity style={styles.card} onPress={() => onSelectMovie(item)}>
                 <Image
                   source={item.logo ? { uri: item.logo } : undefined}
                   style={styles.poster}
@@ -143,11 +119,7 @@ export default function MoviesScreen({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#040914",
-  },
-
+  container: { flex: 1, backgroundColor: "#040914" },
   topnav: {
     height: isPhone ? 42 : 58,
     flexDirection: "row",
@@ -156,27 +128,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.1)",
   },
+  navText: { color: "#d7d7d7", fontSize: isPhone ? 11 : 16 },
+  navTextActive: { color: "#ffe04f", fontSize: isPhone ? 11 : 16, fontWeight: "900" },
+  sep: { color: "#ccc", marginHorizontal: 12 },
 
-  navText: {
-    color: "#d7d7d7",
-    fontSize: isPhone ? 11 : 16,
-  },
-
-  navTextActive: {
-    color: "#ffe04f",
-    fontSize: isPhone ? 11 : 16,
-    fontWeight: "900",
-  },
-
-  sep: {
-    color: "#ccc",
-    marginHorizontal: 12,
-  },
-
-  content: {
-    flex: 1,
-    flexDirection: "row",
-  },
+  content: { flex: 1, flexDirection: "row" },
 
   leftPanel: {
     width: isPhone ? 120 : 260,
@@ -184,7 +140,6 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: "rgba(255,255,255,0.1)",
   },
-
   leftHeader: {
     height: isPhone ? 70 : 110,
     justifyContent: "center",
@@ -192,17 +147,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
   },
-
-  leftIcon: {
-    color: "#fff",
-    fontSize: isPhone ? 30 : 54,
-    marginBottom: 6,
-  },
-
-  leftTitle: {
-    color: "#fff",
-    fontSize: isPhone ? 10 : 14,
-  },
+  leftIcon: { color: "#fff", fontSize: isPhone ? 30 : 54, marginBottom: 6 },
+  leftTitle: { color: "#fff", fontSize: isPhone ? 10 : 14 },
 
   categoryRow: {
     minHeight: isPhone ? 34 : 50,
@@ -213,48 +159,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
   },
+  categoryActive: { backgroundColor: "rgba(255,224,79,0.12)" },
+  categoryText: { color: "#f4f4f4", fontSize: isPhone ? 9 : 13, flex: 1, marginRight: 8 },
+  categoryTextActive: { color: "#ffe04f" },
+  categoryCount: { color: "#f4f4f4", fontSize: isPhone ? 9 : 13 },
 
-  categoryActive: {
-    backgroundColor: "rgba(255,224,79,0.12)",
-  },
-
-  categoryText: {
-    color: "#f4f4f4",
-    fontSize: isPhone ? 9 : 13,
-    flex: 1,
-    marginRight: 8,
-  },
-
-  categoryTextActive: {
-    color: "#ffe04f",
-  },
-
-  categoryCount: {
-    color: "#f4f4f4",
-    fontSize: isPhone ? 9 : 13,
-  },
-
-  rightPanel: {
-    flex: 1,
-    padding: 10,
-  },
-
+  rightPanel: { flex: 1, padding: 10 },
   totalLabel: {
     color: "#d9d9d9",
     textAlign: "right",
     fontSize: isPhone ? 12 : 18,
     marginBottom: 10,
   },
-
-  rowWrap: {
-    justifyContent: "space-between",
-    marginBottom: 10,
-  },
-
-  card: {
-    width: isPhone ? "31.8%" : "18.6%",
-  },
-
+  rowWrap: { justifyContent: "space-between", marginBottom: 10 },
+  card: { width: isPhone ? "31.8%" : "18.6%" },
   poster: {
     width: "100%",
     aspectRatio: 0.7,
@@ -262,9 +180,5 @@ const styles = StyleSheet.create({
     backgroundColor: "#2a3550",
     marginBottom: 6,
   },
-
-  cardTitle: {
-    color: "#f0f0f0",
-    fontSize: isPhone ? 9 : 12,
-  },
+  cardTitle: { color: "#f0f0f0", fontSize: isPhone ? 9 : 12 },
 });

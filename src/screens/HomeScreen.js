@@ -28,7 +28,14 @@ export default function HomeScreen({
     const combined = [...movies.slice(0, 3), ...series.slice(0, 3)];
     return combined.length
       ? combined
-      : [{ name: "MUNDO PLAY TV", description: "Streaming profissional", logo: "" }];
+      : [
+          {
+            name: "MUNDO PLAY TV",
+            description: "Streaming profissional",
+            logo: "",
+            group: "Destaques",
+          },
+        ];
   }, [movies, series]);
 
   const [index, setIndex] = useState(0);
@@ -41,8 +48,19 @@ export default function HomeScreen({
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topbar}>
-        <Text style={styles.brand}>MUNDO PLAY TV</Text>
-        <Text style={styles.subbrand}>IPTV Profissional</Text>
+        <View>
+          <Text style={styles.brand}>MUNDO PLAY TV</Text>
+          <Text style={styles.subbrand}>IPTV Profissional</Text>
+        </View>
+        <View>
+          <Text style={styles.datetime}>
+            {new Date().toLocaleTimeString("pt-BR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}{" "}
+            {new Date().toLocaleDateString("pt-BR")}
+          </Text>
+        </View>
       </View>
 
       <View style={styles.content}>
@@ -78,7 +96,7 @@ export default function HomeScreen({
         </View>
 
         <View style={styles.main}>
-          <TouchableOpacity onPress={nextBanner} activeOpacity={0.9}>
+          <TouchableOpacity activeOpacity={0.9} onPress={nextBanner}>
             <ImageBackground
               source={item?.logo ? { uri: item.logo } : undefined}
               style={styles.hero}
@@ -126,25 +144,51 @@ export default function HomeScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#07111e" },
+  container: {
+    flex: 1,
+    backgroundColor: "#07111e",
+  },
+
   topbar: {
     height: isPhone ? 54 : 70,
-    justifyContent: "center",
-    paddingHorizontal: 12,
     backgroundColor: "#0c1c2c",
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
-  brand: { color: "#fff", fontSize: isPhone ? 16 : 24, fontWeight: "900" },
-  subbrand: { color: "#9eb3c7", fontSize: isPhone ? 8 : 12, marginTop: 2 },
 
-  content: { flex: 1, flexDirection: "row" },
+  brand: {
+    color: "#fff",
+    fontSize: isPhone ? 16 : 24,
+    fontWeight: "900",
+  },
+
+  subbrand: {
+    color: "#9eb3c7",
+    fontSize: isPhone ? 8 : 12,
+    marginTop: 2,
+  },
+
+  datetime: {
+    color: "#d8e2ed",
+    fontSize: isPhone ? 8 : 12,
+    fontWeight: "700",
+  },
+
+  content: {
+    flex: 1,
+    flexDirection: "row",
+  },
 
   sidebar: {
     width: isPhone ? 96 : 150,
-    padding: 10,
     backgroundColor: "#061522",
+    padding: 10,
   },
+
   sideBtn: {
     height: isPhone ? 42 : 54,
     borderRadius: 12,
@@ -155,13 +199,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
   },
+
   sideBtnText: {
     color: "#fff",
     fontSize: isPhone ? 10 : 14,
     fontWeight: "900",
   },
 
-  main: { flex: 1, padding: 10 },
+  main: {
+    flex: 1,
+    padding: 10,
+  },
+
   hero: {
     height: isPhone ? 130 : 220,
     borderRadius: 18,
@@ -169,24 +218,32 @@ const styles = StyleSheet.create({
     backgroundColor: "#0c2133",
     marginBottom: 12,
   },
-  heroImage: { borderRadius: 18, opacity: 0.55 },
+
+  heroImage: {
+    borderRadius: 18,
+    opacity: 0.55,
+  },
+
   heroOverlay: {
     flex: 1,
     justifyContent: "center",
     padding: 18,
     backgroundColor: "rgba(4,13,22,0.45)",
   },
+
   heroType: {
     color: "#38d7ff",
     fontSize: isPhone ? 10 : 14,
     fontWeight: "900",
     marginBottom: 4,
   },
+
   heroTitle: {
     color: "#fff",
     fontSize: isPhone ? 22 : 34,
     fontWeight: "900",
   },
+
   heroSub: {
     color: "#c4d1de",
     fontSize: isPhone ? 10 : 14,
@@ -198,6 +255,7 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "space-between",
   },
+
   card: {
     width: "48.5%",
     minHeight: isPhone ? 84 : 110,
@@ -208,6 +266,16 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 10,
   },
-  cardTitle: { color: "#38d7ff", fontSize: isPhone ? 14 : 22, fontWeight: "900" },
-  cardText: { color: "#d7e0ea", fontSize: isPhone ? 10 : 14, marginTop: 6 },
+
+  cardTitle: {
+    color: "#38d7ff",
+    fontSize: isPhone ? 14 : 22,
+    fontWeight: "900",
+  },
+
+  cardText: {
+    color: "#d7e0ea",
+    fontSize: isPhone ? 10 : 14,
+    marginTop: 6,
+  },
 });
