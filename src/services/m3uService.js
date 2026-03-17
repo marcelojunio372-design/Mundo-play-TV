@@ -17,39 +17,48 @@ function getYearFromName(name) {
   return match ? match[0] : "";
 }
 
+function isSeriesName(name) {
+  return /s\d{1,2}e\d{1,2}|temporada|epis[oó]dio/i.test(name || "");
+}
+
 function detectType(item) {
   const group = (item.group || "").toLowerCase();
   const name = (item.name || "").toLowerCase();
   const url = (item.url || "").toLowerCase();
 
-  const looksSeriesByName =
-    /s\d{1,2}e\d{1,2}/i.test(name) ||
-    /temporada|epis[oó]dio|série|series|serie/.test(group);
-
-  const looksMovieByGroup =
-    /filmes|filme|movie|movies|cinema|lançamentos|lancamentos|vod/.test(group);
-
-  const looksLiveByGroup =
-    /tv|live|ao vivo|canal|canais|abertos|esportes|not[ií]cias|document[aá]rios|infantis|religiosos|variedades/.test(
+  const liveWords =
+    /tv|live|ao vivo|canal|canais|abertos|esportes|not[ií]cias|document[aá]rios|infantis|religiosos|variedades|globo|record|sbt|band|discovery|sportv|espn|premiere|telecine|hbo/.test(
       group
     );
 
-  const looksVodByUrl =
+  const movieWords =
+    /filmes|filme|movie|movies|cinema|lançamentos|lancamentos|ação|acao|com[eé]dia|drama|terror|suspense|anima[cç][aã]o/.test(
+      group
+    );
+
+  const seriesWords =
+    /s[eé]ries|series|serie|temporadas|epis[oó]dios|novelas/.test(group) ||
+    isSeriesName(name);
+
+  const vodByUrl =
     url.includes("/movie/") ||
-    url.includes("/movies/") ||
+    url.includes("/series/") ||
     url.endsWith(".mp4") ||
     url.endsWith(".mkv") ||
     url.endsWith(".avi") ||
-    url.endsWith(".mpg") ||
-    url.endsWith(".mpeg");
+    url.endsWith(".mpeg") ||
+    url.endsWith(".mpg");
 
-  const looksSeriesByUrl = url.includes("/series/");
+  if (seriesWords) return "series";
+  if (movieWords && !liveWords) return "movies";
+  if (liveWords && !vodByUrl) return "live";
 
-  if (looksSeriesByName || looksSeriesByUrl) return "series";
-  if (looksMovieByGroup || looksVodByUrl) return "movies";
-  if (looksLiveByGroup) return "live";
+  if (url.includes("/series/")) return "series";
+  if (url.includes("/movie/")) return "movies";
 
-  // fallback melhor: se não parece VOD, fica em live
+  // se for grupo "filmes e series", manda para movies
+  if (/filmes e series|filmes & series|filmes\/series/.test(group)) return "movies";
+
   return "live";
 }
 
@@ -108,9 +117,5 @@ export async function loadM3U(rawUrl) {
     }
   }
 
-  return {
-    channels,
-    movies,
-    series,
-  };
+  return { channels, movies, series };
 }

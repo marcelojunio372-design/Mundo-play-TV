@@ -7,12 +7,12 @@ import {
   FlatList,
   Image,
   StyleSheet,
+  Modal,
 } from "react-native";
 import VideoPlayer from "../components/VideoPlayer";
 
 function buildMovieCategories(movies) {
   const grouped = {};
-
   movies.forEach((item) => {
     const group = item.group || "OUTROS";
     if (!grouped[group]) grouped[group] = [];
@@ -26,11 +26,7 @@ function buildMovieCategories(movies) {
   ];
 
   Object.keys(grouped).forEach((group, index) => {
-    categories.push({
-      id: `movie_group_${index}`,
-      name: group.toUpperCase(),
-      items: grouped[group],
-    });
+    categories.push({ id: `movie_group_${index}`, name: group.toUpperCase(), items: grouped[group] });
   });
 
   return categories;
@@ -41,23 +37,17 @@ export default function MoviesScreen({ session, onBack, onOpenSettings, onLogout
   const categories = useMemo(() => buildMovieCategories(movies), [movies]);
 
   const [selectedCategory, setSelectedCategory] = useState(0);
-  const [selectedMovie, setSelectedMovie] = useState(0);
+  const [selectedMovie, setSelectedMovie] = useState(null);
+  const [showPlayer, setShowPlayer] = useState(false);
 
   const visibleMovies = categories[selectedCategory]?.items || [];
-  const current = visibleMovies[selectedMovie];
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack}>
-          <Text style={styles.headerBtn}>VOLTAR</Text>
-        </TouchableOpacity>
-
+        <TouchableOpacity onPress={onBack}><Text style={styles.headerBtn}>VOLTAR</Text></TouchableOpacity>
         <Text style={styles.headerTitle}>FILMES</Text>
-
-        <TouchableOpacity onPress={onLogout}>
-          <Text style={styles.headerBtn}>SAIR</Text>
-        </TouchableOpacity>
+        <TouchableOpacity onPress={onLogout}><Text style={styles.headerBtn}>SAIR</Text></TouchableOpacity>
       </View>
 
       <View style={styles.content}>
@@ -67,24 +57,15 @@ export default function MoviesScreen({ session, onBack, onOpenSettings, onLogout
             keyExtractor={(item) => item.id}
             renderItem={({ item, index }) => {
               const active = selectedCategory === index;
-
               return (
                 <TouchableOpacity
                   style={[styles.categoryRow, active && styles.categoryActive]}
-                  onPress={() => {
-                    setSelectedCategory(index);
-                    setSelectedMovie(0);
-                  }}
+                  onPress={() => setSelectedCategory(index)}
                 >
-                  <Text
-                    style={[styles.categoryText, active && styles.categoryTextActive]}
-                    numberOfLines={1}
-                  >
+                  <Text style={[styles.categoryText, active && styles.categoryTextActive]} numberOfLines={1}>
                     {item.name}
                   </Text>
-                  <Text
-                    style={[styles.categoryCount, active && styles.categoryTextActive]}
-                  >
+                  <Text style={[styles.categoryCount, active && styles.categoryTextActive]}>
                     {item.items.length}
                   </Text>
                 </TouchableOpacity>
@@ -98,60 +79,57 @@ export default function MoviesScreen({ session, onBack, onOpenSettings, onLogout
             data={visibleMovies}
             keyExtractor={(item, index) => item.id || `${item.name}_${index}`}
             numColumns={3}
-            initialNumToRender={18}
-            maxToRenderPerBatch={18}
-            windowSize={10}
-            contentContainerStyle={styles.grid}
-            renderItem={({ item, index }) => {
-              const active = selectedMovie === index;
-              return (
-                <TouchableOpacity
-                  style={[styles.card, active && styles.cardActive]}
-                  onPress={() => setSelectedMovie(index)}
-                >
-                  {item.logo ? (
-                    <Image source={{ uri: item.logo }} style={styles.poster} />
-                  ) : (
-                    <View style={styles.posterFallback} />
-                  )}
-
-                  <Text style={styles.title} numberOfLines={2}>
-                    {item.name || item.title || "Sem nome"}
-                  </Text>
-
-                  <Text style={styles.group} numberOfLines={1}>
-                    {item.group || "Filme"}
-                  </Text>
-                </TouchableOpacity>
-              );
-            }}
+            renderItem={({ item }) => (
+              <TouchableOpacity style={styles.card} onPress={() => {
+                setSelectedMovie(item);
+                setShowPlayer(false);
+              }}>
+                {item.logo ? <Image source={{ uri: item.logo }} style={styles.poster} /> : <View style={styles.posterFallback} />}
+                <Text style={styles.title} numberOfLines={2}>{item.name || "Sem nome"}</Text>
+                <Text style={styles.group} numberOfLines={1}>{item.group || "Filme"}</Text>
+              </TouchableOpacity>
+            )}
           />
         </View>
 
         <View style={styles.rightPanel}>
-          <VideoPlayer
-            url={current?.url}
-            title={current?.name}
-            compact
-            brand="MUNDO PLAY TV"
-          />
+          {selectedMovie ? (
+            <>
+              {selectedMovie.logo ? <Image source={{ uri: selectedMovie.logo }} style={styles.detailPoster} /> : <View style={styles.detailPoster} />}
 
-          <View style={styles.details}>
-            <Text style={styles.detailTitle} numberOfLines={2}>
-              {current?.name || "Nenhum filme"}
-            </Text>
-            <Text style={styles.detailText}>Ano: {current?.year || "-"}</Text>
-            <Text style={styles.detailText}>Grupo: {current?.group || "-"}</Text>
-            <Text style={styles.detailText} numberOfLines={5}>
-              Descrição: {current?.description || "Sem descrição na lista"}
-            </Text>
-          </View>
+              <Text style={styles.detailTitle} numberOfLines={2}>{selectedMovie.name}</Text>
+              <Text style={styles.detailText}>Ano: {selectedMovie.year || "-"}</Text>
+              <Text style={styles.detailText}>Grupo: {selectedMovie.group || "-"}</Text>
+              <Text style={styles.detailText} numberOfLines={6}>
+                Descrição: {selectedMovie.description || "Sem descrição na lista"}
+              </Text>
 
-          <TouchableOpacity style={styles.footerBtn} onPress={onOpenSettings}>
-            <Text style={styles.footerBtnText}>CONFIG.</Text>
-          </TouchableOpacity>
+              <TouchableOpacity style={styles.mainBtn} onPress={() => setShowPlayer(true)}>
+                <Text style={styles.mainBtnText}>ABRIR PLAYER</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.mainBtn} onPress={onOpenSettings}>
+                <Text style={styles.mainBtnText}>CONFIG.</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <Text style={styles.empty}>Selecione um filme</Text>
+          )}
         </View>
       </View>
+
+      <Modal visible={showPlayer} animationType="slide">
+        <SafeAreaView style={{ flex: 1, backgroundColor: "#06111d" }}>
+          <View style={{ padding: 10 }}>
+            <TouchableOpacity style={styles.mainBtn} onPress={() => setShowPlayer(false)}>
+              <Text style={styles.mainBtnText}>FECHAR PLAYER</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={{ padding: 10 }}>
+            <VideoPlayer url={selectedMovie?.url} title={selectedMovie?.name} brand="MUNDO PLAY TV" />
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -168,125 +146,33 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  headerBtn: {
-    color: "#38d7ff",
-    fontSize: 8,
-    fontWeight: "900",
-  },
-  headerTitle: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "900",
-  },
-  content: {
-    flex: 1,
-    flexDirection: "row",
-    padding: 4,
-  },
-  leftPanel: {
-    width: 90,
-    paddingRight: 4,
-  },
+  headerBtn: { color: "#38d7ff", fontSize: 8, fontWeight: "900" },
+  headerTitle: { color: "#fff", fontSize: 13, fontWeight: "900" },
+  content: { flex: 1, flexDirection: "row", padding: 4 },
+  leftPanel: { width: 86, paddingRight: 4 },
   categoryRow: {
-    minHeight: 32,
-    paddingHorizontal: 6,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.06)",
+    minHeight: 30, paddingHorizontal: 6, flexDirection: "row",
+    alignItems: "center", justifyContent: "space-between",
+    borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)",
   },
-  categoryActive: {
-    backgroundColor: "#6de9ea",
-    borderRadius: 4,
+  categoryActive: { backgroundColor: "#6de9ea", borderRadius: 4 },
+  categoryText: { color: "#fff", fontSize: 7, fontWeight: "800", flex: 1, marginRight: 4 },
+  categoryTextActive: { color: "#0d2340" },
+  categoryCount: { color: "#fff", fontSize: 7, fontWeight: "800" },
+  centerPanel: { flex: 1, paddingHorizontal: 4 },
+  card: { width: "31%", marginHorizontal: "1%", marginBottom: 8 },
+  poster: { width: "100%", height: 90, borderRadius: 8, backgroundColor: "#243a57", marginBottom: 4 },
+  posterFallback: { width: "100%", height: 90, borderRadius: 8, backgroundColor: "#243a57", marginBottom: 4 },
+  title: { color: "#fff", fontSize: 8, fontWeight: "800" },
+  group: { color: "#9fb2c7", fontSize: 7, marginTop: 2 },
+  rightPanel: { width: 124, paddingLeft: 4 },
+  detailPoster: { width: "100%", height: 110, borderRadius: 8, backgroundColor: "#243a57", marginBottom: 6 },
+  detailTitle: { color: "#fff", fontSize: 8, fontWeight: "900", marginBottom: 4 },
+  detailText: { color: "#9fb2c7", fontSize: 7, marginBottom: 3 },
+  mainBtn: {
+    height: 30, borderRadius: 8, backgroundColor: "rgba(56,215,255,0.18)",
+    borderWidth: 1, borderColor: "#38d7ff", alignItems: "center", justifyContent: "center", marginTop: 6
   },
-  categoryText: {
-    color: "#fff",
-    fontSize: 7,
-    fontWeight: "800",
-    flex: 1,
-    marginRight: 4,
-  },
-  categoryTextActive: {
-    color: "#0d2340",
-  },
-  categoryCount: {
-    color: "#fff",
-    fontSize: 7,
-    fontWeight: "800",
-  },
-  centerPanel: {
-    flex: 1,
-    paddingHorizontal: 4,
-  },
-  grid: {
-    paddingBottom: 8,
-  },
-  card: {
-    width: "31%",
-    marginHorizontal: "1%",
-    marginBottom: 8,
-    paddingBottom: 4,
-    borderRadius: 8,
-  },
-  cardActive: {
-    backgroundColor: "rgba(56,215,255,0.08)",
-  },
-  poster: {
-    width: "100%",
-    height: 90,
-    borderRadius: 8,
-    backgroundColor: "#243a57",
-    marginBottom: 4,
-  },
-  posterFallback: {
-    width: "100%",
-    height: 90,
-    borderRadius: 8,
-    backgroundColor: "#243a57",
-    marginBottom: 4,
-  },
-  title: {
-    color: "#fff",
-    fontSize: 8,
-    fontWeight: "800",
-  },
-  group: {
-    color: "#9fb2c7",
-    fontSize: 7,
-    marginTop: 2,
-  },
-  rightPanel: {
-    width: 132,
-    paddingLeft: 4,
-  },
-  details: {
-    marginTop: 6,
-    marginBottom: 6,
-  },
-  detailTitle: {
-    color: "#fff",
-    fontSize: 8,
-    fontWeight: "900",
-    marginBottom: 4,
-  },
-  detailText: {
-    color: "#9fb2c7",
-    fontSize: 7,
-    marginBottom: 3,
-  },
-  footerBtn: {
-    height: 30,
-    borderRadius: 8,
-    backgroundColor: "rgba(56,215,255,0.18)",
-    borderWidth: 1,
-    borderColor: "#38d7ff",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  footerBtnText: {
-    color: "#38d7ff",
-    fontSize: 7,
-    fontWeight: "900",
-  },
+  mainBtnText: { color: "#38d7ff", fontSize: 7, fontWeight: "900" },
+  empty: { color: "#fff", fontSize: 8, marginTop: 20 },
 });

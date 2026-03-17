@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Alert } from "react-native";
 import LoginScreen from "../screens/LoginScreen";
 import HomeScreen from "../screens/HomeScreen";
 import LiveTVScreen from "../screens/LiveTVScreen";
@@ -11,17 +12,23 @@ export default function AppNavigator() {
   const [screen, setScreen] = useState("home");
   const [session, setSession] = useState(null);
 
-  function handleLogin(payload) {
+  const handleLogin = (payload) => {
     setSession(payload);
     setLoggedIn(true);
     setScreen("home");
-  }
+  };
 
-  function handleLogout() {
+  const handleLogout = () => {
     setLoggedIn(false);
     setSession(null);
     setScreen("home");
-  }
+  };
+
+  const handleReload = () => {
+    Alert.alert("Recarregar", "Volte ao login e conecte novamente sua lista.");
+    setLoggedIn(false);
+    setScreen("home");
+  };
 
   if (!loggedIn) {
     return <LoginScreen onLogin={handleLogin} />;
@@ -61,13 +68,7 @@ export default function AppNavigator() {
   }
 
   if (screen === "settings") {
-    return (
-      <SettingsScreen
-        session={session}
-        onBack={() => setScreen("home")}
-        onLogout={handleLogout}
-      />
-    );
+    return <SettingsScreen session={session} onBack={() => setScreen("home")} onLogout={handleLogout} />;
   }
 
   return (
@@ -77,6 +78,7 @@ export default function AppNavigator() {
       onOpenMovies={() => setScreen("movies")}
       onOpenSeries={() => setScreen("series")}
       onOpenSettings={() => setScreen("settings")}
+      onReload={handleReload}
       onLogout={handleLogout}
     />
   );
