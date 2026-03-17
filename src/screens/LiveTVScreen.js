@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -6,39 +6,58 @@ import {
   TouchableOpacity,
   FlatList,
   StyleSheet,
-  Image,
+  Dimensions,
 } from "react-native";
-import VideoPlayer from "../components/VideoPlayer";
+import { Video } from "expo-av";
 
-function buildCategories(channels) {
-  const grouped = {};
-  channels.forEach((item) => {
-    const group = item.group || "OUTROS";
-    if (!grouped[group]) grouped[group] = [];
-    grouped[group].push(item);
-  });
+const { width } = Dimensions.get("window");
+const isPhone = width < 900;
 
-  const categories = [
-    { id: "all", name: "TODOS", items: channels },
-    { id: "fav", name: "FAVORITOS", items: [] },
-  ];
+export default function LiveTVScreen({
+  session,
+  onBack,
+  onOpenSettings,
+  onLogout,
+}) {
+  const liveItems = session?.data?.live || [];
 
-  Object.keys(grouped).forEach((group, index) => {
-    categories.push({ id: `group_${index}`, name: group.toUpperCase(), items: grouped[group] });
-  });
+  const categories = useMemo(() => {
+    const grouped = {};
+    liveItems.forEach((item) => {
+      const group = String(item.group || "OUTROS").trim().toUpperCase();
+      if (!grouped[group]) grouped[group] = [];
+      grouped[group].push(item);
+    });
 
-  return categories;
-}
+    const result = [
+      { id: "all", name: "TODOS", items: liveItems },
+      { id: "fav", name: "FAVORITOS", items: [] },
+    ];
 
-export default function LiveTVScreen({ session, onBack, onOpenSettings, onLogout }) {
-  const channels = useMemo(() => session?.data?.channels || [], [session]);
-  const categories = useMemo(() => buildCategories(channels), [channels]);
+    Object.keys(grouped)
+      .sort((a, b) => a.localeCompare(b))
+      .forEach((group, index) => {
+        result.push({
+          id: `group_${index}`,
+          name: group,
+          items: grouped[group],
+        });
+      });
+
+    return result;
+  }, [liveItems]);
 
   const [selectedCategory, setSelectedCategory] = useState(0);
-  const [selectedChannel, setSelectedChannel] = useState(0);
+  const [selectedChannel, setSelectedChannel] = useState(
+    liveItems.length ? liveItems[0] : null
+  );
 
   const visibleChannels = categories[selectedCategory]?.items || [];
-  const current = visibleChannels[selectedChannel];
+  const videoRef = useRef(null);
+
+  const handleSelectChannel = (item) => {
+    setSelectedChannel(item);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -53,19 +72,24 @@ export default function LiveTVScreen({ session, onBack, onOpenSettings, onLogout
             data={categories}
             keyExtractor={(item) => item.id}
             renderItem={({ item, index }) => {
-              const active = selectedCategory === index;
+              const active = index === selectedCategory;
               return (
                 <TouchableOpacity
-                  style={[styles.categoryRow, active && styles.categoryRowActive]}
+                  style={[styles.categoryRow, active && styles.categoryActive]}
                   onPress={() => {
                     setSelectedCategory(index);
-                    setSelectedChannel(0);
+                    if (item.items.length) setSelectedChannel(item.items[0]);
                   }}
                 >
-                  <Text style={[styles.categoryName, active && styles.categoryNameActive]} numberOfLines={1}>
+                  <Text
+                    style={[styles.categoryText, active && styles.categoryTextActive]}
+                    numberOfLines={1}
+                  >
                     {item.name}
                   </Text>
-                  <Text style={[styles.categoryCount, active && styles.categoryNameActive]}>
+                  <Text
+                    style={[styles.categoryCount, active && styles.categoryTextActive]}
+                  >
                     {item.items.length}
                   </Text>
                 </TouchableOpacity>
@@ -78,26 +102,27 @@ export default function LiveTVScreen({ session, onBack, onOpenSettings, onLogout
           <FlatList
             data={visibleChannels}
             keyExtractor={(item, index) => item.id || `${item.name}_${index}`}
-            renderItem={({ item, index }) => {
-              const active = selectedChannel === index;
+            renderItem={({ item }) => {
+              const active = selectedChannel?.id === item.id;
               return (
                 <TouchableOpacity
                   style={[styles.channelRow, active && styles.channelRowActive]}
-                  onPress={() => setSelectedChannel(index)}
+                  onPress={() => handleSelectChannel(item)}
                 >
-                  {item.logo ? (
-                    <Image source={{ uri: item.logo }} style={styles.channelLogo} />
-                  ) : (
-                    <View style={styles.channelLogoFallback}>
-                      <Text style={styles.channelLogoText}>{(item.name || "TV").slice(0, 2).toUpperCase()}</Text>
-                    </View>
-                  )}
+                  <View style={styles.logoBox}>
+                    <Text style={styles.logoText}>
+                      {String(item.name || "?").slice(0, 2).toUpperCase()}
+                    </Text>
+                  </View>
 
                   <View style={styles.channelInfo}>
-                    <Text style={[styles.channelName, active && styles.channelNameActive]} numberOfLines={1}>
-                      {item.name || "Sem nome"}
+                    <Text
+                      style={[styles.channelName, active && styles.channelNameActive]}
+                      numberOfLines={1}
+                    >
+                      {item.name}
                     </Text>
-                    <Text style={styles.channelSub} numberOfLines={1}>
+                    <Text style={styles.channelGroup} numberOfLines={1}>
                       {item.group || "Canal"}
                     </Text>
                   </View>
@@ -108,23 +133,60 @@ export default function LiveTVScreen({ session, onBack, onOpenSettings, onLogout
         </View>
 
         <View style={styles.rightPanel}>
-          <VideoPlayer url={current?.url} title={current?.name} compact brand="MUNDO PLAY TV" />
+          <Text style={styles.previewTitle}>MUNDO PLAY TV</Text>
+          <Text style={styles.previewChannel} numberOfLines={2}>
+            {selectedChannel?.name || "Sem canal"}
+          </Text>
 
-          <View style={styles.infoBox}>
-            <Text style={styles.infoTitle} numberOfLines={2}>{current?.name || "Nenhum canal"}</Text>
-            <Text style={styles.infoText}>Grupo: {current?.group || "-"}</Text>
+          <View style={styles.previewBox}>
+            {selectedChannel?.url ? (
+              <Video
+                ref={videoRef}
+                source={{ uri: selectedChannel.url }}
+                style={styles.previewVideo}
+                resizeMode="contain"
+                shouldPlay={false}
+                useNativeControls={false}
+              />
+            ) : null}
           </View>
 
+          <View style={styles.playerButtons}>
+            <TouchableOpacity
+              style={styles.smallBtn}
+              onPress={() => videoRef.current?.playAsync()}
+            >
+              <Text style={styles.smallBtnText}>PLAY</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.smallBtn}
+              onPress={() => videoRef.current?.pauseAsync()}
+            >
+              <Text style={styles.smallBtnText}>PAUSE</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.smallBtn}
+              onPress={() => videoRef.current?.presentFullscreenPlayer()}
+            >
+              <Text style={styles.smallBtnText}>TELA CHEIA</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.sideLabel}>{selectedChannel?.name || "-"}</Text>
+          <Text style={styles.sideSub}>Grupo: {selectedChannel?.group || "-"}</Text>
+
           <TouchableOpacity style={styles.actionBtn} onPress={onBack}>
-            <Text style={styles.actionText}>VOLTAR</Text>
+            <Text style={styles.actionBtnText}>VOLTAR</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionBtn} onPress={onOpenSettings}>
-            <Text style={styles.actionText}>CONFIG.</Text>
+            <Text style={styles.actionBtnText}>CONFIG.</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionBtn} onPress={onLogout}>
-            <Text style={styles.actionText}>SAIR</Text>
+            <Text style={styles.actionBtnText}>SAIR</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -133,63 +195,214 @@ export default function LiveTVScreen({ session, onBack, onOpenSettings, onLogout
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#101737" },
+  container: { flex: 1, backgroundColor: "#22245e" },
+
   header: {
-    height: 38,
-    backgroundColor: "#3a3d7a",
+    height: 40,
     justifyContent: "center",
     paddingHorizontal: 8,
+    backgroundColor: "#4f4f96",
   },
-  headerTitle: { color: "#e8fbff", fontSize: 10, fontWeight: "800" },
-  content: { flex: 1, flexDirection: "row", padding: 4 },
-  leftPanel: { width: 86, paddingRight: 4 },
-  leftTitle: { color: "#dff8ff", fontSize: 7, marginBottom: 6 },
+
+  headerTitle: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "900",
+  },
+
+  content: {
+    flex: 1,
+    flexDirection: "row",
+    backgroundColor: "#0d1038",
+    padding: 6,
+  },
+
+  leftPanel: {
+    width: isPhone ? 92 : 180,
+    paddingRight: 6,
+  },
+
+  leftTitle: {
+    color: "#d8e1f1",
+    fontSize: isPhone ? 7 : 10,
+    marginBottom: 6,
+  },
+
   categoryRow: {
-    minHeight: 30,
-    paddingHorizontal: 6,
+    minHeight: isPhone ? 34 : 46,
+    paddingHorizontal: 8,
+    marginBottom: 4,
+    borderRadius: 6,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "transparent",
   },
-  categoryRowActive: { backgroundColor: "#6de9ea", borderRadius: 4 },
-  categoryName: { color: "#fff", fontSize: 7, fontWeight: "800", flex: 1, marginRight: 4 },
-  categoryNameActive: { color: "#0d2340" },
-  categoryCount: { color: "#fff", fontSize: 7, fontWeight: "800" },
-  centerPanel: { flex: 1, paddingHorizontal: 4 },
+
+  categoryActive: {
+    backgroundColor: "#73edf0",
+  },
+
+  categoryText: {
+    color: "#fff",
+    fontSize: isPhone ? 7 : 10,
+    fontWeight: "800",
+    flex: 1,
+    marginRight: 6,
+  },
+
+  categoryTextActive: {
+    color: "#13233c",
+  },
+
+  categoryCount: {
+    color: "#fff",
+    fontSize: isPhone ? 7 : 10,
+    fontWeight: "900",
+  },
+
+  centerPanel: {
+    flex: 1,
+    paddingHorizontal: 4,
+  },
+
   channelRow: {
-    minHeight: 34,
-    paddingHorizontal: 6,
+    minHeight: isPhone ? 42 : 54,
     flexDirection: "row",
     alignItems: "center",
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.06)",
+    borderBottomColor: "rgba(255,255,255,0.08)",
+    paddingVertical: 4,
   },
-  channelRowActive: { backgroundColor: "#6de9ea", borderRadius: 4 },
-  channelLogo: { width: 20, height: 20, borderRadius: 4, marginRight: 6, backgroundColor: "#29456b" },
-  channelLogoFallback: {
-    width: 20, height: 20, borderRadius: 4, marginRight: 6,
-    backgroundColor: "#29456b", alignItems: "center", justifyContent: "center"
+
+  channelRowActive: {
+    backgroundColor: "rgba(115,237,240,0.16)",
+    borderRadius: 6,
   },
-  channelLogoText: { color: "#fff", fontSize: 6, fontWeight: "900" },
-  channelInfo: { flex: 1 },
-  channelName: { color: "#fff", fontSize: 8, fontWeight: "800" },
-  channelNameActive: { color: "#0d2340" },
-  channelSub: { color: "#c8defa", fontSize: 6, marginTop: 2 },
-  rightPanel: { width: 124, paddingLeft: 4 },
-  infoBox: { marginTop: 6, marginBottom: 4 },
-  infoTitle: { color: "#fff", fontSize: 8, fontWeight: "900", marginBottom: 3 },
-  infoText: { color: "#9fb2c7", fontSize: 7 },
-  actionBtn: {
-    height: 28,
+
+  logoBox: {
+    width: isPhone ? 30 : 42,
+    height: isPhone ? 30 : 42,
+    borderRadius: 6,
+    backgroundColor: "#213d75",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+
+  logoText: {
+    color: "#fff",
+    fontSize: isPhone ? 8 : 11,
+    fontWeight: "900",
+  },
+
+  channelInfo: {
+    flex: 1,
+  },
+
+  channelName: {
+    color: "#fff",
+    fontSize: isPhone ? 8 : 11,
+    fontWeight: "900",
+  },
+
+  channelNameActive: {
+    color: "#9efcff",
+  },
+
+  channelGroup: {
+    color: "#c7d2eb",
+    fontSize: isPhone ? 7 : 9,
+    marginTop: 2,
+  },
+
+  rightPanel: {
+    width: isPhone ? 118 : 220,
+    paddingLeft: 6,
+  },
+
+  previewTitle: {
+    color: "#47d9ff",
+    fontSize: isPhone ? 8 : 11,
+    fontWeight: "900",
+    marginBottom: 4,
+  },
+
+  previewChannel: {
+    color: "#fff",
+    fontSize: isPhone ? 7 : 10,
+    fontWeight: "900",
+    marginBottom: 6,
+  },
+
+  previewBox: {
+    width: "100%",
+    height: isPhone ? 88 : 150,
     borderRadius: 8,
-    backgroundColor: "rgba(56,215,255,0.18)",
+    overflow: "hidden",
+    backgroundColor: "#000",
+    marginBottom: 8,
+  },
+
+  previewVideo: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#000",
+  },
+
+  playerButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+
+  smallBtn: {
+    flex: 1,
+    minHeight: isPhone ? 28 : 34,
+    borderRadius: 8,
+    backgroundColor: "rgba(56,215,255,0.14)",
     borderWidth: 1,
     borderColor: "#38d7ff",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 5,
+    marginHorizontal: 2,
+    paddingHorizontal: 2,
   },
-  actionText: { color: "#38d7ff", fontSize: 7, fontWeight: "900" },
+
+  smallBtnText: {
+    color: "#38d7ff",
+    fontSize: isPhone ? 6 : 8,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+
+  sideLabel: {
+    color: "#fff",
+    fontSize: isPhone ? 8 : 11,
+    fontWeight: "900",
+    marginBottom: 4,
+  },
+
+  sideSub: {
+    color: "#b9c8e1",
+    fontSize: isPhone ? 7 : 9,
+    marginBottom: 10,
+  },
+
+  actionBtn: {
+    minHeight: isPhone ? 30 : 38,
+    borderRadius: 8,
+    backgroundColor: "rgba(56,215,255,0.14)",
+    borderWidth: 1,
+    borderColor: "#38d7ff",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+
+  actionBtnText: {
+    color: "#38d7ff",
+    fontSize: isPhone ? 8 : 10,
+    fontWeight: "900",
+  },
 });
