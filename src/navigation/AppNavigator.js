@@ -6,15 +6,11 @@ import LiveTVScreen from "../screens/LiveTVScreen";
 import MoviesScreen from "../screens/MoviesScreen";
 import SeriesScreen from "../screens/SeriesScreen";
 import SettingsScreen from "../screens/SettingsScreen";
-import MovieDetailsScreen from "../screens/MovieDetailsScreen";
-import SeriesDetailsScreen from "../screens/SeriesDetailsScreen";
 
 export default function AppNavigator() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [screen, setScreen] = useState("home");
   const [session, setSession] = useState(null);
-  const [selectedMovie, setSelectedMovie] = useState(null);
-  const [selectedSeries, setSelectedSeries] = useState(null);
 
   const handleLogin = (payload) => {
     setSession(payload);
@@ -25,8 +21,6 @@ export default function AppNavigator() {
   const handleLogout = () => {
     setLoggedIn(false);
     setSession(null);
-    setSelectedMovie(null);
-    setSelectedSeries(null);
     setScreen("home");
   };
 
@@ -51,16 +45,6 @@ export default function AppNavigator() {
     }
   };
 
-  const openMovieDetails = (movie) => {
-    setSelectedMovie(movie);
-    setScreen("movieDetails");
-  };
-
-  const openSeriesDetails = (series) => {
-    setSelectedSeries(series);
-    setScreen("seriesDetails");
-  };
-
   if (!loggedIn) {
     return <LoginScreen onLogin={handleLogin} />;
   }
@@ -83,60 +67,5 @@ export default function AppNavigator() {
         onBack={() => setScreen("home")}
         onOpenSettings={() => setScreen("settings")}
         onLogout={handleLogout}
-        onOpenMovieDetails={openMovieDetails}
       />
     );
-  }
-
-  if (screen === "series") {
-    return (
-      <SeriesScreen
-        session={session}
-        onBack={() => setScreen("home")}
-        onOpenSettings={() => setScreen("settings")}
-        onLogout={handleLogout}
-        onOpenSeriesDetails={openSeriesDetails}
-      />
-    );
-  }
-
-  if (screen === "movieDetails") {
-    return (
-      <MovieDetailsScreen
-        movie={selectedMovie}
-        onBack={() => setScreen("movies")}
-      />
-    );
-  }
-
-  if (screen === "seriesDetails") {
-    return (
-      <SeriesDetailsScreen
-        series={selectedSeries}
-        onBack={() => setScreen("series")}
-      />
-    );
-  }
-
-  if (screen === "settings") {
-    return (
-      <SettingsScreen
-        session={session}
-        onBack={() => setScreen("home")}
-        onLogout={handleLogout}
-      />
-    );
-  }
-
-  return (
-    <HomeScreen
-      session={session}
-      onOpenLive={() => setScreen("live")}
-      onOpenMovies={() => setScreen("movies")}
-      onOpenSeries={() => setScreen("series")}
-      onOpenSettings={() => setScreen("settings")}
-      onReload={handleReload}
-      onLogout={handleLogout}
-    />
-  );
-}
