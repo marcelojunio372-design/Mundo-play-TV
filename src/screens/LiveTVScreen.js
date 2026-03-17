@@ -66,8 +66,8 @@ export default function LiveTVScreen({
       </View>
 
       <View style={styles.content}>
+        {/* ESQUERDA */}
         <View style={styles.leftPanel}>
-          <Text style={styles.leftTitle}>Categorias</Text>
           <FlatList
             data={categories}
             keyExtractor={(item) => item.id}
@@ -98,6 +98,7 @@ export default function LiveTVScreen({
           />
         </View>
 
+        {/* MEIO */}
         <View style={styles.centerPanel}>
           <FlatList
             data={visibleChannels}
@@ -132,6 +133,7 @@ export default function LiveTVScreen({
           />
         </View>
 
+        {/* DIREITA */}
         <View style={styles.rightPanel}>
           <Text style={styles.previewTitle}>MUNDO PLAY TV</Text>
           <Text style={styles.previewChannel} numberOfLines={2}>
@@ -139,7 +141,7 @@ export default function LiveTVScreen({
           </Text>
 
           <View style={styles.previewBox}>
-            {selectedChannel?.url ? (
+            {selectedChannel?.url && (
               <Video
                 ref={videoRef}
                 source={{ uri: selectedChannel.url }}
@@ -148,7 +150,7 @@ export default function LiveTVScreen({
                 shouldPlay={false}
                 useNativeControls={false}
               />
-            ) : null}
+            )}
           </View>
 
           <View style={styles.playerButtons}>
@@ -174,9 +176,6 @@ export default function LiveTVScreen({
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.sideLabel}>{selectedChannel?.name || "-"}</Text>
-          <Text style={styles.sideSub}>Grupo: {selectedChannel?.group || "-"}</Text>
-
           <TouchableOpacity style={styles.actionBtn} onPress={onBack}>
             <Text style={styles.actionBtnText}>VOLTAR</Text>
           </TouchableOpacity>
@@ -195,7 +194,7 @@ export default function LiveTVScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#22245e" },
+  container: { flex: 1, backgroundColor: "#0d1038" },
 
   header: {
     height: 40,
@@ -213,26 +212,19 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     flexDirection: "row",
-    backgroundColor: "#0d1038",
     padding: 4,
   },
 
+  /* ESQUERDA */
   leftPanel: {
-    width: isPhone ? 84 : 180,
-    paddingRight: 4,
-  },
-
-  leftTitle: {
-    color: "#d8e1f1",
-    fontSize: isPhone ? 7 : 10,
-    marginBottom: 4,
+    width: isPhone ? 70 : 160,
   },
 
   categoryRow: {
-    minHeight: isPhone ? 32 : 46,
-    paddingHorizontal: 6,
-    marginBottom: 3,
-    borderRadius: 6,
+    height: isPhone ? 26 : 40,
+    paddingHorizontal: 5,
+    marginBottom: 2,
+    borderRadius: 5,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -244,10 +236,8 @@ const styles = StyleSheet.create({
 
   categoryText: {
     color: "#fff",
-    fontSize: isPhone ? 6.5 : 10,
+    fontSize: isPhone ? 6 : 9,
     fontWeight: "800",
-    flex: 1,
-    marginRight: 4,
   },
 
   categoryTextActive: {
@@ -256,53 +246,47 @@ const styles = StyleSheet.create({
 
   categoryCount: {
     color: "#fff",
-    fontSize: isPhone ? 6.5 : 10,
+    fontSize: isPhone ? 6 : 9,
     fontWeight: "900",
   },
 
+  /* MEIO */
   centerPanel: {
     flex: 1,
-    paddingHorizontal: 3,
+    paddingHorizontal: 2,
   },
 
   channelRow: {
-    minHeight: isPhone ? 40 : 54,
+    height: isPhone ? 28 : 40,
     flexDirection: "row",
     alignItems: "center",
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
-    paddingVertical: 4,
-    paddingHorizontal: 4,
   },
 
   channelRowActive: {
     backgroundColor: "rgba(115,237,240,0.16)",
-    borderRadius: 6,
   },
 
   logoBox: {
-    width: isPhone ? 28 : 42,
-    height: isPhone ? 28 : 42,
-    borderRadius: 6,
+    width: 20,
+    height: 20,
+    borderRadius: 4,
     backgroundColor: "#213d75",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 6,
+    marginRight: 5,
   },
 
   logoText: {
     color: "#fff",
-    fontSize: isPhone ? 7 : 11,
+    fontSize: 6,
     fontWeight: "900",
-  },
-
-  channelInfo: {
-    flex: 1,
   },
 
   channelName: {
     color: "#fff",
-    fontSize: isPhone ? 7.5 : 11,
+    fontSize: 7,
     fontWeight: "900",
   },
 
@@ -312,33 +296,30 @@ const styles = StyleSheet.create({
 
   channelGroup: {
     color: "#c7d2eb",
-    fontSize: isPhone ? 6.5 : 9,
-    marginTop: 1,
+    fontSize: 5.5,
   },
 
+  /* DIREITA */
   rightPanel: {
-    width: isPhone ? 96 : 220,
-    paddingLeft: 4,
+    width: isPhone ? 90 : 200,
   },
 
   previewTitle: {
     color: "#47d9ff",
-    fontSize: isPhone ? 7 : 11,
+    fontSize: 7,
     fontWeight: "900",
-    marginBottom: 3,
   },
 
   previewChannel: {
     color: "#fff",
-    fontSize: isPhone ? 6.5 : 10,
-    fontWeight: "900",
+    fontSize: 6,
     marginBottom: 4,
   },
 
   previewBox: {
     width: "100%",
-    height: isPhone ? 70 : 150,
-    borderRadius: 8,
+    height: 70,
+    borderRadius: 6,
     overflow: "hidden",
     backgroundColor: "#000",
     marginBottom: 6,
@@ -347,62 +328,43 @@ const styles = StyleSheet.create({
   previewVideo: {
     width: "100%",
     height: "100%",
-    backgroundColor: "#000",
   },
 
   playerButtons: {
     flexDirection: "row",
-    justifyContent: "space-between",
     marginBottom: 6,
   },
 
   smallBtn: {
     flex: 1,
-    minHeight: isPhone ? 24 : 34,
-    borderRadius: 8,
-    backgroundColor: "rgba(56,215,255,0.14)",
+    height: 24,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: "#38d7ff",
     alignItems: "center",
     justifyContent: "center",
     marginHorizontal: 1,
-    paddingHorizontal: 1,
   },
 
   smallBtnText: {
     color: "#38d7ff",
-    fontSize: isPhone ? 5.5 : 8,
+    fontSize: 6,
     fontWeight: "900",
-    textAlign: "center",
-  },
-
-  sideLabel: {
-    color: "#fff",
-    fontSize: isPhone ? 7 : 11,
-    fontWeight: "900",
-    marginBottom: 3,
-  },
-
-  sideSub: {
-    color: "#b9c8e1",
-    fontSize: isPhone ? 6.5 : 9,
-    marginBottom: 8,
   },
 
   actionBtn: {
-    minHeight: isPhone ? 28 : 38,
-    borderRadius: 8,
-    backgroundColor: "rgba(56,215,255,0.14)",
+    height: 28,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: "#38d7ff",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 6,
+    marginBottom: 5,
   },
 
   actionBtnText: {
     color: "#38d7ff",
-    fontSize: isPhone ? 7 : 10,
+    fontSize: 7,
     fontWeight: "900",
   },
 });
