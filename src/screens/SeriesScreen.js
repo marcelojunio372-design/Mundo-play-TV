@@ -21,7 +21,7 @@ function buildSeriesCategories(series) {
   const categories = [
     { id: "all", name: "TODAS AS SÉRIES", items: series },
     { id: "fav", name: "FAVORITOS", items: [] },
-    { id: "last", name: "RECENTEMENTE", items: [] },
+    { id: "last", name: "RECENTE", items: [] },
   ];
 
   Object.keys(grouped).forEach((group, index) => {

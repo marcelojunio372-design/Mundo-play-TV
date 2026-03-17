@@ -21,7 +21,7 @@ function buildMovieCategories(movies) {
   const categories = [
     { id: "all", name: "TODOS OS FILMES", items: movies },
     { id: "fav", name: "FAVORITOS", items: [] },
-    { id: "last", name: "RECENTEMENTE", items: [] },
+    { id: "last", name: "RECENTE", items: [] },
   ];
 
   Object.keys(grouped).forEach((group, index) => {

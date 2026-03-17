@@ -68,7 +68,7 @@ export default function LiveTVScreen({ session, onBack, onOpenSettings, onLogout
 
       <View style={styles.content}>
         <View style={styles.leftPanel}>
-          <Text style={styles.leftTitle}>Pesquisa em categorias</Text>
+          <Text style={styles.leftTitle}>Categorias</Text>
 
           <FlatList
             data={categories}
@@ -145,7 +145,7 @@ export default function LiveTVScreen({ session, onBack, onOpenSettings, onLogout
         </View>
 
         <View style={styles.rightPanel}>
-          <Text style={styles.playerTitle}>Pressione "OK" para jogar</Text>
+          <Text style={styles.playerTitle}>Preview</Text>
 
           <View style={styles.playerBox}>
             {current?.url ? (
@@ -169,10 +169,6 @@ export default function LiveTVScreen({ session, onBack, onOpenSettings, onLogout
 
             <Text style={styles.programSub} numberOfLines={1}>
               {current?.group || "-"}
-            </Text>
-
-            <Text style={styles.programDesc} numberOfLines={3}>
-              {current?.url || "Sem link disponível"}
             </Text>
           </View>
 
@@ -370,12 +366,6 @@ const styles = StyleSheet.create({
     color: "#9fb2c7",
     fontSize: 7,
     marginBottom: 3,
-  },
-
-  programDesc: {
-    color: "#c5dbf8",
-    fontSize: 7,
-    lineHeight: 10,
   },
 
   actionBtn: {

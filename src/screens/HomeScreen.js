@@ -8,47 +8,48 @@ import {
   StyleSheet,
 } from "react-native";
 
-function pickFeaturedItems(session) {
-  const movies = session?.data?.movies || [];
-  const series = session?.data?.series || [];
+function buildFeatured(session) {
+  const movies = (session?.data?.movies || []).filter((item) => item.logo);
+  const series = (session?.data?.series || []).filter((item) => item.logo);
 
-  const movieLaunches = movies.slice(0, 8).map((item, index) => ({
-    id: `movie_${item.id || index}`,
-    title: item.name || item.title || "Filme",
-    subtitle: item.group || "Lançamento de filme",
-    logo: item.logo || "",
-    type: "FILME",
-  }));
-
-  const seriesLaunches = series.slice(0, 8).map((item, index) => ({
-    id: `series_${item.id || index}`,
-    title: item.name || item.title || "Série",
-    subtitle: item.group || "Lançamento de série",
-    logo: item.logo || "",
-    type: "SÉRIE",
-  }));
-
-  const merged = [];
-  const max = Math.max(movieLaunches.length, seriesLaunches.length);
+  const mixed = [];
+  const max = Math.max(movies.length, series.length, 6);
 
   for (let i = 0; i < max; i++) {
-    if (movieLaunches[i]) merged.push(movieLaunches[i]);
-    if (seriesLaunches[i]) merged.push(seriesLaunches[i]);
+    if (movies[i]) {
+      mixed.push({
+        id: `movie_${movies[i].id || i}`,
+        title: movies[i].name || movies[i].title || "Filme",
+        subtitle: movies[i].group || "Filmes",
+        logo: movies[i].logo || "",
+        type: "FILME",
+      });
+    }
+
+    if (series[i]) {
+      mixed.push({
+        id: `series_${series[i].id || i}`,
+        title: series[i].name || series[i].title || "Série",
+        subtitle: series[i].group || "Séries",
+        logo: series[i].logo || "",
+        type: "SÉRIE",
+      });
+    }
   }
 
-  if (merged.length === 0) {
+  if (mixed.length === 0) {
     return [
       {
         id: "fallback_1",
         title: "Lançamentos",
-        subtitle: "Filmes e séries em destaque",
+        subtitle: "Filmes e séries da lista",
         logo: "",
         type: "DESTAQUE",
       },
     ];
   }
 
-  return merged;
+  return mixed.slice(0, 20);
 }
 
 export default function HomeScreen({
@@ -59,19 +60,26 @@ export default function HomeScreen({
   onOpenSettings,
   onLogout,
 }) {
-  const featuredItems = useMemo(() => pickFeaturedItems(session), [session]);
+  const featuredItems = useMemo(() => buildFeatured(session), [session]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [now, setNow] = useState(new Date());
 
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % featuredItems.length);
     }, 3000);
 
-    return () => clearInterval(timer);
+    const clock = setInterval(() => {
+      setNow(new Date());
+    }, 1000);
+
+    return () => {
+      clearInterval(timer);
+      clearInterval(clock);
+    };
   }, [featuredItems.length]);
 
-  const current = featuredItems[currentIndex];
-  const now = new Date();
+  const current = featuredItems[currentIndex] || featuredItems[0];
   const time = now.toLocaleTimeString("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
@@ -132,7 +140,7 @@ export default function HomeScreen({
               </Text>
 
               <Text style={styles.heroSubtitle} numberOfLines={2}>
-                {current?.subtitle || "Filmes e séries em destaque"}
+                {current?.subtitle || "Filmes e séries da lista"}
               </Text>
             </View>
           </View>
@@ -140,17 +148,17 @@ export default function HomeScreen({
           <View style={styles.quickGrid}>
             <TouchableOpacity style={styles.quickCard} onPress={onOpenLive}>
               <Text style={styles.quickTitle}>Live TV</Text>
-              <Text style={styles.quickSub}>Canais ao vivo</Text>
+              <Text style={styles.quickSub}>Canais da lista</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.quickCard} onPress={onOpenMovies}>
               <Text style={styles.quickTitle}>Filmes</Text>
-              <Text style={styles.quickSub}>Catálogo e lançamentos</Text>
+              <Text style={styles.quickSub}>Capas da lista</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.quickCard} onPress={onOpenSeries}>
               <Text style={styles.quickTitle}>Séries</Text>
-              <Text style={styles.quickSub}>Temporadas e episódios</Text>
+              <Text style={styles.quickSub}>Capas da lista</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.quickCard} onPress={onOpenSettings}>
@@ -165,10 +173,7 @@ export default function HomeScreen({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#06111d",
-  },
+  container: { flex: 1, backgroundColor: "#06111d" },
 
   header: {
     height: 48,
