@@ -17,7 +17,7 @@ export default function LoginScreen({ onLogin }) {
   const [serverUrl, setServerUrl] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [mac, setMac] = useState("");
+  const [mac, setMac] = useState("00:1A:79:12:34:56");
   const [loading, setLoading] = useState(false);
 
   const normalizeUrl = (url) => {
@@ -42,6 +42,7 @@ export default function LoginScreen({ onLogin }) {
       onLogin({
         type: "m3u",
         url: finalUrl,
+        mac,
         data,
       });
     } catch (e) {
@@ -73,6 +74,7 @@ export default function LoginScreen({ onLogin }) {
         server: base,
         username,
         password,
+        mac,
         data,
       });
     } catch (e) {
@@ -197,7 +199,10 @@ export default function LoginScreen({ onLogin }) {
             </Text>
           </TouchableOpacity>
 
-          <Text style={styles.footer}>Login IPTV profissional</Text>
+          <View style={styles.footerRow}>
+            <Text style={styles.footerMac}>MAC: {mac}</Text>
+            <Text style={styles.footer}>Login IPTV profissional</Text>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -283,10 +288,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
   },
+  footerRow: {
+    marginTop: 16,
+    alignItems: "flex-start",
+  },
+  footerMac: {
+    color: "#38d7ff",
+    fontSize: 10,
+    fontWeight: "900",
+    marginBottom: 6,
+  },
   footer: {
     color: "#8fa4ba",
-    textAlign: "center",
-    marginTop: 16,
     fontSize: 10,
   },
 });
+
+

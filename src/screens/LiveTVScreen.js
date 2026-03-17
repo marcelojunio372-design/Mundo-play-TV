@@ -170,7 +170,7 @@ export default function LiveTVScreen({
               style={styles.smallBtn}
               onPress={() => videoRef.current?.presentFullscreenPlayer()}
             >
-              <Text style={styles.smallBtnText}>TELA CHEIA</Text>
+              <Text style={styles.smallBtnText}>FULL</Text>
             </TouchableOpacity>
           </View>
 
@@ -214,29 +214,28 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     backgroundColor: "#0d1038",
-    padding: 6,
+    padding: 4,
   },
 
   leftPanel: {
-    width: isPhone ? 92 : 180,
-    paddingRight: 6,
+    width: isPhone ? 84 : 180,
+    paddingRight: 4,
   },
 
   leftTitle: {
     color: "#d8e1f1",
     fontSize: isPhone ? 7 : 10,
-    marginBottom: 6,
+    marginBottom: 4,
   },
 
   categoryRow: {
-    minHeight: isPhone ? 34 : 46,
-    paddingHorizontal: 8,
-    marginBottom: 4,
+    minHeight: isPhone ? 32 : 46,
+    paddingHorizontal: 6,
+    marginBottom: 3,
     borderRadius: 6,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "transparent",
   },
 
   categoryActive: {
@@ -245,10 +244,10 @@ const styles = StyleSheet.create({
 
   categoryText: {
     color: "#fff",
-    fontSize: isPhone ? 7 : 10,
+    fontSize: isPhone ? 6.5 : 10,
     fontWeight: "800",
     flex: 1,
-    marginRight: 6,
+    marginRight: 4,
   },
 
   categoryTextActive: {
@@ -257,22 +256,23 @@ const styles = StyleSheet.create({
 
   categoryCount: {
     color: "#fff",
-    fontSize: isPhone ? 7 : 10,
+    fontSize: isPhone ? 6.5 : 10,
     fontWeight: "900",
   },
 
   centerPanel: {
     flex: 1,
-    paddingHorizontal: 4,
+    paddingHorizontal: 3,
   },
 
   channelRow: {
-    minHeight: isPhone ? 42 : 54,
+    minHeight: isPhone ? 40 : 54,
     flexDirection: "row",
     alignItems: "center",
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
     paddingVertical: 4,
+    paddingHorizontal: 4,
   },
 
   channelRowActive: {
@@ -281,18 +281,18 @@ const styles = StyleSheet.create({
   },
 
   logoBox: {
-    width: isPhone ? 30 : 42,
-    height: isPhone ? 30 : 42,
+    width: isPhone ? 28 : 42,
+    height: isPhone ? 28 : 42,
     borderRadius: 6,
     backgroundColor: "#213d75",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 8,
+    marginRight: 6,
   },
 
   logoText: {
     color: "#fff",
-    fontSize: isPhone ? 8 : 11,
+    fontSize: isPhone ? 7 : 11,
     fontWeight: "900",
   },
 
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
 
   channelName: {
     color: "#fff",
-    fontSize: isPhone ? 8 : 11,
+    fontSize: isPhone ? 7.5 : 11,
     fontWeight: "900",
   },
 
@@ -312,36 +312,36 @@ const styles = StyleSheet.create({
 
   channelGroup: {
     color: "#c7d2eb",
-    fontSize: isPhone ? 7 : 9,
-    marginTop: 2,
+    fontSize: isPhone ? 6.5 : 9,
+    marginTop: 1,
   },
 
   rightPanel: {
-    width: isPhone ? 118 : 220,
-    paddingLeft: 6,
+    width: isPhone ? 96 : 220,
+    paddingLeft: 4,
   },
 
   previewTitle: {
     color: "#47d9ff",
-    fontSize: isPhone ? 8 : 11,
+    fontSize: isPhone ? 7 : 11,
     fontWeight: "900",
-    marginBottom: 4,
+    marginBottom: 3,
   },
 
   previewChannel: {
     color: "#fff",
-    fontSize: isPhone ? 7 : 10,
+    fontSize: isPhone ? 6.5 : 10,
     fontWeight: "900",
-    marginBottom: 6,
+    marginBottom: 4,
   },
 
   previewBox: {
     width: "100%",
-    height: isPhone ? 88 : 150,
+    height: isPhone ? 70 : 150,
     borderRadius: 8,
     overflow: "hidden",
     backgroundColor: "#000",
-    marginBottom: 8,
+    marginBottom: 6,
   },
 
   previewVideo: {
@@ -353,56 +353,56 @@ const styles = StyleSheet.create({
   playerButtons: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 10,
+    marginBottom: 6,
   },
 
   smallBtn: {
     flex: 1,
-    minHeight: isPhone ? 28 : 34,
+    minHeight: isPhone ? 24 : 34,
     borderRadius: 8,
     backgroundColor: "rgba(56,215,255,0.14)",
     borderWidth: 1,
     borderColor: "#38d7ff",
     alignItems: "center",
     justifyContent: "center",
-    marginHorizontal: 2,
-    paddingHorizontal: 2,
+    marginHorizontal: 1,
+    paddingHorizontal: 1,
   },
 
   smallBtnText: {
     color: "#38d7ff",
-    fontSize: isPhone ? 6 : 8,
+    fontSize: isPhone ? 5.5 : 8,
     fontWeight: "900",
     textAlign: "center",
   },
 
   sideLabel: {
     color: "#fff",
-    fontSize: isPhone ? 8 : 11,
+    fontSize: isPhone ? 7 : 11,
     fontWeight: "900",
-    marginBottom: 4,
+    marginBottom: 3,
   },
 
   sideSub: {
     color: "#b9c8e1",
-    fontSize: isPhone ? 7 : 9,
-    marginBottom: 10,
+    fontSize: isPhone ? 6.5 : 9,
+    marginBottom: 8,
   },
 
   actionBtn: {
-    minHeight: isPhone ? 30 : 38,
+    minHeight: isPhone ? 28 : 38,
     borderRadius: 8,
     backgroundColor: "rgba(56,215,255,0.14)",
     borderWidth: 1,
     borderColor: "#38d7ff",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 8,
+    marginBottom: 6,
   },
 
   actionBtnText: {
     color: "#38d7ff",
-    fontSize: isPhone ? 8 : 10,
+    fontSize: isPhone ? 7 : 10,
     fontWeight: "900",
   },
 });
