@@ -25,6 +25,7 @@ function buildFeatured(session) {
         type: "FILME",
       });
     }
+
     if (series[i]) {
       mixed.push({
         id: `series_${series[i].id || i}`,
@@ -38,7 +39,15 @@ function buildFeatured(session) {
 
   return mixed.length
     ? mixed.slice(0, 20)
-    : [{ id: "f1", title: "Sem destaques", subtitle: "Lista vazia", logo: "", type: "INFO" }];
+    : [
+        {
+          id: "fallback_1",
+          title: "Sem destaques",
+          subtitle: "Lista vazia",
+          logo: "",
+          type: "INFO",
+        },
+      ];
 }
 
 export default function HomeScreen({
@@ -47,8 +56,8 @@ export default function HomeScreen({
   onOpenMovies,
   onOpenSeries,
   onOpenSettings,
-  onLogout,
   onReload,
+  onLogout,
 }) {
   const featuredItems = useMemo(() => buildFeatured(session), [session]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -59,7 +68,9 @@ export default function HomeScreen({
       setCurrentIndex((prev) => (prev + 1) % featuredItems.length);
     }, 3500);
 
-    const clock = setInterval(() => setNow(new Date()), 1000);
+    const clock = setInterval(() => {
+      setNow(new Date());
+    }, 1000);
 
     return () => {
       clearInterval(timer);
@@ -68,7 +79,10 @@ export default function HomeScreen({
   }, [featuredItems.length]);
 
   const current = featuredItems[currentIndex] || featuredItems[0];
-  const time = now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const time = now.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
   const date = now.toLocaleDateString("pt-BR");
 
   return (
@@ -78,17 +92,37 @@ export default function HomeScreen({
           <Text style={styles.logo}>MUNDO PLAY TV</Text>
           <Text style={styles.sub}>IPTV Profissional</Text>
         </View>
-        <Text style={styles.clock}>{time}   {date}</Text>
+
+        <Text style={styles.clock}>
+          {time}   {date}
+        </Text>
       </View>
 
       <View style={styles.body}>
         <View style={styles.sidebar}>
-          <TouchableOpacity style={styles.menuBtn} onPress={onOpenLive}><Text style={styles.menuText}>LIVE TV</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.menuBtn} onPress={onOpenMovies}><Text style={styles.menuText}>FILMES</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.menuBtn} onPress={onOpenSeries}><Text style={styles.menuText}>SÉRIES</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.menuBtn} onPress={onOpenSettings}><Text style={styles.menuText}>CONFIG.</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.menuBtn} onPress={onReload}><Text style={styles.menuText}>RECARREGAR</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.menuBtn} onPress={onLogout}><Text style={styles.menuText}>SAIR</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.menuBtn} onPress={onOpenLive}>
+            <Text style={styles.menuText}>LIVE TV</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuBtn} onPress={onOpenMovies}>
+            <Text style={styles.menuText}>FILMES</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuBtn} onPress={onOpenSeries}>
+            <Text style={styles.menuText}>SÉRIES</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuBtn} onPress={onOpenSettings}>
+            <Text style={styles.menuText}>CONFIG.</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuBtn} onPress={onReload}>
+            <Text style={styles.menuText}>RECARREGAR</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuBtn} onPress={onLogout}>
+            <Text style={styles.menuText}>SAIR</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.main}>
@@ -96,13 +130,21 @@ export default function HomeScreen({
             {current?.logo ? (
               <Image source={{ uri: current.logo }} style={styles.heroImage} />
             ) : (
-              <View style={styles.heroFallback}><Text style={styles.heroFallbackText}>SEM CAPA</Text></View>
+              <View style={styles.heroFallback}>
+                <Text style={styles.heroFallbackText}>SEM CAPA</Text>
+              </View>
             )}
 
             <View style={styles.heroInfo}>
               <Text style={styles.heroBadge}>{current?.type || "DESTAQUE"}</Text>
-              <Text style={styles.heroTitle} numberOfLines={2}>{current?.title || "Lançamentos"}</Text>
-              <Text style={styles.heroSubtitle} numberOfLines={2}>{current?.subtitle || "Filmes e séries da lista"}</Text>
+
+              <Text style={styles.heroTitle} numberOfLines={2}>
+                {current?.title || "Lançamentos"}
+              </Text>
+
+              <Text style={styles.heroSubtitle} numberOfLines={2}>
+                {current?.subtitle || "Filmes e séries da lista"}
+              </Text>
             </View>
           </View>
 
@@ -134,7 +176,11 @@ export default function HomeScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#06111d" },
+  container: {
+    flex: 1,
+    backgroundColor: "#06111d",
+  },
+
   header: {
     height: 44,
     backgroundColor: "#0d1b2a",
@@ -145,10 +191,30 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  logo: { color: "#fff", fontSize: 10, fontWeight: "900" },
-  sub: { color: "#9fb2c7", fontSize: 7, marginTop: 1 },
-  clock: { color: "#fff", fontSize: 8, fontWeight: "700" },
-  body: { flex: 1, flexDirection: "row" },
+
+  logo: {
+    color: "#ffffff",
+    fontSize: 10,
+    fontWeight: "900",
+  },
+
+  sub: {
+    color: "#9fb2c7",
+    fontSize: 7,
+    marginTop: 1,
+  },
+
+  clock: {
+    color: "#ffffff",
+    fontSize: 8,
+    fontWeight: "700",
+  },
+
+  body: {
+    flex: 1,
+    flexDirection: "row",
+  },
+
   sidebar: {
     width: 78,
     backgroundColor: "#081624",
@@ -156,6 +222,7 @@ const styles = StyleSheet.create({
     borderRightColor: "rgba(255,255,255,0.08)",
     padding: 6,
   },
+
   menuBtn: {
     height: 34,
     borderRadius: 10,
@@ -166,8 +233,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 6,
   },
-  menuText: { color: "#fff", fontSize: 8, fontWeight: "800" },
-  main: { flex: 1, padding: 8 },
+
+  menuText: {
+    color: "#ffffff",
+    fontSize: 8,
+    fontWeight: "800",
+  },
+
+  main: {
+    flex: 1,
+    padding: 8,
+  },
+
   hero: {
     height: 130,
     borderRadius: 14,
@@ -178,14 +255,61 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     marginBottom: 10,
   },
-  heroImage: { width: 95, height: "100%", resizeMode: "cover", backgroundColor: "#243a57" },
-  heroFallback: { width: 95, height: "100%", backgroundColor: "#243a57", alignItems: "center", justifyContent: "center" },
-  heroFallbackText: { color: "#fff", fontSize: 8, fontWeight: "800" },
-  heroInfo: { flex: 1, padding: 10, justifyContent: "center" },
-  heroBadge: { color: "#38d7ff", fontSize: 8, fontWeight: "900", marginBottom: 5 },
-  heroTitle: { color: "#fff", fontSize: 14, fontWeight: "900", lineHeight: 18 },
-  heroSubtitle: { color: "#9fb2c7", fontSize: 8, lineHeight: 12, marginTop: 6 },
-  quickGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
+
+  heroImage: {
+    width: 95,
+    height: "100%",
+    resizeMode: "cover",
+    backgroundColor: "#243a57",
+  },
+
+  heroFallback: {
+    width: 95,
+    height: "100%",
+    backgroundColor: "#243a57",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  heroFallbackText: {
+    color: "#ffffff",
+    fontSize: 8,
+    fontWeight: "800",
+  },
+
+  heroInfo: {
+    flex: 1,
+    padding: 10,
+    justifyContent: "center",
+  },
+
+  heroBadge: {
+    color: "#38d7ff",
+    fontSize: 8,
+    fontWeight: "900",
+    marginBottom: 5,
+  },
+
+  heroTitle: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "900",
+    lineHeight: 18,
+  },
+
+  heroSubtitle: {
+    color: "#9fb2c7",
+    fontSize: 8,
+    lineHeight: 12,
+    marginTop: 6,
+  },
+
+  quickGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+
   quickCard: {
     width: "48.5%",
     backgroundColor: "#0d1b2a",
@@ -195,6 +319,16 @@ const styles = StyleSheet.create({
     padding: 8,
     marginBottom: 8,
   },
-  quickTitle: { color: "#38d7ff", fontSize: 10, fontWeight: "900" },
-  quickSub: { color: "#fff", fontSize: 8, marginTop: 4 },
+
+  quickTitle: {
+    color: "#38d7ff",
+    fontSize: 10,
+    fontWeight: "900",
+  },
+
+  quickSub: {
+    color: "#ffffff",
+    fontSize: 8,
+    marginTop: 4,
+  },
 });

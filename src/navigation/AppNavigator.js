@@ -6,11 +6,15 @@ import LiveTVScreen from "../screens/LiveTVScreen";
 import MoviesScreen from "../screens/MoviesScreen";
 import SeriesScreen from "../screens/SeriesScreen";
 import SettingsScreen from "../screens/SettingsScreen";
+import MovieDetailsScreen from "../screens/MovieDetailsScreen";
+import SeriesDetailsScreen from "../screens/SeriesDetailsScreen";
 
 export default function AppNavigator() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [screen, setScreen] = useState("home");
   const [session, setSession] = useState(null);
+  const [selectedMovie, setSelectedMovie] = useState(null);
+  const [selectedSeries, setSelectedSeries] = useState(null);
 
   const handleLogin = (payload) => {
     setSession(payload);
@@ -21,13 +25,40 @@ export default function AppNavigator() {
   const handleLogout = () => {
     setLoggedIn(false);
     setSession(null);
+    setSelectedMovie(null);
+    setSelectedSeries(null);
     setScreen("home");
   };
 
-  const handleReload = () => {
-    Alert.alert("Recarregar", "Volte ao login e conecte novamente sua lista.");
-    setLoggedIn(false);
-    setScreen("home");
+  const handleReload = async () => {
+    try {
+      if (!session?.url) {
+        Alert.alert("Erro", "URL da lista não encontrada");
+        return;
+      }
+
+      const { loadM3U } = require("../services/m3uService");
+      const data = await loadM3U(session.url);
+
+      setSession({
+        ...session,
+        data,
+      });
+
+      Alert.alert("Sucesso", "Lista recarregada!");
+    } catch (e) {
+      Alert.alert("Erro", "Falha ao recarregar lista");
+    }
+  };
+
+  const openMovieDetails = (movie) => {
+    setSelectedMovie(movie);
+    setScreen("movieDetails");
+  };
+
+  const openSeriesDetails = (series) => {
+    setSelectedSeries(series);
+    setScreen("seriesDetails");
   };
 
   if (!loggedIn) {
@@ -52,6 +83,7 @@ export default function AppNavigator() {
         onBack={() => setScreen("home")}
         onOpenSettings={() => setScreen("settings")}
         onLogout={handleLogout}
+        onOpenMovieDetails={openMovieDetails}
       />
     );
   }
@@ -63,12 +95,37 @@ export default function AppNavigator() {
         onBack={() => setScreen("home")}
         onOpenSettings={() => setScreen("settings")}
         onLogout={handleLogout}
+        onOpenSeriesDetails={openSeriesDetails}
+      />
+    );
+  }
+
+  if (screen === "movieDetails") {
+    return (
+      <MovieDetailsScreen
+        movie={selectedMovie}
+        onBack={() => setScreen("movies")}
+      />
+    );
+  }
+
+  if (screen === "seriesDetails") {
+    return (
+      <SeriesDetailsScreen
+        series={selectedSeries}
+        onBack={() => setScreen("series")}
       />
     );
   }
 
   if (screen === "settings") {
-    return <SettingsScreen session={session} onBack={() => setScreen("home")} onLogout={handleLogout} />;
+    return (
+      <SettingsScreen
+        session={session}
+        onBack={() => setScreen("home")}
+        onLogout={handleLogout}
+      />
+    );
   }
 
   return (
