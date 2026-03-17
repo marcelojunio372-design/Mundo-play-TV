@@ -8,6 +8,7 @@ import {
   Image,
   StyleSheet,
 } from "react-native";
+import VideoPlayer from "../components/VideoPlayer";
 
 function buildMovieCategories(movies) {
   const grouped = {};
@@ -19,7 +20,7 @@ function buildMovieCategories(movies) {
   });
 
   const categories = [
-    { id: "all", name: "TODOS OS FILMES", items: movies },
+    { id: "all", name: "TODOS", items: movies },
     { id: "fav", name: "FAVORITOS", items: [] },
     { id: "last", name: "RECENTE", items: [] },
   ];
@@ -40,7 +41,10 @@ export default function MoviesScreen({ session, onBack, onOpenSettings, onLogout
   const categories = useMemo(() => buildMovieCategories(movies), [movies]);
 
   const [selectedCategory, setSelectedCategory] = useState(0);
+  const [selectedMovie, setSelectedMovie] = useState(0);
+
   const visibleMovies = categories[selectedCategory]?.items || [];
+  const current = visibleMovies[selectedMovie];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -67,7 +71,10 @@ export default function MoviesScreen({ session, onBack, onOpenSettings, onLogout
               return (
                 <TouchableOpacity
                   style={[styles.categoryRow, active && styles.categoryActive]}
-                  onPress={() => setSelectedCategory(index)}
+                  onPress={() => {
+                    setSelectedCategory(index);
+                    setSelectedMovie(0);
+                  }}
                 >
                   <Text
                     style={[styles.categoryText, active && styles.categoryTextActive]}
@@ -75,7 +82,6 @@ export default function MoviesScreen({ session, onBack, onOpenSettings, onLogout
                   >
                     {item.name}
                   </Text>
-
                   <Text
                     style={[styles.categoryCount, active && styles.categoryTextActive]}
                   >
@@ -87,43 +93,64 @@ export default function MoviesScreen({ session, onBack, onOpenSettings, onLogout
           />
         </View>
 
-        <View style={styles.rightPanel}>
+        <View style={styles.centerPanel}>
           <FlatList
             data={visibleMovies}
             keyExtractor={(item, index) => item.id || `${item.name}_${index}`}
-            numColumns={4}
-            initialNumToRender={24}
-            maxToRenderPerBatch={24}
+            numColumns={3}
+            initialNumToRender={18}
+            maxToRenderPerBatch={18}
             windowSize={10}
             contentContainerStyle={styles.grid}
-            renderItem={({ item }) => (
-              <View style={styles.card}>
-                {item.logo ? (
-                  <Image source={{ uri: item.logo }} style={styles.poster} />
-                ) : (
-                  <View style={styles.posterFallback} />
-                )}
+            renderItem={({ item, index }) => {
+              const active = selectedMovie === index;
+              return (
+                <TouchableOpacity
+                  style={[styles.card, active && styles.cardActive]}
+                  onPress={() => setSelectedMovie(index)}
+                >
+                  {item.logo ? (
+                    <Image source={{ uri: item.logo }} style={styles.poster} />
+                  ) : (
+                    <View style={styles.posterFallback} />
+                  )}
 
-                <Text style={styles.title} numberOfLines={2}>
-                  {item.name || item.title || "Sem nome"}
-                </Text>
+                  <Text style={styles.title} numberOfLines={2}>
+                    {item.name || item.title || "Sem nome"}
+                  </Text>
 
-                <Text style={styles.group} numberOfLines={1}>
-                  {item.group || "Filme"}
-                </Text>
-              </View>
-            )}
-            ListEmptyComponent={
-              <Text style={styles.emptyText}>Nenhum filme encontrado.</Text>
-            }
+                  <Text style={styles.group} numberOfLines={1}>
+                    {item.group || "Filme"}
+                  </Text>
+                </TouchableOpacity>
+              );
+            }}
           />
         </View>
-      </View>
 
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.footerBtn} onPress={onOpenSettings}>
-          <Text style={styles.footerBtnText}>CONFIG.</Text>
-        </TouchableOpacity>
+        <View style={styles.rightPanel}>
+          <VideoPlayer
+            url={current?.url}
+            title={current?.name}
+            compact
+            brand="MUNDO PLAY TV"
+          />
+
+          <View style={styles.details}>
+            <Text style={styles.detailTitle} numberOfLines={2}>
+              {current?.name || "Nenhum filme"}
+            </Text>
+            <Text style={styles.detailText}>Ano: {current?.year || "-"}</Text>
+            <Text style={styles.detailText}>Grupo: {current?.group || "-"}</Text>
+            <Text style={styles.detailText} numberOfLines={5}>
+              Descrição: {current?.description || "Sem descrição na lista"}
+            </Text>
+          </View>
+
+          <TouchableOpacity style={styles.footerBtn} onPress={onOpenSettings}>
+            <Text style={styles.footerBtnText}>CONFIG.</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -131,9 +158,8 @@ export default function MoviesScreen({ session, onBack, onOpenSettings, onLogout
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#06111d" },
-
   header: {
-    height: 48,
+    height: 42,
     backgroundColor: "#0d1b2a",
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
@@ -142,32 +168,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-
   headerBtn: {
     color: "#38d7ff",
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: "900",
   },
-
   headerTitle: {
-    color: "#ffffff",
-    fontSize: 15,
+    color: "#fff",
+    fontSize: 13,
     fontWeight: "900",
   },
-
   content: {
     flex: 1,
     flexDirection: "row",
     padding: 4,
   },
-
   leftPanel: {
-    width: 102,
+    width: 90,
     paddingRight: 4,
   },
-
   categoryRow: {
-    minHeight: 36,
+    minHeight: 32,
     paddingHorizontal: 6,
     flexDirection: "row",
     alignItems: "center",
@@ -175,86 +196,87 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.06)",
   },
-
   categoryActive: {
     backgroundColor: "#6de9ea",
     borderRadius: 4,
   },
-
   categoryText: {
-    color: "#ffffff",
-    fontSize: 8,
+    color: "#fff",
+    fontSize: 7,
     fontWeight: "800",
     flex: 1,
     marginRight: 4,
   },
-
   categoryTextActive: {
     color: "#0d2340",
   },
-
   categoryCount: {
-    color: "#ffffff",
-    fontSize: 8,
+    color: "#fff",
+    fontSize: 7,
     fontWeight: "800",
   },
-
-  rightPanel: {
+  centerPanel: {
     flex: 1,
-    paddingLeft: 4,
+    paddingHorizontal: 4,
   },
-
   grid: {
     paddingBottom: 8,
   },
-
   card: {
-    width: "23%",
+    width: "31%",
     marginHorizontal: "1%",
-    marginBottom: 10,
+    marginBottom: 8,
+    paddingBottom: 4,
+    borderRadius: 8,
   },
-
+  cardActive: {
+    backgroundColor: "rgba(56,215,255,0.08)",
+  },
   poster: {
     width: "100%",
-    height: 95,
+    height: 90,
     borderRadius: 8,
     backgroundColor: "#243a57",
     marginBottom: 4,
   },
-
   posterFallback: {
     width: "100%",
-    height: 95,
+    height: 90,
     borderRadius: 8,
     backgroundColor: "#243a57",
     marginBottom: 4,
   },
-
   title: {
-    color: "#ffffff",
+    color: "#fff",
     fontSize: 8,
     fontWeight: "800",
   },
-
   group: {
     color: "#9fb2c7",
     fontSize: 7,
     marginTop: 2,
   },
-
-  emptyText: {
+  rightPanel: {
+    width: 132,
+    paddingLeft: 4,
+  },
+  details: {
+    marginTop: 6,
+    marginBottom: 6,
+  },
+  detailTitle: {
     color: "#fff",
-    fontSize: 9,
-    textAlign: "center",
-    marginTop: 20,
+    fontSize: 8,
+    fontWeight: "900",
+    marginBottom: 4,
   },
-
-  footer: {
-    padding: 6,
+  detailText: {
+    color: "#9fb2c7",
+    fontSize: 7,
+    marginBottom: 3,
   },
-
   footerBtn: {
-    height: 32,
+    height: 30,
     borderRadius: 8,
     backgroundColor: "rgba(56,215,255,0.18)",
     borderWidth: 1,
@@ -262,10 +284,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
   footerBtnText: {
     color: "#38d7ff",
-    fontSize: 8,
+    fontSize: 7,
     fontWeight: "900",
   },
 });

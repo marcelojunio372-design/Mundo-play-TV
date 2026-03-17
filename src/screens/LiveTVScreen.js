@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -8,7 +8,7 @@ import {
   StyleSheet,
   Image,
 } from "react-native";
-import { Video } from "expo-av";
+import VideoPlayer from "../components/VideoPlayer";
 
 function buildCategories(channels) {
   const grouped = {};
@@ -20,16 +20,8 @@ function buildCategories(channels) {
   });
 
   const categories = [
-    {
-      id: "all",
-      name: "TODOS OS CANAIS",
-      items: channels,
-    },
-    {
-      id: "fav",
-      name: "FAVORITOS",
-      items: [],
-    },
+    { id: "all", name: "TODOS", items: channels },
+    { id: "fav", name: "FAVORITOS", items: [] },
   ];
 
   Object.keys(grouped).forEach((group, index) => {
@@ -44,8 +36,6 @@ function buildCategories(channels) {
 }
 
 export default function LiveTVScreen({ session, onBack, onOpenSettings, onLogout }) {
-  const videoRef = useRef(null);
-
   const channels = useMemo(() => session?.data?.channels || [], [session]);
   const categories = useMemo(() => buildCategories(channels), [channels]);
 
@@ -54,11 +44,6 @@ export default function LiveTVScreen({ session, onBack, onOpenSettings, onLogout
 
   const visibleChannels = categories[selectedCategory]?.items || [];
   const current = visibleChannels[selectedChannel];
-
-  function selectCategory(index) {
-    setSelectedCategory(index);
-    setSelectedChannel(0);
-  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -78,7 +63,10 @@ export default function LiveTVScreen({ session, onBack, onOpenSettings, onLogout
               return (
                 <TouchableOpacity
                   style={[styles.categoryRow, active && styles.categoryRowActive]}
-                  onPress={() => selectCategory(index)}
+                  onPress={() => {
+                    setSelectedCategory(index);
+                    setSelectedChannel(0);
+                  }}
                 >
                   <Text
                     style={[styles.categoryName, active && styles.categoryNameActive]}
@@ -86,7 +74,6 @@ export default function LiveTVScreen({ session, onBack, onOpenSettings, onLogout
                   >
                     {item.name}
                   </Text>
-
                   <Text
                     style={[styles.categoryCount, active && styles.categoryNameActive]}
                   >
@@ -130,7 +117,6 @@ export default function LiveTVScreen({ session, onBack, onOpenSettings, onLogout
                     >
                       {item.name || "Sem nome"}
                     </Text>
-
                     <Text style={styles.channelSub} numberOfLines={1}>
                       {item.group || "Canal"}
                     </Text>
@@ -138,38 +124,22 @@ export default function LiveTVScreen({ session, onBack, onOpenSettings, onLogout
                 </TouchableOpacity>
               );
             }}
-            ListEmptyComponent={
-              <Text style={styles.emptyText}>Nenhum canal encontrado.</Text>
-            }
           />
         </View>
 
         <View style={styles.rightPanel}>
-          <Text style={styles.playerTitle}>Preview</Text>
+          <VideoPlayer
+            url={current?.url}
+            title={current?.name}
+            compact
+            brand="MUNDO PLAY TV"
+          />
 
-          <View style={styles.playerBox}>
-            {current?.url ? (
-              <Video
-                ref={videoRef}
-                source={{ uri: current.url }}
-                style={styles.video}
-                useNativeControls
-                resizeMode="contain"
-                shouldPlay={false}
-              />
-            ) : (
-              <View style={styles.videoPlaceholder} />
-            )}
-          </View>
-
-          <View style={styles.programBox}>
-            <Text style={styles.programTitle} numberOfLines={1}>
+          <View style={styles.infoBox}>
+            <Text style={styles.infoTitle} numberOfLines={2}>
               {current?.name || "Nenhum canal"}
             </Text>
-
-            <Text style={styles.programSub} numberOfLines={1}>
-              {current?.group || "-"}
-            </Text>
+            <Text style={styles.infoText}>Grupo: {current?.group || "-"}</Text>
           </View>
 
           <TouchableOpacity style={styles.actionBtn} onPress={onBack}>
@@ -190,43 +160,34 @@ export default function LiveTVScreen({ session, onBack, onOpenSettings, onLogout
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#101737",
-  },
-
+  container: { flex: 1, backgroundColor: "#101737" },
   header: {
-    height: 46,
+    height: 40,
     backgroundColor: "#3a3d7a",
     justifyContent: "center",
     paddingHorizontal: 8,
   },
-
   headerTitle: {
     color: "#e8fbff",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "800",
   },
-
   content: {
     flex: 1,
     flexDirection: "row",
     padding: 4,
   },
-
   leftPanel: {
-    width: 102,
+    width: 90,
     paddingRight: 4,
   },
-
   leftTitle: {
     color: "#dff8ff",
     fontSize: 8,
-    marginBottom: 8,
+    marginBottom: 6,
   },
-
   categoryRow: {
-    minHeight: 38,
+    minHeight: 32,
     paddingHorizontal: 6,
     flexDirection: "row",
     alignItems: "center",
@@ -234,142 +195,98 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.06)",
   },
-
   categoryRowActive: {
     backgroundColor: "#6de9ea",
     borderRadius: 4,
   },
-
   categoryName: {
-    color: "#ffffff",
-    fontSize: 8,
+    color: "#fff",
+    fontSize: 7,
     fontWeight: "800",
     flex: 1,
     marginRight: 4,
   },
-
   categoryNameActive: {
     color: "#0d2340",
   },
-
   categoryCount: {
-    color: "#ffffff",
-    fontSize: 8,
+    color: "#fff",
+    fontSize: 7,
     fontWeight: "800",
   },
-
   centerPanel: {
     flex: 1,
     paddingHorizontal: 4,
   },
-
   channelRow: {
-    minHeight: 44,
+    minHeight: 38,
     paddingHorizontal: 6,
     flexDirection: "row",
     alignItems: "center",
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.06)",
   },
-
   channelRowActive: {
     backgroundColor: "#6de9ea",
     borderRadius: 4,
   },
-
   channelLogo: {
-    width: 24,
-    height: 24,
+    width: 22,
+    height: 22,
     borderRadius: 4,
     marginRight: 6,
     backgroundColor: "#29456b",
   },
-
   channelLogoFallback: {
-    width: 24,
-    height: 24,
+    width: 22,
+    height: 22,
     borderRadius: 4,
     marginRight: 6,
     backgroundColor: "#29456b",
     alignItems: "center",
     justifyContent: "center",
   },
-
   channelLogoText: {
     color: "#fff",
-    fontSize: 8,
+    fontSize: 7,
     fontWeight: "900",
   },
-
   channelInfo: {
     flex: 1,
   },
-
   channelName: {
-    color: "#ffffff",
-    fontSize: 9,
+    color: "#fff",
+    fontSize: 8,
     fontWeight: "800",
   },
-
   channelNameActive: {
     color: "#0d2340",
   },
-
   channelSub: {
     color: "#c8defa",
     fontSize: 7,
     marginTop: 2,
   },
-
   rightPanel: {
-    width: 118,
+    width: 132,
     paddingLeft: 4,
   },
-
-  playerTitle: {
-    color: "#dff8ff",
-    fontSize: 8,
-    textAlign: "center",
-    marginBottom: 6,
+  infoBox: {
+    marginTop: 6,
+    marginBottom: 4,
   },
-
-  playerBox: {
-    height: 110,
-    backgroundColor: "#1a2246",
-    marginBottom: 6,
-    overflow: "hidden",
-  },
-
-  video: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: "#000",
-  },
-
-  videoPlaceholder: {
-    flex: 1,
-    backgroundColor: "#1a2246",
-  },
-
-  programBox: {
-    marginBottom: 6,
-  },
-
-  programTitle: {
-    color: "#ffffff",
+  infoTitle: {
+    color: "#fff",
     fontSize: 8,
     fontWeight: "900",
-    marginBottom: 2,
-  },
-
-  programSub: {
-    color: "#9fb2c7",
-    fontSize: 7,
     marginBottom: 3,
   },
-
+  infoText: {
+    color: "#9fb2c7",
+    fontSize: 7,
+  },
   actionBtn: {
-    height: 32,
+    height: 30,
     borderRadius: 8,
     backgroundColor: "rgba(56,215,255,0.18)",
     borderWidth: 1,
@@ -378,17 +295,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 5,
   },
-
   actionText: {
     color: "#38d7ff",
-    fontSize: 8,
+    fontSize: 7,
     fontWeight: "900",
-  },
-
-  emptyText: {
-    color: "#fff",
-    fontSize: 9,
-    textAlign: "center",
-    marginTop: 20,
   },
 });

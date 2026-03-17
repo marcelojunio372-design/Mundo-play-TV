@@ -1,51 +1,68 @@
-import React, { useMemo } from "react";
+import React, { useState } from "react";
 import {
   SafeAreaView,
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
+  Alert,
 } from "react-native";
-import { COLORS, LAYOUT } from "../utils/constants";
 
-export default function SettingsScreen({ onBack, onLogout }) {
-  const now = useMemo(() => new Date(), []);
-  const time = now.toLocaleTimeString("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  const date = now.toLocaleDateString("pt-BR");
+export default function SettingsScreen({ session, onBack, onLogout }) {
+  const [language, setLanguage] = useState("Português");
+
+  function changeLanguage(lang) {
+    setLanguage(lang);
+    Alert.alert("Idioma alterado", `Idioma atual: ${lang}`);
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerBrand}>⚙ Configuração</Text>
-        <Text style={styles.headerClock}>{time}   {date}</Text>
+        <Text style={styles.headerTitle}>⚙ Configuração</Text>
+        <Text style={styles.headerClock}>
+          {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}{" "}
+          {new Date().toLocaleDateString("pt-BR")}
+        </Text>
       </View>
 
-      <View style={styles.body}>
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Idiomas</Text>
-          <Text style={styles.cardText}>Português</Text>
-          <Text style={styles.cardText}>English</Text>
-          <Text style={styles.cardText}>Español</Text>
-        </View>
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Idiomas</Text>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Validade da Lista</Text>
-          <Text style={styles.cardText}>Usuário: Marcelo123</Text>
-          <Text style={styles.cardText}>Status: Ativo</Text>
-          <Text style={styles.cardText}>Validade: 03/04/2026</Text>
-        </View>
-      </View>
-
-      <View style={styles.bottomActions}>
-        <TouchableOpacity style={styles.bottomBtn} onPress={onBack}>
-          <Text style={styles.bottomBtnText}>VOLTAR</Text>
+        <TouchableOpacity style={styles.langBtn} onPress={() => changeLanguage("Português")}>
+          <Text style={[styles.langText, language === "Português" && styles.langTextActive]}>
+            Português
+          </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.bottomBtn} onPress={onLogout}>
-          <Text style={styles.bottomBtnText}>SAIR</Text>
+        <TouchableOpacity style={styles.langBtn} onPress={() => changeLanguage("English")}>
+          <Text style={[styles.langText, language === "English" && styles.langTextActive]}>
+            English
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.langBtn} onPress={() => changeLanguage("Español")}>
+          <Text style={[styles.langText, language === "Español" && styles.langTextActive]}>
+            Español
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Validade da Lista</Text>
+        <Text style={styles.info}>Usuário: Marcelo123</Text>
+        <Text style={styles.info}>Status: Ativo</Text>
+        <Text style={styles.info}>Validade: 03/04/2026</Text>
+        <Text style={styles.info}>Idioma atual: {language}</Text>
+      </View>
+
+      <View style={styles.footer}>
+        <TouchableOpacity style={styles.footerBtn} onPress={onBack}>
+          <Text style={styles.footerText}>VOLTAR</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.footerBtn} onPress={onLogout}>
+          <Text style={styles.footerText}>SAIR</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -53,76 +70,75 @@ export default function SettingsScreen({ onBack, onLogout }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#101737" },
-
+  container: { flex: 1, backgroundColor: "#1f2160" },
   header: {
-    height: LAYOUT.isTV ? 70 : 56,
-    paddingHorizontal: LAYOUT.isTV ? 18 : 10,
-    backgroundColor: "#2b2f66",
+    height: 46,
+    backgroundColor: "#3a3d7a",
+    paddingHorizontal: 8,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-
-  headerBrand: {
-    color: "#d9f6ff",
-    fontSize: LAYOUT.isTV ? 18 : 12,
-    fontWeight: "700",
+  headerTitle: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "900",
   },
-
   headerClock: {
-    color: "#e7fbff",
-    fontSize: LAYOUT.isTV ? 16 : 11,
+    color: "#fff",
+    fontSize: 9,
     fontWeight: "700",
   },
-
-  body: {
-    flex: 1,
-    padding: LAYOUT.isTV ? 18 : 10,
-    gap: 14,
-  },
-
   card: {
+    margin: 10,
+    padding: 12,
+    borderRadius: 16,
     backgroundColor: "#0d1b2a",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
-    borderRadius: 18,
-    padding: 18,
   },
-
   cardTitle: {
-    color: "#ffffff",
-    fontSize: LAYOUT.isTV ? 18 : 12,
+    color: "#fff",
+    fontSize: 10,
     fontWeight: "900",
     marginBottom: 10,
   },
-
-  cardText: {
-    color: "#d4e4f7",
-    fontSize: LAYOUT.isTV ? 15 : 11,
+  langBtn: {
+    paddingVertical: 8,
+  },
+  langText: {
+    color: "#cfd8e3",
+    fontSize: 9,
+  },
+  langTextActive: {
+    color: "#38d7ff",
+    fontWeight: "900",
+  },
+  info: {
+    color: "#d5dde8",
+    fontSize: 9,
     marginBottom: 8,
   },
-
-  bottomActions: {
+  footer: {
     flexDirection: "row",
     gap: 10,
-    paddingHorizontal: 12,
-    paddingBottom: 10,
+    paddingHorizontal: 10,
+    marginTop: "auto",
+    marginBottom: 10,
   },
-
-  bottomBtn: {
+  footerBtn: {
     flex: 1,
-    backgroundColor: COLORS.primarySoft,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
+    height: 40,
     borderRadius: 12,
-    paddingVertical: 12,
+    backgroundColor: "rgba(56,215,255,0.18)",
+    borderWidth: 1,
+    borderColor: "#38d7ff",
     alignItems: "center",
+    justifyContent: "center",
   },
-
-  bottomBtnText: {
-    color: COLORS.primary,
-    fontSize: LAYOUT.isTV ? 13 : 10,
+  footerText: {
+    color: "#38d7ff",
+    fontSize: 9,
     fontWeight: "900",
   },
 });
