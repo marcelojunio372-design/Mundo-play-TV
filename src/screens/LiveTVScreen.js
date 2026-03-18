@@ -67,7 +67,6 @@ export default function LiveTVScreen({
 
   const [favoriteIds, setFavoriteIds] = useState([]);
   const [recentIds, setRecentIds] = useState([]);
-
   const [selectedCategory, setSelectedCategory] = useState(0);
   const [selectedChannelIndex, setSelectedChannelIndex] = useState(0);
   const [search, setSearch] = useState("");
@@ -106,6 +105,7 @@ export default function LiveTVScreen({
       try {
         setEpgLoading(true);
         const data = await loadEPG();
+
         if (active) {
           setEpgItems(Array.isArray(data) ? data : []);
         }
@@ -194,7 +194,7 @@ export default function LiveTVScreen({
     const id = getChannelStorageId(channel);
     if (!id) return;
 
-    const updated = [id, ...recentIds.filter((item) => item !== id)].slice(0, 30);
+    const updated = [id, ...recentIds.filter((item) => item !== id)].slice(0, 50);
     setRecentIds(updated);
     await persistRecents(updated);
   };
@@ -396,24 +396,15 @@ export default function LiveTVScreen({
               <Text style={styles.actionBtnText}>PLAY</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.actionBtnSmall}
-              onPress={handlePause}
-            >
+            <TouchableOpacity style={styles.actionBtnSmall} onPress={handlePause}>
               <Text style={styles.actionBtnText}>PAUSE</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.actionBtnSmall}
-              onPress={openFullscreen}
-            >
+            <TouchableOpacity style={styles.actionBtnSmall} onPress={openFullscreen}>
               <Text style={styles.actionBtnText}>FULL</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.actionBtnSmall}
-              onPress={toggleFavorite}
-            >
+            <TouchableOpacity style={styles.actionBtnSmall} onPress={toggleFavorite}>
               <Text style={styles.actionBtnText}>
                 {isFavorite ? "★ FAVORITO" : "☆ FAVORITAR"}
               </Text>
@@ -443,7 +434,7 @@ export default function LiveTVScreen({
                     : "Grupo: -"}
                 </Text>
 
-                <Text style={styles.epgDesc} numberOfLines={4}>
+                <Text style={styles.epgDesc} numberOfLines={6}>
                   {nowProgram?.desc ||
                     "Programação atual não encontrada para este canal."}
                 </Text>
@@ -513,7 +504,7 @@ export default function LiveTVScreen({
             </Text>
 
             <Text style={styles.epgTitle} numberOfLines={2}>
-              {nowProgram?.title || selectedChannel?.name || "Sem canal"}
+              {nowProgram?.title || selectedChannel?.name || "Canal"}
             </Text>
 
             <Text style={styles.epgSub} numberOfLines={1}>
@@ -522,7 +513,7 @@ export default function LiveTVScreen({
                 : "Grupo: -"}
             </Text>
 
-            <Text style={styles.epgDesc} numberOfLines={3}>
+            <Text style={styles.epgDesc} numberOfLines={4}>
               {nowProgram?.desc ||
                 "Programação atual não encontrada para este canal."}
             </Text>
@@ -552,10 +543,10 @@ const styles = StyleSheet.create({
   },
 
   topnav: {
-    height: isPhone ? 42 : 58,
+    height: isPhone ? 38 : 56,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 10,
+    paddingHorizontal: isPhone ? 8 : 10,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
     backgroundColor: "#10163a",
@@ -563,33 +554,33 @@ const styles = StyleSheet.create({
 
   topLink: {
     color: "#dbdbdb",
-    fontSize: isPhone ? 10 : 14,
+    fontSize: isPhone ? 9 : 14,
   },
 
   topLinkActive: {
     color: "#ffe24f",
-    fontSize: isPhone ? 10 : 14,
+    fontSize: isPhone ? 9 : 14,
     fontWeight: "900",
   },
 
   topSep: {
     color: "#98a5b5",
-    marginHorizontal: 8,
-    fontSize: isPhone ? 10 : 14,
+    marginHorizontal: isPhone ? 6 : 8,
+    fontSize: isPhone ? 9 : 14,
   },
 
   searchWrap: {
     marginLeft: "auto",
-    width: isPhone ? 100 : 180,
+    width: isPhone ? 94 : 180,
   },
 
   searchInput: {
-    height: isPhone ? 28 : 36,
+    height: isPhone ? 24 : 36,
     borderRadius: 8,
     backgroundColor: "#1a224d",
     color: "#fff",
-    paddingHorizontal: 10,
-    fontSize: isPhone ? 9 : 12,
+    paddingHorizontal: 8,
+    fontSize: isPhone ? 8 : 12,
   },
 
   main: {
@@ -598,15 +589,15 @@ const styles = StyleSheet.create({
   },
 
   leftPanel: {
-    width: isPhone ? 108 : 220,
+    width: isPhone ? 92 : 220,
     backgroundColor: "#2a1530",
     borderRightWidth: 1,
     borderRightColor: "rgba(255,255,255,0.08)",
   },
 
   categoryRow: {
-    minHeight: isPhone ? 34 : 46,
-    paddingHorizontal: 10,
+    minHeight: isPhone ? 28 : 46,
+    paddingHorizontal: isPhone ? 8 : 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -620,9 +611,9 @@ const styles = StyleSheet.create({
 
   categoryText: {
     color: "#f4f4f4",
-    fontSize: isPhone ? 8 : 12,
+    fontSize: isPhone ? 7.5 : 12,
     flex: 1,
-    marginRight: 6,
+    marginRight: 4,
   },
 
   categoryTextActive: {
@@ -632,21 +623,21 @@ const styles = StyleSheet.create({
 
   categoryCount: {
     color: "#f4f4f4",
-    fontSize: isPhone ? 8 : 12,
+    fontSize: isPhone ? 7.5 : 12,
   },
 
   centerPanel: {
-    width: isPhone ? 130 : 260,
+    width: isPhone ? 118 : 260,
     backgroundColor: "#11183d",
     borderRightWidth: 1,
     borderRightColor: "rgba(255,255,255,0.08)",
   },
 
   channelRow: {
-    minHeight: isPhone ? 38 : 48,
+    minHeight: isPhone ? 34 : 48,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 8,
+    paddingHorizontal: isPhone ? 6 : 8,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
   },
@@ -656,15 +647,15 @@ const styles = StyleSheet.create({
   },
 
   channelNumberBox: {
-    width: isPhone ? 24 : 34,
+    width: isPhone ? 20 : 34,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 6,
+    marginRight: isPhone ? 4 : 6,
   },
 
   channelNumber: {
     color: "#f2f2f2",
-    fontSize: isPhone ? 7 : 10,
+    fontSize: isPhone ? 6.5 : 10,
     fontWeight: "900",
   },
 
@@ -674,7 +665,7 @@ const styles = StyleSheet.create({
 
   channelName: {
     color: "#fff",
-    fontSize: isPhone ? 7.5 : 11,
+    fontSize: isPhone ? 7 : 11,
     fontWeight: "800",
   },
 
@@ -684,23 +675,23 @@ const styles = StyleSheet.create({
 
   channelSub: {
     color: "#c6d2e8",
-    fontSize: isPhone ? 6 : 9,
+    fontSize: isPhone ? 5.5 : 9,
     marginTop: 1,
   },
 
   rightPanel: {
     flex: 1,
     backgroundColor: "#0b1338",
-    padding: 8,
+    padding: isPhone ? 6 : 8,
   },
 
   previewBox: {
     width: "100%",
-    height: isPhone ? height * 0.24 : 260,
+    height: isPhone ? 92 : 260,
     borderRadius: 8,
     overflow: "hidden",
     backgroundColor: "#000",
-    marginBottom: 8,
+    marginBottom: isPhone ? 6 : 8,
   },
 
   previewVideo: {
@@ -718,107 +709,111 @@ const styles = StyleSheet.create({
 
   previewEmptyText: {
     color: "#c8d4e2",
-    fontSize: isPhone ? 9 : 12,
+    fontSize: isPhone ? 8 : 12,
   },
 
   previewActions: {
     flexDirection: "row",
-    flexWrap: "wrap",
     justifyContent: "flex-start",
-    marginBottom: 8,
-    gap: 8,
+    marginBottom: isPhone ? 6 : 8,
+    gap: isPhone ? 6 : 8,
+    flexWrap: "wrap",
   },
 
   actionBtnSmall: {
-    minWidth: isPhone ? 62 : 90,
-    minHeight: isPhone ? 34 : 42,
+    minWidth: isPhone ? 52 : 90,
+    minHeight: isPhone ? 26 : 42,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#38d7ff",
     backgroundColor: "rgba(56,215,255,0.10)",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 10,
+    paddingHorizontal: isPhone ? 8 : 10,
   },
 
   actionBtnText: {
     color: "#38d7ff",
-    fontSize: isPhone ? 9 : 12,
+    fontSize: isPhone ? 7.5 : 12,
     fontWeight: "900",
   },
 
   epgBox: {
     backgroundColor: "#10183f",
     borderRadius: 8,
-    padding: 10,
+    padding: isPhone ? 8 : 10,
+    flex: 1,
   },
 
   epgHeader: {
     color: "#38d7ff",
-    fontSize: isPhone ? 10 : 13,
+    fontSize: isPhone ? 9 : 13,
     fontWeight: "900",
-    marginBottom: 6,
+    marginBottom: 4,
   },
 
   epgTime: {
     color: "#ffd94d",
-    fontSize: isPhone ? 8 : 11,
+    fontSize: isPhone ? 7.5 : 11,
     fontWeight: "900",
     marginBottom: 4,
   },
 
   epgTitle: {
     color: "#fff",
-    fontSize: isPhone ? 10 : 14,
+    fontSize: isPhone ? 9.5 : 14,
     fontWeight: "900",
     marginBottom: 4,
   },
 
   epgSub: {
     color: "#c4d1df",
-    fontSize: isPhone ? 8 : 11,
-    marginBottom: 6,
+    fontSize: isPhone ? 7 : 11,
+    marginBottom: 4,
   },
 
   epgDesc: {
     color: "#d7e1ec",
-    fontSize: isPhone ? 8 : 11,
-    lineHeight: isPhone ? 12 : 16,
+    fontSize: isPhone ? 7 : 11,
+    lineHeight: isPhone ? 10 : 16,
   },
 
   nextProgramBox: {
-    marginTop: 10,
-    paddingTop: 10,
+    marginTop: isPhone ? 6 : 10,
+    paddingTop: isPhone ? 6 : 10,
     borderTopWidth: 1,
     borderTopColor: "rgba(255,255,255,0.08)",
   },
 
   nextProgramLabel: {
     color: "#38d7ff",
-    fontSize: isPhone ? 8 : 10,
+    fontSize: isPhone ? 7 : 10,
     fontWeight: "900",
     marginBottom: 4,
   },
 
   nextProgramTitle: {
     color: "#fff",
-    fontSize: isPhone ? 9 : 12,
+    fontSize: isPhone ? 8 : 12,
     fontWeight: "700",
   },
 
   nextProgramTime: {
     color: "#c4d1df",
-    fontSize: isPhone ? 8 : 10,
+    fontSize: isPhone ? 7 : 10,
     marginTop: 4,
   },
 
   emptyList: {
-    padding: 16,
+    paddingVertical: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   emptyListText: {
-    color: "#c8d4e2",
-    fontSize: isPhone ? 9 : 12,
+    color: "#cfdae7",
+    fontSize: isPhone ? 8 : 12,
+    textAlign: "center",
   },
 
   fullscreenContainer: {

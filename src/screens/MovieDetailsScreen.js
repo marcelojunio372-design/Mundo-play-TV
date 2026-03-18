@@ -9,6 +9,7 @@ import {
   Image,
   Dimensions,
   Modal,
+  ScrollView,
 } from "react-native";
 import { Video, ResizeMode } from "expo-av";
 
@@ -38,7 +39,15 @@ export default function MovieDetailsScreen({ movie, onBack }) {
   return (
     <SafeAreaView style={styles.container}>
       <ImageBackground
-        source={movie.logo ? { uri: movie.logo } : undefined}
+        source={
+          movie.cover
+            ? { uri: movie.cover }
+            : movie.backdrop
+            ? { uri: movie.backdrop }
+            : movie.logo
+            ? { uri: movie.logo }
+            : undefined
+        }
         style={styles.bg}
         imageStyle={styles.bgImage}
       >
@@ -46,34 +55,38 @@ export default function MovieDetailsScreen({ movie, onBack }) {
           <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
 
-        <View style={styles.overlay}>
-          <Image
-            source={movie.logo ? { uri: movie.logo } : undefined}
-            style={styles.poster}
-          />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.overlay}>
+            <Image
+              source={movie.logo ? { uri: movie.logo } : undefined}
+              style={styles.poster}
+            />
 
-          <View style={styles.infoWrap}>
-            <View style={styles.actionBar}>
-              <TouchableOpacity style={styles.actionBtn} onPress={openPlayer}>
-                <Text style={styles.actionBtnText}>▶ Assistir agora</Text>
-              </TouchableOpacity>
+            <View style={styles.infoWrap}>
+              <View style={styles.actionBar}>
+                <TouchableOpacity style={styles.actionBtn} onPress={openPlayer}>
+                  <Text style={styles.actionBtnText}>▶ Assistir agora</Text>
+                </TouchableOpacity>
+              </View>
 
-              <TouchableOpacity style={styles.iconBtn}>
-                <Text style={styles.iconBtnText}>★</Text>
-              </TouchableOpacity>
+              <Text style={styles.title}>{movie.name || "Sem nome"}</Text>
+
+              <Text style={styles.meta}>
+                {(movie.year || "-") + " • " + (movie.group || "Filmes")}
+              </Text>
+
+              <Text style={styles.label}>Descrição</Text>
+              <Text style={styles.desc}>
+                {movie.description || "Sem descrição na lista."}
+              </Text>
+
+              <Text style={styles.label}>Link</Text>
+              <Text style={styles.urlText}>
+                {movie.url || "Link não disponível"}
+              </Text>
             </View>
-
-            <Text style={styles.title}>{movie.name}</Text>
-
-            <Text style={styles.meta}>
-              {(movie.year || "-") + " • " + (movie.group || "Filmes")}
-            </Text>
-
-            <Text style={styles.desc}>
-              {movie.description || "Sem descrição na lista."}
-            </Text>
           </View>
-        </View>
+        </ScrollView>
       </ImageBackground>
 
       <Modal
@@ -90,7 +103,7 @@ export default function MovieDetailsScreen({ movie, onBack }) {
             </TouchableOpacity>
 
             <Text style={styles.playerTitle} numberOfLines={1}>
-              {movie.name}
+              {movie.name || "Filme"}
             </Text>
           </View>
 
@@ -114,6 +127,7 @@ export default function MovieDetailsScreen({ movie, onBack }) {
                 setStatusText(msg);
               }}
             />
+
             {!!statusText && (
               <View style={styles.statusOverlay}>
                 <Text style={styles.statusText}>{statusText}</Text>
@@ -121,15 +135,15 @@ export default function MovieDetailsScreen({ movie, onBack }) {
             )}
           </View>
 
-          <View style={styles.playerInfo}>
-            <Text style={styles.playerInfoTitle}>{movie.name}</Text>
+          <ScrollView style={styles.playerInfo}>
+            <Text style={styles.playerInfoTitle}>{movie.name || "Filme"}</Text>
             <Text style={styles.playerInfoMeta}>
               {(movie.year || "-") + " • " + (movie.group || "Filmes")}
             </Text>
             <Text style={styles.playerInfoDesc}>
               {movie.description || "Sem descrição na lista."}
             </Text>
-          </View>
+          </ScrollView>
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -147,7 +161,11 @@ const styles = StyleSheet.create({
   },
 
   bgImage: {
-    opacity: 0.22,
+    opacity: 0.20,
+  },
+
+  scrollContent: {
+    flexGrow: 1,
   },
 
   backBtn: {
@@ -167,36 +185,37 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: isPhone ? "column" : "row",
     alignItems: isPhone ? "flex-start" : "center",
-    paddingHorizontal: isPhone ? 20 : 70,
-    paddingTop: isPhone ? 70 : 0,
-    backgroundColor: "rgba(10,8,16,0.58)",
+    paddingHorizontal: isPhone ? 18 : 60,
+    paddingTop: isPhone ? 60 : 40,
+    paddingBottom: 24,
+    backgroundColor: "rgba(10,8,16,0.62)",
   },
 
   poster: {
-    width: isPhone ? 140 : 200,
-    height: isPhone ? 210 : 300,
+    width: isPhone ? 130 : 200,
+    height: isPhone ? 190 : 300,
     borderRadius: 12,
     backgroundColor: "#26354b",
   },
 
   infoWrap: {
     flex: 1,
-    marginLeft: isPhone ? 0 : 28,
-    marginTop: isPhone ? 20 : 0,
+    marginLeft: isPhone ? 0 : 24,
+    marginTop: isPhone ? 18 : 0,
     width: "100%",
     backgroundColor: "rgba(60,36,72,0.55)",
-    padding: 20,
+    padding: isPhone ? 16 : 20,
     borderRadius: 14,
   },
 
   actionBar: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 18,
+    marginBottom: 16,
   },
 
   actionBtn: {
-    height: 42,
+    height: isPhone ? 40 : 46,
     paddingHorizontal: 18,
     backgroundColor: "rgba(255,255,255,0.08)",
     justifyContent: "center",
@@ -210,37 +229,36 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  iconBtn: {
-    width: 42,
-    height: 42,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderRadius: 10,
-  },
-
-  iconBtnText: {
-    color: "#fff",
-    fontSize: 20,
-  },
-
   title: {
     color: "#fff",
-    fontSize: isPhone ? 24 : 36,
+    fontSize: isPhone ? 22 : 34,
     fontWeight: "900",
   },
 
   meta: {
     color: "#d9d0de",
-    fontSize: isPhone ? 12 : 16,
+    fontSize: isPhone ? 11 : 16,
     marginTop: 8,
+  },
+
+  label: {
+    color: "#38d7ff",
+    fontSize: isPhone ? 11 : 14,
+    fontWeight: "800",
+    marginTop: 18,
+    marginBottom: 6,
   },
 
   desc: {
     color: "#f1edf4",
     fontSize: isPhone ? 12 : 16,
-    marginTop: 18,
-    lineHeight: isPhone ? 18 : 25,
+    lineHeight: isPhone ? 18 : 24,
+  },
+
+  urlText: {
+    color: "#d6e6ff",
+    fontSize: isPhone ? 10 : 13,
+    lineHeight: isPhone ? 15 : 19,
   },
 
   playerScreen: {
@@ -259,14 +277,14 @@ const styles = StyleSheet.create({
 
   playerBackBtn: {
     paddingVertical: 8,
-    paddingHorizontal: 10,
-    backgroundColor: "#102033",
+    paddingHorizontal: 12,
     borderRadius: 8,
+    backgroundColor: "#102033",
   },
 
   playerBackText: {
     color: "#38d7ff",
-    fontWeight: "800",
+    fontWeight: "900",
     fontSize: 12,
   },
 
@@ -280,9 +298,8 @@ const styles = StyleSheet.create({
 
   playerBox: {
     width: "100%",
-    height: isPhone ? height * 0.34 : height * 0.55,
+    height: height * 0.42,
     backgroundColor: "#000",
-    position: "relative",
   },
 
   video: {
@@ -292,20 +309,21 @@ const styles = StyleSheet.create({
   },
 
   statusOverlay: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    padding: 10,
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: "rgba(0,0,0,0.45)",
+    paddingHorizontal: 20,
   },
 
   statusText: {
     color: "#fff",
-    fontSize: 12,
+    textAlign: "center",
+    fontSize: isPhone ? 11 : 14,
   },
 
   playerInfo: {
+    flex: 1,
     padding: 14,
   },
 
@@ -313,18 +331,18 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: isPhone ? 18 : 24,
     fontWeight: "900",
-    marginBottom: 6,
-  },
-
-  playerInfoMeta: {
-    color: "#c7d2df",
-    fontSize: isPhone ? 11 : 14,
     marginBottom: 8,
   },
 
+  playerInfoMeta: {
+    color: "#cfd8e3",
+    fontSize: isPhone ? 11 : 14,
+    marginBottom: 14,
+  },
+
   playerInfoDesc: {
-    color: "#e7edf5",
+    color: "#e9edf2",
     fontSize: isPhone ? 12 : 15,
-    lineHeight: isPhone ? 18 : 22,
+    lineHeight: isPhone ? 18 : 23,
   },
 });
