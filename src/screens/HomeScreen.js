@@ -7,9 +7,10 @@ import {
   StyleSheet,
   Dimensions,
   ImageBackground,
+  Image,
 } from "react-native";
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 const isPhone = width < 900;
 
 export default function HomeScreen({
@@ -141,8 +142,20 @@ export default function HomeScreen({
               style={styles.hero}
               imageStyle={styles.heroImage}
             >
-              <View style={styles.heroOverlay}>
-                <View style={styles.heroInfoBox}>
+              <View style={styles.heroShade} />
+
+              <View style={styles.heroContent}>
+                <View style={styles.posterBox}>
+                  {item?.logo ? (
+                    <Image source={{ uri: item.logo }} style={styles.poster} />
+                  ) : (
+                    <View style={styles.posterFallback}>
+                      <Text style={styles.posterFallbackText}>MUNDO PLAY TV</Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.infoBox}>
                   <Text style={styles.heroType}>
                     {item?.mediaType === "series" ? "SÉRIE" : "FILME"}
                   </Text>
@@ -249,22 +262,57 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     overflow: "hidden",
     backgroundColor: "#0c2133",
+    justifyContent: "center",
   },
 
   heroImage: {
-    opacity: 0.78,
+    opacity: 0.96,
   },
 
-  heroOverlay: {
+  heroShade: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.30)",
+  },
+
+  heroContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: isPhone ? 18 : 30,
+    paddingVertical: isPhone ? 18 : 30,
+  },
+
+  posterBox: {
+    width: isPhone ? 120 : 180,
+    marginRight: isPhone ? 16 : 24,
+  },
+
+  poster: {
+    width: "100%",
+    aspectRatio: 0.68,
+    borderRadius: 14,
+    backgroundColor: "#1f2c3f",
+  },
+
+  posterFallback: {
+    width: "100%",
+    aspectRatio: 0.68,
+    borderRadius: 14,
+    backgroundColor: "#132235",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 10,
+  },
+
+  posterFallbackText: {
+    color: "#38d7ff",
+    fontWeight: "900",
+    textAlign: "center",
+    fontSize: isPhone ? 12 : 16,
+  },
+
+  infoBox: {
     flex: 1,
-    justifyContent: "flex-end",
-    padding: isPhone ? 18 : 28,
-    backgroundColor: "rgba(4,13,22,0.18)",
-  },
-
-  heroInfoBox: {
-    width: isPhone ? "92%" : "62%",
-    backgroundColor: "rgba(8,14,24,0.38)",
+    backgroundColor: "rgba(18,22,34,0.38)",
     borderRadius: 18,
     padding: isPhone ? 16 : 22,
   },
@@ -283,27 +331,27 @@ const styles = StyleSheet.create({
   },
 
   heroMeta: {
-    color: "#d4dde7",
+    color: "#e3e8ed",
     fontSize: isPhone ? 11 : 15,
     marginTop: 8,
   },
 
   heroDesc: {
-    color: "#f3f7fb",
-    fontSize: isPhone ? 12 : 16,
-    lineHeight: isPhone ? 18 : 24,
-    marginTop: 12,
+    color: "#ffffff",
+    fontSize: isPhone ? 13 : 17,
+    lineHeight: isPhone ? 20 : 25,
+    marginTop: 14,
   },
 
   heroAction: {
     alignSelf: "flex-start",
-    marginTop: 16,
-    backgroundColor: "rgba(56,215,255,0.16)",
+    marginTop: 18,
+    backgroundColor: "rgba(56,215,255,0.18)",
     borderWidth: 1,
     borderColor: "#38d7ff",
     borderRadius: 10,
     paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
   },
 
   heroActionText: {
@@ -312,4 +360,3 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 });
-
