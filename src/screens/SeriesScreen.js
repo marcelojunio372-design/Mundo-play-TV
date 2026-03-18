@@ -42,10 +42,7 @@ function buildCategories(items = [], favorites = [], recents = []) {
     { name: "Visto por último", items: recents },
     ...Object.keys(groups)
       .sort((a, b) => a.localeCompare(b))
-      .map((group) => ({
-        name: group,
-        items: groups[group],
-      })),
+      .map((group) => ({ name: group, items: groups[group] })),
   ];
 }
 
@@ -72,8 +69,13 @@ export default function SeriesScreen({
           AsyncStorage.getItem(RECENTS_KEY),
         ]);
 
-        if (savedFavorites) setFavoriteIds(JSON.parse(savedFavorites));
-        if (savedRecents) setRecentIds(JSON.parse(savedRecents));
+        if (savedFavorites) {
+          setFavoriteIds(JSON.parse(savedFavorites));
+        }
+
+        if (savedRecents) {
+          setRecentIds(JSON.parse(savedRecents));
+        }
       } catch (e) {}
     }
 
@@ -81,14 +83,12 @@ export default function SeriesScreen({
   }, []);
 
   const favoriteSeries = useMemo(() => {
-    const setFav = new Set(favoriteIds);
-    return series.filter((item) =>
-      setFav.has(getSeriesStorageId(item))
-    );
+    const favoriteSet = new Set(favoriteIds);
+    return series.filter((item) => favoriteSet.has(getSeriesStorageId(item)));
   }, [series, favoriteIds]);
 
   const recentSeries = useMemo(() => {
-    const map = new Map(series.map((i) => [getSeriesStorageId(i), i]));
+    const map = new Map(series.map((item) => [getSeriesStorageId(item), item]));
     return recentIds.map((id) => map.get(id)).filter(Boolean);
   }, [series, recentIds]);
 
@@ -105,38 +105,33 @@ export default function SeriesScreen({
     return baseSeries.filter((item) => {
       const name = safeText(item.name).toLowerCase();
       const group = safeText(item.group).toLowerCase();
-      return name.includes(term) || group.includes(term);
+      const year = safeText(item.year).toLowerCase();
+      return (
+        name.includes(term) ||
+        group.includes(term) ||
+        year.includes(term)
+      );
     });
   }, [baseSeries, search]);
 
-  const addToRecent = async (item) => {
-    const id = getSeriesStorageId(item);
+  const persistRecents = async (ids) => {
+    try {
+      await AsyncStorage.setItem(RECENTS_KEY, JSON.stringify(ids));
+    } catch (e) {}
+  };
+
+  const addToRecent = async (serie) => {
+    const id = getSeriesStorageId(serie);
     if (!id) return;
 
-    const updated = [id, ...recentIds.filter((i) => i !== id)].slice(0, 50);
+    const updated = [id, ...recentIds.filter((item) => item !== id)].slice(0, 30);
     setRecentIds(updated);
-    await AsyncStorage.setItem(RECENTS_KEY, JSON.stringify(updated));
+    await persistRecents(updated);
   };
 
-  const toggleFavorite = async (item) => {
-    const id = getSeriesStorageId(item);
-    if (!id) return;
-
-    let updated = [];
-
-    if (favoriteIds.includes(id)) {
-      updated = favoriteIds.filter((i) => i !== id);
-    } else {
-      updated = [id, ...favoriteIds];
-    }
-
-    setFavoriteIds(updated);
-    await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
-  };
-
-  const handleSelect = async (item) => {
-    await addToRecent(item);
-    onSelectSeries?.(item);
+  const handleSelectSeries = async (serie) => {
+    await addToRecent(serie);
+    onSelectSeries?.(serie);
   };
 
   return (
@@ -177,19 +172,43 @@ export default function SeriesScreen({
 
       <View style={styles.content}>
         <View style={styles.leftPanel}>
+          <View style={styles.leftHeader}>
+            <Text style={styles.leftIcon}>🎬</Text>
+            <Text style={styles.leftTitle}>voltar</Text>
+          </View>
+
           <FlatList
             data={categories}
-            keyExtractor={(item, i) => `${item.name}_${i}`}
+            keyExtractor={(item, index) => `${item.name}_${index}`}
             renderItem={({ item, index }) => {
               const active = index === selectedCategory;
 
               return (
                 <TouchableOpacity
                   style={[styles.categoryRow, active && styles.categoryActive]}
-                  onPress={() => setSelectedCategory(index)}
+                  onPress={() => {
+                    setSelectedCategory(index);
+                    setSearch("");
+                  }}
                 >
-                  <Text style={styles.categoryText}>{item.name}</Text>
-                  <Text style={styles.categoryCount}>{item.items.length}</Text>
+                  <Text
+                    style={[
+                      styles.categoryText,
+                      active && styles.categoryTextActive,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {item.name}
+                  </Text>
+
+                  <Text
+                    style={[
+                      styles.categoryCount,
+                      active && styles.categoryTextActive,
+                    ]}
+                  >
+                    {item.items.length}
+                  </Text>
                 </TouchableOpacity>
               );
             }}
@@ -197,45 +216,44 @@ export default function SeriesScreen({
         </View>
 
         <View style={styles.rightPanel}>
+          <Text style={styles.totalLabel}>
+            {categories[selectedCategory]?.name || "Tudo"} ({visibleSeries.length})
+          </Text>
+
           <FlatList
             data={visibleSeries}
-
-            // 🔥 ZOOM CORRIGIDO
-            numColumns={isPhone ? 2 : 5}
-
-            keyExtractor={(item, i) => item.id || `${item.name}_${i}`}
+            keyExtractor={(item, index) => item.id || `${item.name}_${index}`}
+            numColumns={isPhone ? 3 : 5}
             columnWrapperStyle={styles.rowWrap}
             renderItem={({ item }) => {
               const favorite = favoriteIds.includes(getSeriesStorageId(item));
 
               return (
-                <View style={styles.card}>
-                  <TouchableOpacity
-                    style={styles.favoriteBtn}
-                    onPress={() => toggleFavorite(item)}
-                  >
-                    <Text style={styles.favoriteBtnText}>
-                      {favorite ? "★" : "☆"}
-                    </Text>
-                  </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.card}
+                  onPress={() => handleSelectSeries(item)}
+                >
+                  <Image
+                    source={item.logo ? { uri: item.logo } : undefined}
+                    style={styles.poster}
+                  />
 
-                  <TouchableOpacity onPress={() => handleSelect(item)}>
-                    <Image
-                      source={item.logo ? { uri: item.logo } : undefined}
-                      style={styles.poster}
-                    />
+                  <Text style={styles.cardTitle} numberOfLines={2}>
+                    {favorite ? "★ " : ""}
+                    {item.name}
+                  </Text>
 
-                    <Text style={styles.cardTitle} numberOfLines={2}>
-                      {item.name}
-                    </Text>
-
-                    <Text style={styles.cardMeta}>
-                      {item.group || "Séries"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                  <Text style={styles.cardMeta} numberOfLines={1}>
+                    {(item.year || "-") + " • " + (item.group || "Séries")}
+                  </Text>
+                </TouchableOpacity>
               );
             }}
+            ListEmptyComponent={
+              <View style={styles.emptyWrap}>
+                <Text style={styles.emptyText}>Nenhuma série encontrada</Text>
+              </View>
+            }
           />
         </View>
       </View>
@@ -244,16 +262,24 @@ export default function SeriesScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#040914" },
+  container: {
+    flex: 1,
+    backgroundColor: "#040914",
+  },
 
   topnav: {
     height: isPhone ? 42 : 58,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.1)",
   },
 
-  navText: { color: "#d7d7d7", fontSize: isPhone ? 11 : 16 },
+  navText: {
+    color: "#d7d7d7",
+    fontSize: isPhone ? 11 : 16,
+  },
 
   navTextActive: {
     color: "#ffe04f",
@@ -261,60 +287,137 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 
-  sep: { color: "#ccc", marginHorizontal: 12 },
+  sep: {
+    color: "#ccc",
+    marginHorizontal: 12,
+  },
 
-  searchWrap: { marginLeft: "auto", width: isPhone ? 100 : 190 },
+  searchWrap: {
+    marginLeft: "auto",
+    width: isPhone ? 100 : 190,
+  },
 
   searchInput: {
-    height: 30,
+    height: isPhone ? 30 : 36,
+    borderRadius: 8,
     backgroundColor: "#151d3d",
     color: "#fff",
     paddingHorizontal: 10,
+    fontSize: isPhone ? 9 : 12,
   },
 
-  content: { flex: 1, flexDirection: "row" },
+  content: {
+    flex: 1,
+    flexDirection: "row",
+  },
 
-  leftPanel: { width: isPhone ? 120 : 260, backgroundColor: "#261425" },
+  leftPanel: {
+    width: isPhone ? 108 : 260,
+    backgroundColor: "#261425",
+    borderRightWidth: 1,
+    borderRightColor: "rgba(255,255,255,0.1)",
+  },
+
+  leftHeader: {
+    height: isPhone ? 58 : 110,
+    justifyContent: "center",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.08)",
+  },
+
+  leftIcon: {
+    color: "#fff",
+    fontSize: isPhone ? 22 : 50,
+    marginBottom: 4,
+  },
+
+  leftTitle: {
+    color: "#fff",
+    fontSize: isPhone ? 9 : 14,
+  },
 
   categoryRow: {
-    minHeight: 40,
-    paddingHorizontal: 12,
+    minHeight: isPhone ? 32 : 50,
+    paddingHorizontal: isPhone ? 8 : 12,
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.08)",
   },
 
-  categoryActive: { backgroundColor: "rgba(255,224,79,0.12)" },
+  categoryActive: {
+    backgroundColor: "rgba(255,224,79,0.12)",
+  },
 
-  categoryText: { color: "#fff" },
-  categoryCount: { color: "#fff" },
+  categoryText: {
+    color: "#f4f4f4",
+    fontSize: isPhone ? 8 : 13,
+    flex: 1,
+    marginRight: 8,
+  },
 
-  rightPanel: { flex: 1, padding: 10 },
+  categoryTextActive: {
+    color: "#ffe04f",
+    fontWeight: "900",
+  },
 
-  rowWrap: { justifyContent: "space-between" },
+  categoryCount: {
+    color: "#f4f4f4",
+    fontSize: isPhone ? 8 : 13,
+  },
 
-  // 🔥 TAMANHO MAIOR
+  rightPanel: {
+    flex: 1,
+    padding: isPhone ? 8 : 10,
+  },
+
+  totalLabel: {
+    color: "#d9d9d9",
+    textAlign: "right",
+    fontSize: isPhone ? 10 : 18,
+    marginBottom: 8,
+  },
+
+  rowWrap: {
+    justifyContent: "space-between",
+    marginBottom: isPhone ? 8 : 10,
+  },
+
   card: {
-    width: isPhone ? "48%" : "18.6%",
-    marginBottom: 10,
+    width: isPhone ? "31.5%" : "18.6%",
+    marginBottom: isPhone ? 8 : 12,
   },
-
-  favoriteBtn: {
-    position: "absolute",
-    top: 6,
-    right: 6,
-    zIndex: 5,
-  },
-
-  favoriteBtnText: { color: "#ffe04f", fontSize: 16 },
 
   poster: {
     width: "100%",
     aspectRatio: 0.7,
     borderRadius: 8,
-    marginBottom: 6,
+    backgroundColor: "#2a3550",
+    marginBottom: 5,
   },
 
-  cardTitle: { color: "#fff", fontSize: 12 },
+  cardTitle: {
+    color: "#f0f0f0",
+    fontSize: isPhone ? 8.5 : 12,
+    fontWeight: "700",
+    lineHeight: isPhone ? 11 : 16,
+  },
 
-  cardMeta: { color: "#aaa", fontSize: 10 },
+  cardMeta: {
+    color: "#c9d3df",
+    fontSize: isPhone ? 7 : 10,
+    marginTop: 2,
+  },
+
+  emptyWrap: {
+    paddingVertical: 20,
+  },
+
+  emptyText: {
+    color: "#cfd7e2",
+    fontSize: isPhone ? 10 : 13,
+    textAlign: "center",
+  },
 });

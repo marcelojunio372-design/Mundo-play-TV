@@ -22,25 +22,19 @@ import {
 const { width, height } = Dimensions.get("window");
 const isPhone = width < 900;
 
-const FAVORITES_KEY = "live_favorites";
-const RECENTS_KEY = "live_recents";
+const FAVORITES_KEY = "mundoplaytv_live_favorites";
+const RECENTS_KEY = "mundoplaytv_live_recents";
 
 function safeText(value) {
   if (value === null || value === undefined) return "";
   return String(value).trim();
 }
 
-function getChannelStorageId(channel) {
-  if (!channel) return "";
-  return (
-    safeText(channel.id) ||
-    `${safeText(channel.name)}__${safeText(channel.group)}__${safeText(
-      channel.url
-    )}`
-  );
+function getChannelStorageId(item = {}) {
+  return safeText(item.id || item.url || item.name);
 }
 
-function buildCategories(channels = [], favoriteChannels = [], recentChannels = []) {
+function buildCategories(channels = [], favorites = [], recents = []) {
   const groups = {};
 
   channels.forEach((item) => {
@@ -51,8 +45,8 @@ function buildCategories(channels = [], favoriteChannels = [], recentChannels = 
 
   return [
     { name: "Tudo", items: channels },
-    { name: "Favoritos", items: favoriteChannels },
-    { name: "Visto por último", items: recentChannels },
+    { name: "Favoritos", items: favorites },
+    { name: "Visto por último", items: recents },
     ...Object.keys(groups)
       .sort((a, b) => a.localeCompare(b))
       .map((group) => ({
@@ -73,6 +67,7 @@ export default function LiveTVScreen({
 
   const [favoriteIds, setFavoriteIds] = useState([]);
   const [recentIds, setRecentIds] = useState([]);
+
   const [selectedCategory, setSelectedCategory] = useState(0);
   const [selectedChannelIndex, setSelectedChannelIndex] = useState(0);
   const [search, setSearch] = useState("");
@@ -111,7 +106,6 @@ export default function LiveTVScreen({
       try {
         setEpgLoading(true);
         const data = await loadEPG();
-
         if (active) {
           setEpgItems(Array.isArray(data) ? data : []);
         }
@@ -135,15 +129,11 @@ export default function LiveTVScreen({
 
   const favoriteChannels = useMemo(() => {
     const favoriteSet = new Set(favoriteIds);
-    return channels.filter((item) =>
-      favoriteSet.has(getChannelStorageId(item))
-    );
+    return channels.filter((item) => favoriteSet.has(getChannelStorageId(item)));
   }, [channels, favoriteIds]);
 
   const recentChannels = useMemo(() => {
-    const map = new Map(
-      channels.map((item) => [getChannelStorageId(item), item])
-    );
+    const map = new Map(channels.map((item) => [getChannelStorageId(item), item]));
     return recentIds.map((id) => map.get(id)).filter(Boolean);
   }, [channels, recentIds]);
 
@@ -155,7 +145,6 @@ export default function LiveTVScreen({
 
   const visibleChannels = useMemo(() => {
     const term = safeText(search).toLowerCase();
-
     if (!term) return baseChannels;
 
     return baseChannels.filter((item) => {
@@ -205,7 +194,7 @@ export default function LiveTVScreen({
     const id = getChannelStorageId(channel);
     if (!id) return;
 
-    const updated = [id, ...recentIds.filter((item) => item !== id)].slice(0, 50);
+    const updated = [id, ...recentIds.filter((item) => item !== id)].slice(0, 30);
     setRecentIds(updated);
     await persistRecents(updated);
   };
@@ -407,15 +396,24 @@ export default function LiveTVScreen({
               <Text style={styles.actionBtnText}>PLAY</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionBtnSmall} onPress={handlePause}>
+            <TouchableOpacity
+              style={styles.actionBtnSmall}
+              onPress={handlePause}
+            >
               <Text style={styles.actionBtnText}>PAUSE</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionBtnSmall} onPress={openFullscreen}>
+            <TouchableOpacity
+              style={styles.actionBtnSmall}
+              onPress={openFullscreen}
+            >
               <Text style={styles.actionBtnText}>FULL</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionBtnSmall} onPress={toggleFavorite}>
+            <TouchableOpacity
+              style={styles.actionBtnSmall}
+              onPress={toggleFavorite}
+            >
               <Text style={styles.actionBtnText}>
                 {isFavorite ? "★ FAVORITO" : "☆ FAVORITAR"}
               </Text>
@@ -690,18 +688,6 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
 
-  emptyList: {
-    paddingVertical: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  emptyListText: {
-    color: "#cfd8e3",
-    fontSize: isPhone ? 9 : 12,
-    textAlign: "center",
-  },
-
   rightPanel: {
     flex: 1,
     backgroundColor: "#0b1338",
@@ -824,6 +810,15 @@ const styles = StyleSheet.create({
     color: "#c4d1df",
     fontSize: isPhone ? 8 : 10,
     marginTop: 4,
+  },
+
+  emptyList: {
+    padding: 16,
+  },
+
+  emptyListText: {
+    color: "#c8d4e2",
+    fontSize: isPhone ? 9 : 12,
   },
 
   fullscreenContainer: {
