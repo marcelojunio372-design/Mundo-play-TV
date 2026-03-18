@@ -18,8 +18,8 @@ function parseXmltvDate(value = "") {
   if (!match) return null;
 
   const [, year, month, day, hour, minute, second, tz] = match;
-
   const isoBase = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
+
   if (!tz) return new Date(isoBase);
 
   const offset = `${tz.slice(0, 3)}:${tz.slice(3)}`;
@@ -40,6 +40,16 @@ function extractTag(block = "", tag = "") {
   return match ? decodeXml(match[1].trim()) : "";
 }
 
+function cleanChannelName(name = "") {
+  return String(name || "")
+    .toLowerCase()
+    .replace(/\b(fhd|hd|sd|uhd|4k)\b/gi, "")
+    .replace(/\btv\b/gi, "")
+    .replace(/\bchannel\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function extractProgrammes(xml = "") {
   const programmes = [];
   const regex =
@@ -52,9 +62,12 @@ function extractProgrammes(xml = "") {
     const channel = decodeXml(match[3] || "").trim();
     const body = match[4] || "";
 
+    const clean = cleanChannelName(channel);
+
     programmes.push({
       channel,
       channelKey: normalizeText(channel),
+      cleanChannelKey: normalizeText(clean),
       start,
       stop,
       title: extractTag(body, "title"),
@@ -86,17 +99,23 @@ export async function loadEPG() {
 export function findNowAndNextForChannel(epgItems = [], channelName = "") {
   const now = new Date();
   const channelKey = normalizeText(channelName);
+  const cleanChannelKey = normalizeText(cleanChannelName(channelName));
 
-  if (!channelKey || !epgItems?.length) {
+  if ((!channelKey && !cleanChannelKey) || !epgItems?.length) {
     return { nowProgram: null, nextProgram: null };
   }
 
   const matches = epgItems.filter((item) => {
-    if (!item?.channelKey) return false;
+    const a = item?.channelKey || "";
+    const b = item?.cleanChannelKey || "";
 
     return (
-      item.channelKey.includes(channelKey) ||
-      channelKey.includes(item.channelKey)
+      a.includes(channelKey) ||
+      channelKey.includes(a) ||
+      b.includes(cleanChannelKey) ||
+      cleanChannelKey.includes(b) ||
+      a.includes(cleanChannelKey) ||
+      channelKey.includes(b)
     );
   });
 

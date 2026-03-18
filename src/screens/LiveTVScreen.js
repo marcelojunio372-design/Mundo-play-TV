@@ -11,6 +11,7 @@ import {
   Modal,
   StatusBar,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Video, ResizeMode } from "expo-av";
 import {
   loadEPG,
@@ -21,18 +22,31 @@ import {
 const { width, height } = Dimensions.get("window");
 const isPhone = width < 900;
 
-function buildCategories(channels = []) {
+const FAVORITES_KEY = "mundoplaytv_live_favorites";
+const RECENTS_KEY = "mundoplaytv_live_recents";
+
+function safeText(value) {
+  if (value === null || value === undefined) return "";
+  return String(value).trim();
+}
+
+function getChannelStorageId(item = {}) {
+  return safeText(item.id || item.url || item.name);
+}
+
+function buildCategories(channels = [], favorites = [], recents = []) {
   const groups = {};
 
   channels.forEach((item) => {
-    const key = String(item.group || "OUTROS").trim();
+    const key = safeText(item.group || "OUTROS");
     if (!groups[key]) groups[key] = [];
     groups[key].push(item);
   });
 
   return [
     { name: "Tudo", items: channels },
-    { name: "Favoritos", items: [] },
+    { name: "Favoritos", items: favorites },
+    { name: "Visto por último", items: recents },
     ...Object.keys(groups)
       .sort((a, b) => a.localeCompare(b))
       .map((group) => ({
@@ -50,7 +64,9 @@ export default function LiveTVScreen({
   onOpenSeries,
 }) {
   const channels = session?.data?.live || [];
-  const categories = useMemo(() => buildCategories(channels), [channels]);
+
+  const [favoriteIds, setFavoriteIds] = useState([]);
+  const [recentIds, setRecentIds] = useState([]);
 
   const [selectedCategory, setSelectedCategory] = useState(0);
   const [selectedChannelIndex, setSelectedChannelIndex] = useState(0);
@@ -63,14 +79,44 @@ export default function LiveTVScreen({
   const fullscreenVideoRef = useRef(null);
 
   useEffect(() => {
+    async function loadSavedData() {
+      try {
+        const [savedFavorites, savedRecents] = await Promise.all([
+          AsyncStorage.getItem(FAVORITES_KEY),
+          AsyncStorage.getItem(RECENTS_KEY),
+        ]);
+
+        if (savedFavorites) {
+          setFavoriteIds(JSON.parse(savedFavorites));
+        }
+
+        if (savedRecents) {
+          setRecentIds(JSON.parse(savedRecents));
+        }
+      } catch (e) {}
+    }
+
+    loadSavedData();
+  }, []);
+
+  useEffect(() => {
     let active = true;
 
     async function fetchEPG() {
-      setEpgLoading(true);
-      const data = await loadEPG();
-      if (active) {
-        setEpgItems(data);
-        setEpgLoading(false);
+      try {
+        setEpgLoading(true);
+        const data = await loadEPG();
+        if (active) {
+          setEpgItems(Array.isArray(data) ? data : []);
+        }
+      } catch (e) {
+        if (active) {
+          setEpgItems([]);
+        }
+      } finally {
+        if (active) {
+          setEpgLoading(false);
+        }
       }
     }
 
@@ -81,20 +127,92 @@ export default function LiveTVScreen({
     };
   }, []);
 
+  const favoriteChannels = useMemo(() => {
+    const favoriteSet = new Set(favoriteIds);
+    return channels.filter((item) => favoriteSet.has(getChannelStorageId(item)));
+  }, [channels, favoriteIds]);
+
+  const recentChannels = useMemo(() => {
+    const map = new Map(channels.map((item) => [getChannelStorageId(item), item]));
+    return recentIds.map((id) => map.get(id)).filter(Boolean);
+  }, [channels, recentIds]);
+
+  const categories = useMemo(() => {
+    return buildCategories(channels, favoriteChannels, recentChannels);
+  }, [channels, favoriteChannels, recentChannels]);
+
   const baseChannels = categories[selectedCategory]?.items || channels;
 
-  const visibleChannels = baseChannels.filter((item) =>
-    String(item.name || "")
-      .toLowerCase()
-      .includes(search.toLowerCase())
-  );
+  const visibleChannels = useMemo(() => {
+    const term = safeText(search).toLowerCase();
+    if (!term) return baseChannels;
+
+    return baseChannels.filter((item) => {
+      const name = safeText(item.name).toLowerCase();
+      const group = safeText(item.group).toLowerCase();
+      return name.includes(term) || group.includes(term);
+    });
+  }, [baseChannels, search]);
 
   const selectedChannel =
     visibleChannels[selectedChannelIndex] || visibleChannels[0] || null;
 
+  const selectedChannelId = getChannelStorageId(selectedChannel);
+
+  const isFavorite = useMemo(() => {
+    return favoriteIds.includes(selectedChannelId);
+  }, [favoriteIds, selectedChannelId]);
+
   const { nowProgram, nextProgram } = useMemo(() => {
-    return findNowAndNextForChannel(epgItems, selectedChannel?.name || "");
+    if (!selectedChannel) {
+      return { nowProgram: null, nextProgram: null };
+    }
+
+    const cleanName = safeText(selectedChannel.name)
+      .replace(/\b(fhd|hd|sd|uhd|4k)\b/gi, "")
+      .replace(/\btv\b/gi, "")
+      .replace(/\bchannel\b/gi, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    return findNowAndNextForChannel(epgItems, cleanName);
   }, [epgItems, selectedChannel]);
+
+  const persistFavorites = async (ids) => {
+    try {
+      await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(ids));
+    } catch (e) {}
+  };
+
+  const persistRecents = async (ids) => {
+    try {
+      await AsyncStorage.setItem(RECENTS_KEY, JSON.stringify(ids));
+    } catch (e) {}
+  };
+
+  const addToRecent = async (channel) => {
+    const id = getChannelStorageId(channel);
+    if (!id) return;
+
+    const updated = [id, ...recentIds.filter((item) => item !== id)].slice(0, 30);
+    setRecentIds(updated);
+    await persistRecents(updated);
+  };
+
+  const toggleFavorite = async () => {
+    if (!selectedChannelId) return;
+
+    let updated = [];
+
+    if (favoriteIds.includes(selectedChannelId)) {
+      updated = favoriteIds.filter((id) => id !== selectedChannelId);
+    } else {
+      updated = [selectedChannelId, ...favoriteIds];
+    }
+
+    setFavoriteIds(updated);
+    await persistFavorites(updated);
+  };
 
   const handleSelectCategory = (index) => {
     setSelectedCategory(index);
@@ -102,12 +220,17 @@ export default function LiveTVScreen({
     setSearch("");
   };
 
-  const handleSelectChannel = (index) => {
+  const handleSelectChannel = async (index) => {
     setSelectedChannelIndex(index);
+    const item = visibleChannels[index];
+    if (item) {
+      await addToRecent(item);
+    }
   };
 
   const openFullscreen = async () => {
     if (!selectedChannel?.url) return;
+    await addToRecent(selectedChannel);
     setShowFullscreen(true);
   };
 
@@ -116,6 +239,19 @@ export default function LiveTVScreen({
       await fullscreenVideoRef.current?.stopAsync?.();
     } catch (e) {}
     setShowFullscreen(false);
+  };
+
+  const handlePlay = async () => {
+    try {
+      await addToRecent(selectedChannel);
+      await videoRef.current?.playAsync?.();
+    } catch (e) {}
+  };
+
+  const handlePause = async () => {
+    try {
+      await videoRef.current?.pauseAsync?.();
+    } catch (e) {}
   };
 
   return (
@@ -149,7 +285,7 @@ export default function LiveTVScreen({
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="buscar"
+            placeholder="Buscar canal..."
             placeholderTextColor="#94a7bb"
             style={styles.searchInput}
           />
@@ -163,6 +299,7 @@ export default function LiveTVScreen({
             keyExtractor={(item, index) => `${item.name}_${index}`}
             renderItem={({ item, index }) => {
               const active = index === selectedCategory;
+
               return (
                 <TouchableOpacity
                   style={[styles.categoryRow, active && styles.categoryActive]}
@@ -177,6 +314,7 @@ export default function LiveTVScreen({
                   >
                     {item.name}
                   </Text>
+
                   <Text
                     style={[
                       styles.categoryCount,
@@ -197,6 +335,7 @@ export default function LiveTVScreen({
             keyExtractor={(item, index) => item.id || `${item.name}_${index}`}
             renderItem={({ item, index }) => {
               const active = index === selectedChannelIndex;
+              const rowFavorite = favoriteIds.includes(getChannelStorageId(item));
 
               return (
                 <TouchableOpacity
@@ -215,6 +354,7 @@ export default function LiveTVScreen({
                       ]}
                       numberOfLines={1}
                     >
+                      {rowFavorite ? "★ " : ""}
                       {item.name || "Sem nome"}
                     </Text>
 
@@ -225,6 +365,11 @@ export default function LiveTVScreen({
                 </TouchableOpacity>
               );
             }}
+            ListEmptyComponent={
+              <View style={styles.emptyList}>
+                <Text style={styles.emptyListText}>Nenhum canal encontrado</Text>
+              </View>
+            }
           />
         </View>
 
@@ -237,23 +382,24 @@ export default function LiveTVScreen({
                 style={styles.previewVideo}
                 resizeMode={ResizeMode.CONTAIN}
                 useNativeControls
-                shouldPlay={false}
+                shouldPlay
               />
             ) : (
               <View style={styles.previewEmpty}>
-                <Text style={styles.previewEmptyText}>
-                  Selecione um canal
-                </Text>
+                <Text style={styles.previewEmptyText}>Selecione um canal</Text>
               </View>
             )}
           </View>
 
           <View style={styles.previewActions}>
-            <TouchableOpacity style={styles.actionBtnSmall}>
+            <TouchableOpacity style={styles.actionBtnSmall} onPress={handlePlay}>
               <Text style={styles.actionBtnText}>PLAY</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionBtnSmall}>
+            <TouchableOpacity
+              style={styles.actionBtnSmall}
+              onPress={handlePause}
+            >
               <Text style={styles.actionBtnText}>PAUSE</Text>
             </TouchableOpacity>
 
@@ -262,6 +408,15 @@ export default function LiveTVScreen({
               onPress={openFullscreen}
             >
               <Text style={styles.actionBtnText}>FULL</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionBtnSmall}
+              onPress={toggleFavorite}
+            >
+              <Text style={styles.actionBtnText}>
+                {isFavorite ? "★ FAVORITO" : "☆ FAVORITAR"}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -277,7 +432,9 @@ export default function LiveTVScreen({
                 </Text>
 
                 <Text style={styles.epgTitle} numberOfLines={2}>
-                  {nowProgram?.title || selectedChannel?.name || "Sem canal selecionado"}
+                  {nowProgram?.title ||
+                    selectedChannel?.name ||
+                    "Sem canal selecionado"}
                 </Text>
 
                 <Text style={styles.epgSub} numberOfLines={1}>
@@ -293,9 +450,11 @@ export default function LiveTVScreen({
 
                 <View style={styles.nextProgramBox}>
                   <Text style={styles.nextProgramLabel}>Próximo</Text>
+
                   <Text style={styles.nextProgramTitle} numberOfLines={2}>
                     {nextProgram?.title || "Sem próximo programa"}
                   </Text>
+
                   <Text style={styles.nextProgramTime} numberOfLines={1}>
                     {nextProgram ? formatProgramTime(nextProgram) : ""}
                   </Text>
@@ -336,8 +495,8 @@ export default function LiveTVScreen({
                 source={{ uri: selectedChannel.url }}
                 style={styles.fullscreenVideo}
                 resizeMode={ResizeMode.CONTAIN}
-                useNativeControls
                 shouldPlay
+                useNativeControls
               />
             ) : (
               <View style={styles.previewEmpty}>
@@ -348,17 +507,21 @@ export default function LiveTVScreen({
 
           <View style={styles.fullscreenEpg}>
             <Text style={styles.epgHeader}>EPG</Text>
+
             <Text style={styles.epgTime}>
               {nowProgram ? formatProgramTime(nowProgram) : "Ao vivo agora"}
             </Text>
+
             <Text style={styles.epgTitle} numberOfLines={2}>
               {nowProgram?.title || selectedChannel?.name || "Sem canal"}
             </Text>
+
             <Text style={styles.epgSub} numberOfLines={1}>
               {selectedChannel?.group
                 ? `Grupo: ${selectedChannel.group}`
                 : "Grupo: -"}
             </Text>
+
             <Text style={styles.epgDesc} numberOfLines={3}>
               {nowProgram?.desc ||
                 "Programação atual não encontrada para este canal."}
@@ -366,9 +529,11 @@ export default function LiveTVScreen({
 
             <View style={styles.nextProgramBox}>
               <Text style={styles.nextProgramLabel}>Próximo</Text>
+
               <Text style={styles.nextProgramTitle} numberOfLines={2}>
                 {nextProgram?.title || "Sem próximo programa"}
               </Text>
+
               <Text style={styles.nextProgramTime} numberOfLines={1}>
                 {nextProgram ? formatProgramTime(nextProgram) : ""}
               </Text>
@@ -415,7 +580,7 @@ const styles = StyleSheet.create({
 
   searchWrap: {
     marginLeft: "auto",
-    width: isPhone ? 90 : 180,
+    width: isPhone ? 100 : 180,
   },
 
   searchInput: {
@@ -558,6 +723,7 @@ const styles = StyleSheet.create({
 
   previewActions: {
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "flex-start",
     marginBottom: 8,
     gap: 8,
@@ -646,6 +812,15 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
+  emptyList: {
+    padding: 16,
+  },
+
+  emptyListText: {
+    color: "#c8d4e2",
+    fontSize: isPhone ? 9 : 12,
+  },
+
   fullscreenContainer: {
     flex: 1,
     backgroundColor: "#000",
@@ -684,7 +859,7 @@ const styles = StyleSheet.create({
 
   fullscreenVideoWrap: {
     width: "100%",
-    height: height * 0.62,
+    height: height * 0.72,
     backgroundColor: "#000",
   },
 

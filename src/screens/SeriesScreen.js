@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -8,23 +8,38 @@ import {
   FlatList,
   Dimensions,
   Image,
+  TextInput,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { width } = Dimensions.get("window");
 const isPhone = width < 900;
 
-function buildCategories(items) {
+const FAVORITES_KEY = "mundoplaytv_series_favorites";
+const RECENTS_KEY = "mundoplaytv_series_recents";
+
+function safeText(value) {
+  if (value === null || value === undefined) return "";
+  return String(value).trim();
+}
+
+function getSeriesStorageId(item = {}) {
+  return safeText(item.id || item.url || item.name);
+}
+
+function buildCategories(items = [], favorites = [], recents = []) {
   const groups = {};
+
   items.forEach((item) => {
-    const key = String(item.group || "OUTROS").trim();
+    const key = safeText(item.group || "OUTROS");
     if (!groups[key]) groups[key] = [];
     groups[key].push(item);
   });
 
   return [
     { name: "Tudo", items },
-    { name: "Favoritos", items: [] },
-    { name: "Visto por último", items: [] },
+    { name: "Favoritos", items: favorites },
+    { name: "Visto por último", items: recents },
     ...Object.keys(groups)
       .sort((a, b) => a.localeCompare(b))
       .map((group) => ({ name: group, items: groups[group] })),
@@ -40,10 +55,84 @@ export default function SeriesScreen({
   onSelectSeries,
 }) {
   const series = session?.data?.series || [];
-  const categories = useMemo(() => buildCategories(series), [series]);
-  const [selectedCategory, setSelectedCategory] = useState(0);
 
-  const visibleSeries = categories[selectedCategory]?.items || series;
+  const [favoriteIds, setFavoriteIds] = useState([]);
+  const [recentIds, setRecentIds] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(0);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    async function loadSavedData() {
+      try {
+        const [savedFavorites, savedRecents] = await Promise.all([
+          AsyncStorage.getItem(FAVORITES_KEY),
+          AsyncStorage.getItem(RECENTS_KEY),
+        ]);
+
+        if (savedFavorites) {
+          setFavoriteIds(JSON.parse(savedFavorites));
+        }
+
+        if (savedRecents) {
+          setRecentIds(JSON.parse(savedRecents));
+        }
+      } catch (e) {}
+    }
+
+    loadSavedData();
+  }, []);
+
+  const favoriteSeries = useMemo(() => {
+    const favoriteSet = new Set(favoriteIds);
+    return series.filter((item) => favoriteSet.has(getSeriesStorageId(item)));
+  }, [series, favoriteIds]);
+
+  const recentSeries = useMemo(() => {
+    const map = new Map(series.map((item) => [getSeriesStorageId(item), item]));
+    return recentIds.map((id) => map.get(id)).filter(Boolean);
+  }, [series, recentIds]);
+
+  const categories = useMemo(() => {
+    return buildCategories(series, favoriteSeries, recentSeries);
+  }, [series, favoriteSeries, recentSeries]);
+
+  const baseSeries = categories[selectedCategory]?.items || series;
+
+  const visibleSeries = useMemo(() => {
+    const term = safeText(search).toLowerCase();
+    if (!term) return baseSeries;
+
+    return baseSeries.filter((item) => {
+      const name = safeText(item.name).toLowerCase();
+      const group = safeText(item.group).toLowerCase();
+      const year = safeText(item.year).toLowerCase();
+      return (
+        name.includes(term) ||
+        group.includes(term) ||
+        year.includes(term)
+      );
+    });
+  }, [baseSeries, search]);
+
+  const persistRecents = async (ids) => {
+    try {
+      await AsyncStorage.setItem(RECENTS_KEY, JSON.stringify(ids));
+    } catch (e) {}
+  };
+
+  const addToRecent = async (serie) => {
+    const id = getSeriesStorageId(serie);
+    if (!id) return;
+
+    const updated = [id, ...recentIds.filter((item) => item !== id)].slice(0, 30);
+    setRecentIds(updated);
+    await persistRecents(updated);
+  };
+
+  const handleSelectSeries = async (serie) => {
+    await addToRecent(serie);
+    onSelectSeries?.(serie);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -69,6 +158,16 @@ export default function SeriesScreen({
         <TouchableOpacity onPress={onOpenSeries}>
           <Text style={styles.navTextActive}>Séries</Text>
         </TouchableOpacity>
+
+        <View style={styles.searchWrap}>
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Buscar série..."
+            placeholderTextColor="#9aa7b8"
+            style={styles.searchInput}
+          />
+        </View>
       </View>
 
       <View style={styles.content}>
@@ -83,10 +182,14 @@ export default function SeriesScreen({
             keyExtractor={(item, index) => `${item.name}_${index}`}
             renderItem={({ item, index }) => {
               const active = index === selectedCategory;
+
               return (
                 <TouchableOpacity
                   style={[styles.categoryRow, active && styles.categoryActive]}
-                  onPress={() => setSelectedCategory(index)}
+                  onPress={() => {
+                    setSelectedCategory(index);
+                    setSearch("");
+                  }}
                 >
                   <Text
                     style={[
@@ -122,29 +225,35 @@ export default function SeriesScreen({
             keyExtractor={(item, index) => item.id || `${item.name}_${index}`}
             numColumns={isPhone ? 3 : 5}
             columnWrapperStyle={styles.rowWrap}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.card}
-                onPress={() => onSelectSeries(item)}
-              >
-                <Image
-                  source={item.logo ? { uri: item.logo } : undefined}
-                  style={styles.poster}
-                />
+            renderItem={({ item }) => {
+              const favorite = favoriteIds.includes(getSeriesStorageId(item));
 
-                <Text style={styles.cardTitle} numberOfLines={2}>
-                  {item.name}
-                </Text>
+              return (
+                <TouchableOpacity
+                  style={styles.card}
+                  onPress={() => handleSelectSeries(item)}
+                >
+                  <Image
+                    source={item.logo ? { uri: item.logo } : undefined}
+                    style={styles.poster}
+                  />
 
-                <Text style={styles.cardMeta} numberOfLines={1}>
-                  {item.year || "-"}
-                </Text>
+                  <Text style={styles.cardTitle} numberOfLines={2}>
+                    {favorite ? "★ " : ""}
+                    {item.name}
+                  </Text>
 
-                <Text style={styles.cardGroup} numberOfLines={1}>
-                  {item.group || "Séries"}
-                </Text>
-              </TouchableOpacity>
-            )}
+                  <Text style={styles.cardMeta} numberOfLines={1}>
+                    {(item.year || "-") + " • " + (item.group || "Séries")}
+                  </Text>
+                </TouchableOpacity>
+              );
+            }}
+            ListEmptyComponent={
+              <View style={styles.emptyWrap}>
+                <Text style={styles.emptyText}>Nenhuma série encontrada</Text>
+              </View>
+            }
           />
         </View>
       </View>
@@ -181,6 +290,20 @@ const styles = StyleSheet.create({
   sep: {
     color: "#ccc",
     marginHorizontal: 12,
+  },
+
+  searchWrap: {
+    marginLeft: "auto",
+    width: isPhone ? 100 : 190,
+  },
+
+  searchInput: {
+    height: isPhone ? 30 : 36,
+    borderRadius: 8,
+    backgroundColor: "#151d3d",
+    color: "#fff",
+    paddingHorizontal: 10,
+    fontSize: isPhone ? 9 : 12,
   },
 
   content: {
@@ -288,9 +411,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  cardGroup: {
-    color: "#9fb1c7",
-    fontSize: isPhone ? 7 : 10,
-    marginTop: 1,
+  emptyWrap: {
+    paddingVertical: 20,
+  },
+
+  emptyText: {
+    color: "#cfd7e2",
+    fontSize: isPhone ? 10 : 13,
+    textAlign: "center",
   },
 });

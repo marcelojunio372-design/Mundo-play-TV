@@ -10,7 +10,7 @@ import {
   Image,
 } from "react-native";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 const isPhone = width < 900;
 
 export default function HomeScreen({
@@ -28,31 +28,17 @@ export default function HomeScreen({
   const series = session?.data?.series || [];
 
   const featured = useMemo(() => {
-    const movieItems = movies.slice(0, 5).map((item) => ({
+    const movieItems = movies.slice(0, 10).map((item) => ({
       ...item,
       mediaType: "movie",
     }));
 
-    const seriesItems = series.slice(0, 5).map((item) => ({
+    const seriesItems = series.slice(0, 10).map((item) => ({
       ...item,
       mediaType: "series",
     }));
 
-    const combined = [...movieItems, ...seriesItems];
-
-    if (combined.length > 0) return combined;
-
-    return [
-      {
-        id: "fallback_home",
-        name: "MUNDO PLAY TV",
-        description: "Lançamentos e destaques da sua lista.",
-        logo: "",
-        group: "Destaques",
-        year: "-",
-        mediaType: "movie",
-      },
-    ];
+    return [...movieItems, ...seriesItems];
   }, [movies, series]);
 
   const [index, setIndex] = useState(0);
@@ -67,123 +53,91 @@ export default function HomeScreen({
     return () => clearInterval(timer);
   }, [featured]);
 
-  const item = featured[index] || featured[0];
+  const item = featured[index] || featured[0] || null;
 
   const openFeatured = () => {
     if (!item) return;
 
     if (item.mediaType === "series") {
       onSelectSeries?.(item);
-      return;
+    } else {
+      onSelectMovie?.(item);
     }
-
-    onSelectMovie?.(item);
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topbar}>
-        <View>
-          <Text style={styles.brand}>MUNDO PLAY TV</Text>
-          <Text style={styles.subbrand}>IPTV Profissional</Text>
-        </View>
-
-        <View>
-          <Text style={styles.datetime}>
-            {new Date().toLocaleTimeString("pt-BR", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}{" "}
-            {new Date().toLocaleDateString("pt-BR")}
-          </Text>
-        </View>
+        <Text style={styles.brand}>MUNDO PLAY TV</Text>
+        <Text style={styles.datetime}>
+          {new Date().toLocaleTimeString("pt-BR")}
+        </Text>
       </View>
 
       <View style={styles.content}>
         <View style={styles.sidebar}>
-          <TouchableOpacity style={styles.sideBtn} onPress={onOpenLive}>
-            <Text style={styles.sideBtnText}>LIVE TV</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.sideBtn} onPress={onOpenMovies}>
-            <Text style={styles.sideBtnText}>FILMES</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.sideBtn} onPress={onOpenSeries}>
-            <Text style={styles.sideBtnText}>SÉRIES</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.sideBtn} onPress={onOpenSettings}>
-            <Text style={styles.sideBtnText}>CONFIG.</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.sideBtn}
-            onPress={async () => {
-              await onReload?.();
-            }}
-          >
-            <Text style={styles.sideBtnText}>RECARREGAR</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.sideBtn} onPress={onLogout}>
-            <Text style={styles.sideBtnText}>SAIR</Text>
-          </TouchableOpacity>
+          <Btn text="LIVE TV" onPress={onOpenLive} />
+          <Btn text="FILMES" onPress={onOpenMovies} />
+          <Btn text="SÉRIES" onPress={onOpenSeries} />
+          <Btn text="CONFIG." onPress={onOpenSettings} />
+          <Btn text="RECARREGAR" onPress={onReload} />
+          <Btn text="SAIR" onPress={onLogout} />
         </View>
 
-        <View style={styles.main}>
-          <TouchableOpacity
-            activeOpacity={0.92}
-            style={styles.heroTouch}
-            onPress={openFeatured}
+        <TouchableOpacity style={styles.main} onPress={openFeatured} activeOpacity={0.92}>
+          <ImageBackground
+            source={{
+              uri:
+                item?.cover ||
+                item?.backdrop ||
+                item?.fanart ||
+                item?.poster ||
+                item?.logo ||
+                "https://i.imgur.com/6Z8FQ0C.jpg",
+            }}
+            style={styles.hero}
+            imageStyle={styles.heroImage}
           >
-            <ImageBackground
-              source={item?.logo ? { uri: item.logo } : undefined}
-              style={styles.hero}
-              imageStyle={styles.heroImage}
-            >
-              <View style={styles.heroShade} />
+            <View style={styles.overlay} />
 
-              <View style={styles.heroContent}>
-                <View style={styles.posterBox}>
-                  {item?.logo ? (
-                    <Image source={{ uri: item.logo }} style={styles.poster} />
-                  ) : (
-                    <View style={styles.posterFallback}>
-                      <Text style={styles.posterFallbackText}>MUNDO PLAY TV</Text>
-                    </View>
-                  )}
-                </View>
+            <View style={styles.heroContent}>
+              <Image
+                source={{
+                  uri: item?.logo || item?.poster || item?.cover || "https://i.imgur.com/6Z8FQ0C.jpg",
+                }}
+                style={styles.poster}
+              />
 
-                <View style={styles.infoBox}>
-                  <Text style={styles.heroType}>
-                    {item?.mediaType === "series" ? "SÉRIE" : "FILME"}
-                  </Text>
+              <View style={styles.info}>
+                <Text style={styles.type}>
+                  {item?.mediaType === "series" ? "SÉRIE" : "FILME"}
+                </Text>
 
-                  <Text style={styles.heroTitle} numberOfLines={2}>
-                    {item?.name || "MUNDO PLAY TV"}
-                  </Text>
+                <Text style={styles.title} numberOfLines={2}>
+                  {item?.name || "MUNDO PLAY TV"}
+                </Text>
 
-                  <Text style={styles.heroMeta} numberOfLines={1}>
-                    {(item?.year || "-") + " • " + (item?.group || "Destaques")}
-                  </Text>
+                <Text style={styles.desc} numberOfLines={3}>
+                  {item?.description || "Conteúdo disponível"}
+                </Text>
 
-                  <Text style={styles.heroDesc} numberOfLines={4}>
-                    {item?.description || "Lançamentos e destaques da sua lista."}
-                  </Text>
-
-                  <View style={styles.heroAction}>
-                    <Text style={styles.heroActionText}>TOQUE PARA ABRIR</Text>
-                  </View>
+                <View style={styles.button}>
+                  <Text style={styles.buttonText}>TOQUE PARA ABRIR</Text>
                 </View>
               </View>
-            </ImageBackground>
-          </TouchableOpacity>
-        </View>
+            </View>
+          </ImageBackground>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 }
+
+const Btn = ({ text, onPress }) => (
+  <TouchableOpacity style={styles.sideBtn} onPress={onPress}>
+    <Text style={styles.sideText}>{text}</Text>
+  </TouchableOpacity>
+);
 
 const styles = StyleSheet.create({
   container: {
@@ -192,32 +146,22 @@ const styles = StyleSheet.create({
   },
 
   topbar: {
-    height: isPhone ? 54 : 70,
+    height: 60,
     backgroundColor: "#0c1c2c",
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.08)",
-    paddingHorizontal: 12,
+    justifyContent: "space-between",
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    paddingHorizontal: 15,
   },
 
   brand: {
     color: "#fff",
-    fontSize: isPhone ? 16 : 24,
+    fontSize: 18,
     fontWeight: "900",
   },
 
-  subbrand: {
-    color: "#9eb3c7",
-    fontSize: isPhone ? 8 : 12,
-    marginTop: 2,
-  },
-
   datetime: {
-    color: "#d8e2ed",
-    fontSize: isPhone ? 8 : 12,
-    fontWeight: "700",
+    color: "#9eb3c7",
   },
 
   content: {
@@ -226,137 +170,98 @@ const styles = StyleSheet.create({
   },
 
   sidebar: {
-    width: isPhone ? 96 : 150,
+    width: 110,
     backgroundColor: "#061522",
     padding: 10,
   },
 
   sideBtn: {
-    height: isPhone ? 42 : 54,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
     backgroundColor: "#0b1b2b",
-    justifyContent: "center",
-    alignItems: "center",
+    padding: 12,
+    borderRadius: 10,
     marginBottom: 10,
   },
 
-  sideBtnText: {
+  sideText: {
     color: "#fff",
-    fontSize: isPhone ? 10 : 14,
-    fontWeight: "900",
+    fontWeight: "700",
+    textAlign: "center",
   },
 
   main: {
-    flex: 1,
-    padding: 10,
-  },
-
-  heroTouch: {
     flex: 1,
   },
 
   hero: {
     flex: 1,
-    borderRadius: 18,
-    overflow: "hidden",
-    backgroundColor: "#0c2133",
     justifyContent: "center",
   },
 
   heroImage: {
-    opacity: 0.96,
+    resizeMode: "contain",
   },
 
-  heroShade: {
+  overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.30)",
+    backgroundColor: "rgba(0,0,0,0.45)",
   },
 
   heroContent: {
     flexDirection: "row",
+    paddingHorizontal: 26,
+    paddingVertical: 24,
     alignItems: "center",
-    paddingHorizontal: isPhone ? 18 : 30,
-    paddingVertical: isPhone ? 18 : 30,
-  },
-
-  posterBox: {
-    width: isPhone ? 120 : 180,
-    marginRight: isPhone ? 16 : 24,
   },
 
   poster: {
-    width: "100%",
-    aspectRatio: 0.68,
-    borderRadius: 14,
-    backgroundColor: "#1f2c3f",
-  },
-
-  posterFallback: {
-    width: "100%",
-    aspectRatio: 0.68,
-    borderRadius: 14,
+    width: 150,
+    height: 220,
+    borderRadius: 12,
+    marginRight: 22,
     backgroundColor: "#132235",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 10,
   },
 
-  posterFallbackText: {
-    color: "#38d7ff",
-    fontWeight: "900",
-    textAlign: "center",
-    fontSize: isPhone ? 12 : 16,
-  },
-
-  infoBox: {
+  info: {
     flex: 1,
-    backgroundColor: "rgba(18,22,34,0.38)",
+    backgroundColor: "rgba(18, 22, 34, 0.42)",
     borderRadius: 18,
-    padding: isPhone ? 16 : 22,
+    padding: 18,
   },
 
-  heroType: {
+  type: {
     color: "#38d7ff",
-    fontSize: isPhone ? 11 : 15,
     fontWeight: "900",
-    marginBottom: 6,
+    marginBottom: 8,
+    fontSize: 16,
   },
 
-  heroTitle: {
+  title: {
     color: "#fff",
-    fontSize: isPhone ? 24 : 38,
+    fontSize: 30,
     fontWeight: "900",
   },
 
-  heroMeta: {
-    color: "#e3e8ed",
-    fontSize: isPhone ? 11 : 15,
-    marginTop: 8,
-  },
-
-  heroDesc: {
+  desc: {
     color: "#ffffff",
-    fontSize: isPhone ? 13 : 17,
-    lineHeight: isPhone ? 20 : 25,
     marginTop: 14,
+    fontSize: 17,
+    lineHeight: 24,
   },
 
-  heroAction: {
-    alignSelf: "flex-start",
-    marginTop: 18,
-    backgroundColor: "rgba(56,215,255,0.18)",
-    borderWidth: 1,
+  button: {
+    marginTop: 22,
     borderColor: "#38d7ff",
+    borderWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
     borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(56,215,255,0.12)",
   },
 
-  heroActionText: {
+  buttonText: {
     color: "#38d7ff",
-    fontSize: isPhone ? 11 : 13,
     fontWeight: "900",
+    fontSize: 13,
   },
 });

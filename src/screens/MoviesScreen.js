@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -8,24 +8,38 @@ import {
   FlatList,
   Dimensions,
   Image,
+  TextInput,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { width } = Dimensions.get("window");
 const isPhone = width < 900;
 
-function buildCategories(items) {
+const FAVORITES_KEY = "mundoplaytv_movie_favorites";
+const RECENTS_KEY = "mundoplaytv_movie_recents";
+
+function safeText(value) {
+  if (value === null || value === undefined) return "";
+  return String(value).trim();
+}
+
+function getMovieStorageId(item = {}) {
+  return safeText(item.id || item.url || item.name);
+}
+
+function buildCategories(items = [], favorites = [], recents = []) {
   const groups = {};
 
   items.forEach((item) => {
-    const key = String(item.group || "OUTROS").trim();
+    const key = safeText(item.group || "OUTROS");
     if (!groups[key]) groups[key] = [];
     groups[key].push(item);
   });
 
   return [
     { name: "Tudo", items },
-    { name: "Favoritos", items: [] },
-    { name: "Visto por último", items: [] },
+    { name: "Favoritos", items: favorites },
+    { name: "Visto por último", items: recents },
     ...Object.keys(groups)
       .sort((a, b) => a.localeCompare(b))
       .map((group) => ({
@@ -44,10 +58,84 @@ export default function MoviesScreen({
   onSelectMovie,
 }) {
   const movies = session?.data?.movies || [];
-  const categories = useMemo(() => buildCategories(movies), [movies]);
-  const [selectedCategory, setSelectedCategory] = useState(0);
 
-  const visibleMovies = categories[selectedCategory]?.items || movies;
+  const [favoriteIds, setFavoriteIds] = useState([]);
+  const [recentIds, setRecentIds] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(0);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    async function loadSavedData() {
+      try {
+        const [savedFavorites, savedRecents] = await Promise.all([
+          AsyncStorage.getItem(FAVORITES_KEY),
+          AsyncStorage.getItem(RECENTS_KEY),
+        ]);
+
+        if (savedFavorites) {
+          setFavoriteIds(JSON.parse(savedFavorites));
+        }
+
+        if (savedRecents) {
+          setRecentIds(JSON.parse(savedRecents));
+        }
+      } catch (e) {}
+    }
+
+    loadSavedData();
+  }, []);
+
+  const favoriteMovies = useMemo(() => {
+    const favoriteSet = new Set(favoriteIds);
+    return movies.filter((item) => favoriteSet.has(getMovieStorageId(item)));
+  }, [movies, favoriteIds]);
+
+  const recentMovies = useMemo(() => {
+    const map = new Map(movies.map((item) => [getMovieStorageId(item), item]));
+    return recentIds.map((id) => map.get(id)).filter(Boolean);
+  }, [movies, recentIds]);
+
+  const categories = useMemo(() => {
+    return buildCategories(movies, favoriteMovies, recentMovies);
+  }, [movies, favoriteMovies, recentMovies]);
+
+  const baseMovies = categories[selectedCategory]?.items || movies;
+
+  const visibleMovies = useMemo(() => {
+    const term = safeText(search).toLowerCase();
+    if (!term) return baseMovies;
+
+    return baseMovies.filter((item) => {
+      const name = safeText(item.name).toLowerCase();
+      const group = safeText(item.group).toLowerCase();
+      const year = safeText(item.year).toLowerCase();
+      return (
+        name.includes(term) ||
+        group.includes(term) ||
+        year.includes(term)
+      );
+    });
+  }, [baseMovies, search]);
+
+  const persistRecents = async (ids) => {
+    try {
+      await AsyncStorage.setItem(RECENTS_KEY, JSON.stringify(ids));
+    } catch (e) {}
+  };
+
+  const addToRecent = async (movie) => {
+    const id = getMovieStorageId(movie);
+    if (!id) return;
+
+    const updated = [id, ...recentIds.filter((item) => item !== id)].slice(0, 30);
+    setRecentIds(updated);
+    await persistRecents(updated);
+  };
+
+  const handleSelectMovie = async (movie) => {
+    await addToRecent(movie);
+    onSelectMovie?.(movie);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -73,6 +161,16 @@ export default function MoviesScreen({
         <TouchableOpacity onPress={onOpenSeries}>
           <Text style={styles.navText}>Séries</Text>
         </TouchableOpacity>
+
+        <View style={styles.searchWrap}>
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Buscar filme..."
+            placeholderTextColor="#9aa7b8"
+            style={styles.searchInput}
+          />
+        </View>
       </View>
 
       <View style={styles.content}>
@@ -91,17 +189,26 @@ export default function MoviesScreen({
               return (
                 <TouchableOpacity
                   style={[styles.categoryRow, active && styles.categoryActive]}
-                  onPress={() => setSelectedCategory(index)}
+                  onPress={() => {
+                    setSelectedCategory(index);
+                    setSearch("");
+                  }}
                 >
                   <Text
-                    style={[styles.categoryText, active && styles.categoryTextActive]}
+                    style={[
+                      styles.categoryText,
+                      active && styles.categoryTextActive,
+                    ]}
                     numberOfLines={1}
                   >
                     {item.name}
                   </Text>
 
                   <Text
-                    style={[styles.categoryCount, active && styles.categoryTextActive]}
+                    style={[
+                      styles.categoryCount,
+                      active && styles.categoryTextActive,
+                    ]}
                   >
                     {item.items.length}
                   </Text>
@@ -121,20 +228,35 @@ export default function MoviesScreen({
             keyExtractor={(item, index) => item.id || `${item.name}_${index}`}
             numColumns={isPhone ? 3 : 5}
             columnWrapperStyle={styles.rowWrap}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.card}
-                onPress={() => onSelectMovie(item)}
-              >
-                <Image
-                  source={item.logo ? { uri: item.logo } : undefined}
-                  style={styles.poster}
-                />
-                <Text style={styles.cardTitle} numberOfLines={2}>
-                  {item.name}
-                </Text>
-              </TouchableOpacity>
-            )}
+            renderItem={({ item }) => {
+              const favorite = favoriteIds.includes(getMovieStorageId(item));
+
+              return (
+                <TouchableOpacity
+                  style={styles.card}
+                  onPress={() => handleSelectMovie(item)}
+                >
+                  <Image
+                    source={item.logo ? { uri: item.logo } : undefined}
+                    style={styles.poster}
+                  />
+
+                  <Text style={styles.cardTitle} numberOfLines={2}>
+                    {favorite ? "★ " : ""}
+                    {item.name}
+                  </Text>
+
+                  <Text style={styles.cardMeta} numberOfLines={1}>
+                    {(item.year || "-") + " • " + (item.group || "Filmes")}
+                  </Text>
+                </TouchableOpacity>
+              );
+            }}
+            ListEmptyComponent={
+              <View style={styles.emptyWrap}>
+                <Text style={styles.emptyText}>Nenhum filme encontrado</Text>
+              </View>
+            }
           />
         </View>
       </View>
@@ -171,6 +293,20 @@ const styles = StyleSheet.create({
   sep: {
     color: "#ccc",
     marginHorizontal: 12,
+  },
+
+  searchWrap: {
+    marginLeft: "auto",
+    width: isPhone ? 100 : 190,
+  },
+
+  searchInput: {
+    height: isPhone ? 30 : 36,
+    borderRadius: 8,
+    backgroundColor: "#151d3d",
+    color: "#fff",
+    paddingHorizontal: 10,
+    fontSize: isPhone ? 9 : 12,
   },
 
   content: {
@@ -266,5 +402,22 @@ const styles = StyleSheet.create({
   cardTitle: {
     color: "#f0f0f0",
     fontSize: isPhone ? 9 : 12,
+    fontWeight: "700",
+  },
+
+  cardMeta: {
+    color: "#adb9ca",
+    fontSize: isPhone ? 7.5 : 10,
+    marginTop: 2,
+  },
+
+  emptyWrap: {
+    paddingVertical: 20,
+  },
+
+  emptyText: {
+    color: "#cfd7e2",
+    fontSize: isPhone ? 10 : 13,
+    textAlign: "center",
   },
 });

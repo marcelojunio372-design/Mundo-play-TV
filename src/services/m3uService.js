@@ -60,11 +60,11 @@ function extractDescription(extinf = "", name = "", group = "") {
 
   const text = `${name} ${group}`.toLowerCase();
 
-  if (/temporada|epis[oó]dio|s\d{1,2}e\d{1,2}|series|séries/.test(text)) {
+  if (/temporada|epis[oó]dio|s\d{1,2}e\d{1,2}|series|séries|season/.test(text)) {
     return safeText(name || "Conteúdo de série.");
   }
 
-  if (/movie|filme|cinema|lançamento/.test(text)) {
+  if (/movie|filme|cinema|lançamento|vod/.test(text)) {
     return safeText(name || "Conteúdo de filme.");
   }
 
@@ -95,6 +95,24 @@ function isMovieByText(name = "", group = "", url = "") {
   );
 }
 
+function shouldForceLive(name = "", group = "", url = "") {
+  const text = `${name} ${group} ${url}`.toLowerCase();
+
+  if (/warner channel|hbo|telecine|premiere|sportv|discovery|history|tnt|space|megapix|canal brasil|globo|sbt|record|band|multishow|gnt|viva|fox|fx|sony|axn|a&e|amc|agrobrasil|amazon sat|all sports/.test(text)) {
+    return true;
+  }
+
+  if (/\bhd\b|\bsd\b|\bfhd\b|\buhd\b|\b4k\b/.test(text)) {
+    return true;
+  }
+
+  if (/\/live\//.test(text)) {
+    return true;
+  }
+
+  return false;
+}
+
 function inferType(name = "", group = "", url = "") {
   const link = safeText(url).toLowerCase();
   const groupText = safeText(group).toLowerCase();
@@ -112,33 +130,14 @@ function inferType(name = "", group = "", url = "") {
       groupText
     );
 
+  if (shouldForceLive(name, group, url)) return "live";
   if (byMovieUrl) return "movie";
   if (bySeriesUrl) return "series";
-
   if (liveGroupForced) return "live";
-
   if (isSeriesByText(name, group, url) && !isLiveByGroup(group)) return "series";
   if (isMovieByText(name, group, url) && !isLiveByGroup(group)) return "movie";
 
   return "live";
-}
-
-function shouldForceLive(name = "", group = "", url = "") {
-  const text = `${name} ${group} ${url}`.toLowerCase();
-
-  if (/warner channel|hbo|telecine|premiere|sportv|discovery|history|tnt|space|megapix|canal brasil|globo|sbt|record|band|multishow|gnt|viva|fox|fx|sony|axn|a&e|amc/.test(text)) {
-    return true;
-  }
-
-  if (/ hd\b| sd\b| fhd\b| uhd\b| 4k\b/.test(text)) {
-    return true;
-  }
-
-  if (/\/live\//.test(text)) {
-    return true;
-  }
-
-  return false;
 }
 
 function buildCategories(items = []) {
@@ -196,13 +195,9 @@ export async function loadM3U(url) {
     const name = extractName(extinf);
     const group = extractGroup(extinf);
     const logo = extractLogo(extinf);
-    let type = inferType(name, group, streamUrl);
+    const type = inferType(name, group, streamUrl);
     const year = extractYear(name, group);
     const description = extractDescription(extinf, name, group);
-
-    if (shouldForceLive(name, group, streamUrl)) {
-      type = "live";
-    }
 
     const item = {
       id: `${type}_${i}_${name}`.replace(/\s+/g, "_"),
