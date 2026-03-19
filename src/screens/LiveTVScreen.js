@@ -172,6 +172,20 @@ export default function LiveTVScreen({
     };
   }, []);
 
+  useEffect(() => {
+    if (!showFullscreen) return;
+
+    setShowFullscreenUi(true);
+
+    if (fullscreenUiTimerRef.current) {
+      clearTimeout(fullscreenUiTimerRef.current);
+    }
+
+    fullscreenUiTimerRef.current = setTimeout(() => {
+      setShowFullscreenUi(false);
+    }, 2500);
+  }, [showFullscreen, fullscreenRetryKey]);
+
   const favoriteChannels = useMemo(() => {
     const favoriteSet = new Set(favoriteIds);
     return channels.filter((item) => favoriteSet.has(getChannelStorageId(item)));
@@ -316,6 +330,17 @@ export default function LiveTVScreen({
       setRetryKey((prev) => prev + 1);
       setIsPaused(false);
       setIsFullscreenPaused(false);
+    }
+  };
+
+  const handleChannelPress = async (index) => {
+    const sameChannel = index === selectedChannelIndex;
+    await handleSelectChannel(index);
+
+    if (sameChannel) {
+      setTimeout(() => {
+        openFullscreen();
+      }, 120);
     }
   };
 
@@ -470,7 +495,7 @@ export default function LiveTVScreen({
               return (
                 <TouchableOpacity
                   style={[styles.channelRow, active && styles.channelRowActive]}
-                  onPress={() => handleSelectChannel(index)}
+                  onPress={() => handleChannelPress(index)}
                 >
                   <View style={styles.channelNumberBox}>
                     <Text style={styles.channelNumber}>{index + 1}</Text>
@@ -659,35 +684,6 @@ export default function LiveTVScreen({
                 >
                   <Text style={styles.fullscreenBackText}>VOLTAR</Text>
                 </TouchableOpacity>
-
-                <Text style={styles.fullscreenTitle} numberOfLines={1}>
-                  {selectedChannel?.name || "Canal"}
-                </Text>
-
-                <View style={styles.fullscreenControlsRight}>
-                  <TouchableOpacity
-                    style={styles.pauseBtn}
-                    onPress={goToPreviousChannel}
-                  >
-                    <Text style={styles.pauseBtnText}>◀</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.pauseBtn}
-                    onPress={togglePauseFullscreen}
-                  >
-                    <Text style={styles.pauseBtnText}>
-                      {isFullscreenPaused ? "PLAY" : "PAUSE"}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.pauseBtn}
-                    onPress={goToNextChannel}
-                  >
-                    <Text style={styles.pauseBtnText}>▶</Text>
-                  </TouchableOpacity>
-                </View>
               </View>
 
               {!!fullscreenError && (
@@ -712,6 +708,22 @@ export default function LiveTVScreen({
                     ? `Próximo: ${formatProgramTime(nextProgram)}  ${nextProgram.title || ""}`
                     : "Próximo: Sem próximo programa"}
                 </Text>
+
+                <View style={styles.fullscreenBottomControls}>
+                  <TouchableOpacity style={styles.pauseBtn} onPress={goToPreviousChannel}>
+                    <Text style={styles.pauseBtnText}>◀</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={styles.pauseBtn} onPress={togglePauseFullscreen}>
+                    <Text style={styles.pauseBtnText}>
+                      {isFullscreenPaused ? "PLAY" : "PAUSE"}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={styles.pauseBtn} onPress={goToNextChannel}>
+                    <Text style={styles.pauseBtnText}>▶</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </>
           )}
@@ -982,7 +994,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 10,
-    marginLeft: 8,
+    marginRight: 8,
   },
 
   pauseBtnText: {
@@ -1107,7 +1119,7 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
     paddingTop: isPhone ? 18 : 24,
     paddingHorizontal: 10,
     paddingBottom: 8,
@@ -1125,20 +1137,6 @@ const styles = StyleSheet.create({
     color: "#38d7ff",
     fontWeight: "900",
     fontSize: 12,
-  },
-
-  fullscreenTitle: {
-    flex: 1,
-    color: "#fff",
-    marginLeft: 12,
-    marginRight: 12,
-    fontSize: isPhone ? 12 : 16,
-    fontWeight: "800",
-  },
-
-  fullscreenControlsRight: {
-    flexDirection: "row",
-    alignItems: "center",
   },
 
   fullscreenStatusText: {
@@ -1159,7 +1157,8 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingTop: 8,
+    paddingBottom: 12,
     backgroundColor: "rgba(5,7,13,0.30)",
   },
 
@@ -1174,5 +1173,12 @@ const styles = StyleSheet.create({
     color: "#d8e5f0",
     fontSize: isPhone ? 7.5 : 10,
     fontWeight: "600",
+  },
+
+  fullscreenBottomControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10,
   },
 });
