@@ -73,9 +73,15 @@ export default function LiveTVScreen({
   const [showFullscreen, setShowFullscreen] = useState(false);
   const [epgItems, setEpgItems] = useState([]);
   const [epgLoading, setEpgLoading] = useState(true);
+  const [retryKey, setRetryKey] = useState(0);
+  const [fullscreenRetryKey, setFullscreenRetryKey] = useState(0);
+  const [playerError, setPlayerError] = useState("");
+  const [fullscreenError, setFullscreenError] = useState("");
 
   const videoRef = useRef(null);
   const fullscreenVideoRef = useRef(null);
+  const reconnectTimerRef = useRef(null);
+  const fullscreenReconnectTimerRef = useRef(null);
 
   useEffect(() => {
     async function loadSavedData() {
@@ -127,6 +133,24 @@ export default function LiveTVScreen({
     };
   }, []);
 
+  useEffect(() => {
+    setRetryKey((prev) => prev + 1);
+    setFullscreenRetryKey((prev) => prev + 1);
+    setPlayerError("");
+    setFullscreenError("");
+  }, [selectedChannel?.url]);
+
+  useEffect(() => {
+    return () => {
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+      }
+      if (fullscreenReconnectTimerRef.current) {
+        clearTimeout(fullscreenReconnectTimerRef.current);
+      }
+    };
+  }, []);
+
   const favoriteChannels = useMemo(() => {
     const favoriteSet = new Set(favoriteIds);
     return channels.filter((item) => favoriteSet.has(getChannelStorageId(item)));
@@ -168,14 +192,11 @@ export default function LiveTVScreen({
       return { nowProgram: null, nextProgram: null };
     }
 
-    const cleanName = safeText(selectedChannel.name)
-      .replace(/\b(fhd|hd|sd|uhd|4k)\b/gi, "")
-      .replace(/\btv\b/gi, "")
-      .replace(/\bchannel\b/gi, "")
-      .replace(/\s+/g, " ")
-      .trim();
-
-    return findNowAndNextForChannel(epgItems, cleanName);
+    return findNowAndNextForChannel(
+      epgItems,
+      safeText(selectedChannel.name),
+      safeText(selectedChannel.group)
+    );
   }, [epgItems, selectedChannel]);
 
   const persistFavorites = async (ids) => {
@@ -228,9 +249,31 @@ export default function LiveTVScreen({
     }
   };
 
+  const scheduleReconnect = () => {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+    }
+
+    reconnectTimerRef.current = setTimeout(() => {
+      setRetryKey((prev) => prev + 1);
+    }, 2500);
+  };
+
+  const scheduleFullscreenReconnect = () => {
+    if (fullscreenReconnectTimerRef.current) {
+      clearTimeout(fullscreenReconnectTimerRef.current);
+    }
+
+    fullscreenReconnectTimerRef.current = setTimeout(() => {
+      setFullscreenRetryKey((prev) => prev + 1);
+    }, 2500);
+  };
+
   const openFullscreen = async () => {
     if (!selectedChannel?.url) return;
     await addToRecent(selectedChannel);
+    setFullscreenError("");
+    setFullscreenRetryKey((prev) => prev + 1);
     setShowFullscreen(true);
   };
 
@@ -238,14 +281,22 @@ export default function LiveTVScreen({
     try {
       await fullscreenVideoRef.current?.stopAsync?.();
     } catch (e) {}
+
+    if (fullscreenReconnectTimerRef.current) {
+      clearTimeout(fullscreenReconnectTimerRef.current);
+    }
+
     setShowFullscreen(false);
   };
 
   const handlePlay = async () => {
     try {
       await addToRecent(selectedChannel);
+      setPlayerError("");
       await videoRef.current?.playAsync?.();
-    } catch (e) {}
+    } catch (e) {
+      setRetryKey((prev) => prev + 1);
+    }
   };
 
   const handlePause = async () => {
@@ -377,12 +428,20 @@ export default function LiveTVScreen({
           <View style={styles.previewBox}>
             {selectedChannel?.url ? (
               <Video
+                key={`${selectedChannel.url}_${retryKey}`}
                 ref={videoRef}
                 source={{ uri: selectedChannel.url }}
                 style={styles.previewVideo}
-                resizeMode={ResizeMode.CONTAIN}
+                resizeMode={ResizeMode.COVER}
                 useNativeControls
                 shouldPlay
+                isLooping={false}
+                onLoadStart={() => setPlayerError("")}
+                onReadyForDisplay={() => setPlayerError("")}
+                onError={() => {
+                  setPlayerError("Reconectando sinal...");
+                  scheduleReconnect();
+                }}
               />
             ) : (
               <View style={styles.previewEmpty}>
@@ -390,6 +449,10 @@ export default function LiveTVScreen({
               </View>
             )}
           </View>
+
+          {!!playerError && (
+            <Text style={styles.playerStatusText}>{playerError}</Text>
+          )}
 
           <View style={styles.previewActions}>
             <TouchableOpacity style={styles.actionBtnSmall} onPress={handlePlay}>
@@ -480,12 +543,19 @@ export default function LiveTVScreen({
           <View style={styles.fullscreenVideoWrap}>
             {selectedChannel?.url ? (
               <Video
+                key={`${selectedChannel.url}_${fullscreenRetryKey}_fullscreen`}
                 ref={fullscreenVideoRef}
                 source={{ uri: selectedChannel.url }}
                 style={styles.fullscreenVideo}
-                resizeMode={ResizeMode.CONTAIN}
+                resizeMode={ResizeMode.COVER}
                 shouldPlay
                 useNativeControls
+                onLoadStart={() => setFullscreenError("")}
+                onReadyForDisplay={() => setFullscreenError("")}
+                onError={() => {
+                  setFullscreenError("Reconectando sinal...");
+                  scheduleFullscreenReconnect();
+                }}
               />
             ) : (
               <View style={styles.previewEmpty}>
@@ -493,6 +563,10 @@ export default function LiveTVScreen({
               </View>
             )}
           </View>
+
+          {!!fullscreenError && (
+            <Text style={styles.playerStatusText}>{fullscreenError}</Text>
+          )}
 
           <View style={styles.fullscreenEpg}>
             <Text style={styles.epgHeader}>EPG</Text>
@@ -696,7 +770,8 @@ const styles = StyleSheet.create({
   },
 
   previewBox: {
-    width: "100%",
+    width: isPhone ? "64%" : "70%",
+    alignSelf: "center",
     height: isPhone ? 108 : 230,
     borderRadius: 8,
     overflow: "hidden",
@@ -720,6 +795,13 @@ const styles = StyleSheet.create({
   previewEmptyText: {
     color: "#c8d4e2",
     fontSize: isPhone ? 9 : 12,
+  },
+
+  playerStatusText: {
+    color: "#ffd94d",
+    fontSize: isPhone ? 8 : 11,
+    marginBottom: 8,
+    textAlign: "center",
   },
 
   previewActions: {
