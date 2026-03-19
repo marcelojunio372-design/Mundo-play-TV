@@ -37,12 +37,11 @@ function cleanChannelName(name = "") {
     .trim();
 }
 
-function buildChannelAliases(name = "", group = "", tvgId = "") {
+function buildChannelAliases(name = "", group = "") {
   const original = decodeEntities(safeText(name));
   const clean = cleanChannelName(original);
-  const idText = decodeEntities(safeText(tvgId));
 
-  const rawParts = `${original} ${group} ${idText}`
+  const rawParts = `${original} ${group}`
     .split(/[\-|/|]+/g)
     .map((item) => item.trim())
     .filter(Boolean);
@@ -51,7 +50,7 @@ function buildChannelAliases(name = "", group = "", tvgId = "") {
     .map((item) => cleanChannelName(item))
     .filter(Boolean);
 
-  const aliases = [original, clean, idText, ...rawParts, ...cleanParts]
+  const aliases = [original, clean, ...rawParts, ...cleanParts]
     .map((item) => normalizeText(item))
     .filter(Boolean);
 
@@ -81,15 +80,6 @@ function extractName(extinf = "") {
 
 function extractLogo(extinf = "") {
   return extractAttr(extinf, "tvg-logo") || extractAttr(extinf, "logo") || "";
-}
-
-function extractTvgId(extinf = "") {
-  return (
-    extractAttr(extinf, "tvg-id") ||
-    extractAttr(extinf, "channel-id") ||
-    extractAttr(extinf, "tvg-name") ||
-    ""
-  );
 }
 
 function extractYear(name = "", group = "") {
@@ -243,11 +233,10 @@ export async function loadM3U(url) {
     const name = extractName(extinf);
     const group = extractGroup(extinf);
     const logo = extractLogo(extinf);
-    const tvgId = extractTvgId(extinf);
     const type = inferType(name, group, streamUrl);
     const year = extractYear(name, group);
     const description = extractDescription(extinf, name, group);
-    const aliases = buildChannelAliases(name, group, tvgId);
+    const aliases = buildChannelAliases(name, group);
 
     const item = {
       id: `${type}_${i}_${name}`.replace(/\s+/g, "_"),
@@ -258,7 +247,6 @@ export async function loadM3U(url) {
       type,
       year,
       description,
-      tvgId,
       channelKey: normalizeText(name),
       cleanChannelKey: normalizeText(cleanChannelName(name)),
       aliases,
