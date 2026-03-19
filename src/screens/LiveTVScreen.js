@@ -423,9 +423,7 @@ export default function LiveTVScreen({
                 </Text>
 
                 <Text style={styles.epgTitle} numberOfLines={2}>
-                  {nowProgram?.title ||
-                    selectedChannel?.name ||
-                    "Sem canal selecionado"}
+                  {nowProgram?.title || selectedChannel?.name || "Sem canal selecionado"}
                 </Text>
 
                 <Text style={styles.epgSub} numberOfLines={1}>
@@ -434,7 +432,7 @@ export default function LiveTVScreen({
                     : "Grupo: -"}
                 </Text>
 
-                <Text style={styles.epgDesc} numberOfLines={6}>
+                <Text style={styles.epgDesc} numberOfLines={5}>
                   {nowProgram?.desc ||
                     "Programação atual não encontrada para este canal."}
                 </Text>
@@ -504,7 +502,7 @@ export default function LiveTVScreen({
             </Text>
 
             <Text style={styles.epgTitle} numberOfLines={2}>
-              {nowProgram?.title || selectedChannel?.name || "Canal"}
+              {nowProgram?.title || selectedChannel?.name || "Sem canal"}
             </Text>
 
             <Text style={styles.epgSub} numberOfLines={1}>
@@ -543,10 +541,10 @@ const styles = StyleSheet.create({
   },
 
   topnav: {
-    height: isPhone ? 38 : 56,
+    height: isPhone ? 42 : 58,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: isPhone ? 8 : 10,
+    paddingHorizontal: 10,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
     backgroundColor: "#10163a",
@@ -554,33 +552,33 @@ const styles = StyleSheet.create({
 
   topLink: {
     color: "#dbdbdb",
-    fontSize: isPhone ? 9 : 14,
+    fontSize: isPhone ? 10 : 14,
   },
 
   topLinkActive: {
     color: "#ffe24f",
-    fontSize: isPhone ? 9 : 14,
+    fontSize: isPhone ? 10 : 14,
     fontWeight: "900",
   },
 
   topSep: {
     color: "#98a5b5",
-    marginHorizontal: isPhone ? 6 : 8,
-    fontSize: isPhone ? 9 : 14,
+    marginHorizontal: 8,
+    fontSize: isPhone ? 10 : 14,
   },
 
   searchWrap: {
     marginLeft: "auto",
-    width: isPhone ? 94 : 180,
+    width: isPhone ? 100 : 180,
   },
 
   searchInput: {
-    height: isPhone ? 24 : 36,
+    height: isPhone ? 28 : 36,
     borderRadius: 8,
     backgroundColor: "#1a224d",
     color: "#fff",
-    paddingHorizontal: 8,
-    fontSize: isPhone ? 8 : 12,
+    paddingHorizontal: 10,
+    fontSize: isPhone ? 9 : 12,
   },
 
   main: {
@@ -589,15 +587,15 @@ const styles = StyleSheet.create({
   },
 
   leftPanel: {
-    width: isPhone ? 92 : 220,
+    width: isPhone ? 108 : 220,
     backgroundColor: "#2a1530",
     borderRightWidth: 1,
     borderRightColor: "rgba(255,255,255,0.08)",
   },
 
   categoryRow: {
-    minHeight: isPhone ? 28 : 46,
-    paddingHorizontal: isPhone ? 8 : 10,
+    minHeight: isPhone ? 34 : 46,
+    paddingHorizontal: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -611,9 +609,9 @@ const styles = StyleSheet.create({
 
   categoryText: {
     color: "#f4f4f4",
-    fontSize: isPhone ? 7.5 : 12,
+    fontSize: isPhone ? 8 : 12,
     flex: 1,
-    marginRight: 4,
+    marginRight: 6,
   },
 
   categoryTextActive: {
@@ -623,21 +621,21 @@ const styles = StyleSheet.create({
 
   categoryCount: {
     color: "#f4f4f4",
-    fontSize: isPhone ? 7.5 : 12,
+    fontSize: isPhone ? 8 : 12,
   },
 
   centerPanel: {
-    width: isPhone ? 118 : 260,
+    width: isPhone ? 130 : 260,
     backgroundColor: "#11183d",
     borderRightWidth: 1,
     borderRightColor: "rgba(255,255,255,0.08)",
   },
 
   channelRow: {
-    minHeight: isPhone ? 34 : 48,
+    minHeight: isPhone ? 38 : 48,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: isPhone ? 6 : 8,
+    paddingHorizontal: 8,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
   },
@@ -647,15 +645,15 @@ const styles = StyleSheet.create({
   },
 
   channelNumberBox: {
-    width: isPhone ? 20 : 34,
+    width: isPhone ? 24 : 34,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: isPhone ? 4 : 6,
+    marginRight: 6,
   },
 
   channelNumber: {
     color: "#f2f2f2",
-    fontSize: isPhone ? 6.5 : 10,
+    fontSize: isPhone ? 7 : 10,
     fontWeight: "900",
   },
 
@@ -665,7 +663,7 @@ const styles = StyleSheet.create({
 
   channelName: {
     color: "#fff",
-    fontSize: isPhone ? 7 : 11,
+    fontSize: isPhone ? 7.5 : 11,
     fontWeight: "800",
   },
 
@@ -675,23 +673,35 @@ const styles = StyleSheet.create({
 
   channelSub: {
     color: "#c6d2e8",
-    fontSize: isPhone ? 5.5 : 9,
+    fontSize: isPhone ? 6 : 9,
     marginTop: 1,
+  },
+
+  emptyList: {
+    paddingVertical: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  emptyListText: {
+    color: "#cfd7e2",
+    fontSize: isPhone ? 9 : 12,
+    textAlign: "center",
   },
 
   rightPanel: {
     flex: 1,
     backgroundColor: "#0b1338",
-    padding: isPhone ? 6 : 8,
+    padding: isPhone ? 8 : 12,
   },
 
   previewBox: {
     width: "100%",
-    height: isPhone ? 92 : 260,
+    height: isPhone ? 108 : 230,
     borderRadius: 8,
     overflow: "hidden",
     backgroundColor: "#000",
-    marginBottom: isPhone ? 6 : 8,
+    marginBottom: 8,
   },
 
   previewVideo: {
@@ -709,111 +719,100 @@ const styles = StyleSheet.create({
 
   previewEmptyText: {
     color: "#c8d4e2",
-    fontSize: isPhone ? 8 : 12,
+    fontSize: isPhone ? 9 : 12,
   },
 
   previewActions: {
     flexDirection: "row",
-    justifyContent: "flex-start",
-    marginBottom: isPhone ? 6 : 8,
-    gap: isPhone ? 6 : 8,
     flexWrap: "wrap",
+    alignItems: "center",
+    marginBottom: 8,
   },
 
   actionBtnSmall: {
-    minWidth: isPhone ? 52 : 90,
-    minHeight: isPhone ? 26 : 42,
+    minWidth: isPhone ? 58 : 86,
+    height: isPhone ? 32 : 40,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#38d7ff",
     backgroundColor: "rgba(56,215,255,0.10)",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: isPhone ? 8 : 10,
+    paddingHorizontal: isPhone ? 8 : 12,
+    marginRight: 8,
+    marginBottom: 8,
   },
 
   actionBtnText: {
     color: "#38d7ff",
-    fontSize: isPhone ? 7.5 : 12,
+    fontSize: isPhone ? 8 : 12,
     fontWeight: "900",
   },
 
   epgBox: {
+    flex: 1,
     backgroundColor: "#10183f",
     borderRadius: 8,
-    padding: isPhone ? 8 : 10,
-    flex: 1,
+    padding: isPhone ? 10 : 14,
   },
 
   epgHeader: {
     color: "#38d7ff",
-    fontSize: isPhone ? 9 : 13,
+    fontSize: isPhone ? 10 : 14,
     fontWeight: "900",
-    marginBottom: 4,
+    marginBottom: 6,
   },
 
   epgTime: {
     color: "#ffd94d",
-    fontSize: isPhone ? 7.5 : 11,
+    fontSize: isPhone ? 8.5 : 11,
     fontWeight: "900",
     marginBottom: 4,
   },
 
   epgTitle: {
     color: "#fff",
-    fontSize: isPhone ? 9.5 : 14,
+    fontSize: isPhone ? 10.5 : 15,
     fontWeight: "900",
     marginBottom: 4,
   },
 
   epgSub: {
     color: "#c4d1df",
-    fontSize: isPhone ? 7 : 11,
-    marginBottom: 4,
+    fontSize: isPhone ? 8.5 : 11,
+    marginBottom: 6,
   },
 
   epgDesc: {
     color: "#d7e1ec",
-    fontSize: isPhone ? 7 : 11,
-    lineHeight: isPhone ? 10 : 16,
+    fontSize: isPhone ? 8.5 : 11,
+    lineHeight: isPhone ? 13 : 17,
   },
 
   nextProgramBox: {
-    marginTop: isPhone ? 6 : 10,
-    paddingTop: isPhone ? 6 : 10,
+    marginTop: 10,
+    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: "rgba(255,255,255,0.08)",
   },
 
   nextProgramLabel: {
     color: "#38d7ff",
-    fontSize: isPhone ? 7 : 10,
+    fontSize: isPhone ? 8.5 : 10,
     fontWeight: "900",
     marginBottom: 4,
   },
 
   nextProgramTitle: {
     color: "#fff",
-    fontSize: isPhone ? 8 : 12,
+    fontSize: isPhone ? 9.5 : 12,
     fontWeight: "700",
   },
 
   nextProgramTime: {
     color: "#c4d1df",
-    fontSize: isPhone ? 7 : 10,
+    fontSize: isPhone ? 8 : 10,
     marginTop: 4,
-  },
-
-  emptyList: {
-    paddingVertical: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  emptyListText: {
-    color: "#cfdae7",
-    fontSize: isPhone ? 8 : 12,
-    textAlign: "center",
   },
 
   fullscreenContainer: {
