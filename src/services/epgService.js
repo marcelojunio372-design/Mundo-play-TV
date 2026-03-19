@@ -139,10 +139,7 @@ function extractProgrammes(xml = "", channelMap = {}) {
     const category = extractTag(body, "category");
     const channelInfo = channelMap[channelId] || null;
 
-    const aliases = buildAliases(
-      channelId,
-      channelInfo?.displayNames || []
-    );
+    const aliases = buildAliases(channelId, channelInfo?.displayNames || []);
 
     programmes.push({
       channel: channelId,
@@ -185,7 +182,7 @@ function itemTime(date) {
   return date instanceof Date ? date.getTime() : 0;
 }
 
-function scoreProgrammeMatch(programme, aliases = []) {
+function scoreProgrammeMatch(programme, aliases = [], tvgId = "") {
   const programAliases = Array.isArray(programme?.aliases)
     ? programme.aliases
     : [
@@ -193,7 +190,18 @@ function scoreProgrammeMatch(programme, aliases = []) {
         programme?.cleanChannelKey || "",
       ].filter(Boolean);
 
+  const normalizedTvgId = normalizeText(tvgId);
   let score = 0;
+
+  if (normalizedTvgId) {
+    if (
+      normalizedTvgId === programme?.channelKey ||
+      normalizedTvgId === programme?.cleanChannelKey ||
+      programAliases.includes(normalizedTvgId)
+    ) {
+      score = Math.max(score, 1000);
+    }
+  }
 
   for (const channelAlias of aliases) {
     for (const programAlias of programAliases) {
@@ -241,19 +249,20 @@ function scoreProgrammeMatch(programme, aliases = []) {
 export function findNowAndNextForChannel(
   epgItems = [],
   channelName = "",
-  channelGroup = ""
+  channelGroup = "",
+  tvgId = ""
 ) {
   const now = new Date();
-  const aliases = buildAliases(channelName, channelGroup);
+  const aliases = buildAliases(channelName, channelGroup, tvgId);
 
-  if (!aliases.length || !epgItems?.length) {
+  if ((!aliases.length && !tvgId) || !epgItems?.length) {
     return { nowProgram: null, nextProgram: null };
   }
 
   const scoredMatches = epgItems
     .map((item) => ({
       ...item,
-      _score: scoreProgrammeMatch(item, aliases),
+      _score: scoreProgrammeMatch(item, aliases, tvgId),
     }))
     .filter((item) => item._score >= 95)
     .sort((a, b) => {
@@ -293,21 +302,10 @@ export function findNowAndNextForChannel(
       orderedMatches.find((item) => item.start && item.start > now) || null;
   }
 
-  if (!current && orderedMatches.length) {
-    const maybeCurrent = orderedMatches.find((item) => {
-      if (!item.start || !item.stop) return false;
-      return now >= item.start && now < item.stop;
-    });
-
-    if (maybeCurrent) {
-      return {
-        nowProgram: maybeCurrent,
-        nextProgram:
-          orderedMatches.find((item) => {
-            if (!item.start || !maybeCurrent.stop) return false;
-            return item.start >= maybeCurrent.stop;
-          }) || null,
-      };
+  if (!nextProgram) {
+    const upcoming = orderedMatches.filter((item) => item.start && item.start > now);
+    if (upcoming.length) {
+      nextProgram = upcoming[0];
     }
   }
 

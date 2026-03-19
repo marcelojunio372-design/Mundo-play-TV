@@ -12,11 +12,50 @@ function decodeEntities(text = "") {
     .replace(/&gt;/g, ">");
 }
 
+function normalizeText(value = "") {
+  return decodeEntities(String(value || ""))
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
 function cleanName(name = "") {
   return decodeEntities(safeText(name))
     .replace(/\s+/g, " ")
     .replace(/tvg-logo="[^"]*"/gi, "")
     .trim();
+}
+
+function cleanChannelName(name = "") {
+  return String(name || "")
+    .toLowerCase()
+    .replace(/\b(fhd|hd|sd|uhd|4k|fullhd)\b/gi, "")
+    .replace(/\b(tv|tvc|canal|channel)\b/gi, "")
+    .replace(/[|[\]()/\\\-_.:,]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildChannelAliases(name = "", group = "", tvgId = "") {
+  const original = decodeEntities(safeText(name));
+  const clean = cleanChannelName(original);
+  const idText = decodeEntities(safeText(tvgId));
+
+  const rawParts = `${original} ${group} ${idText}`
+    .split(/[\-|/|]+/g)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const cleanParts = rawParts
+    .map((item) => cleanChannelName(item))
+    .filter(Boolean);
+
+  const aliases = [original, clean, idText, ...rawParts, ...cleanParts]
+    .map((item) => normalizeText(item))
+    .filter(Boolean);
+
+  return Array.from(new Set(aliases));
 }
 
 function extractAttr(line = "", attr = "") {
@@ -42,6 +81,15 @@ function extractName(extinf = "") {
 
 function extractLogo(extinf = "") {
   return extractAttr(extinf, "tvg-logo") || extractAttr(extinf, "logo") || "";
+}
+
+function extractTvgId(extinf = "") {
+  return (
+    extractAttr(extinf, "tvg-id") ||
+    extractAttr(extinf, "channel-id") ||
+    extractAttr(extinf, "tvg-name") ||
+    ""
+  );
 }
 
 function extractYear(name = "", group = "") {
@@ -195,9 +243,11 @@ export async function loadM3U(url) {
     const name = extractName(extinf);
     const group = extractGroup(extinf);
     const logo = extractLogo(extinf);
+    const tvgId = extractTvgId(extinf);
     const type = inferType(name, group, streamUrl);
     const year = extractYear(name, group);
     const description = extractDescription(extinf, name, group);
+    const aliases = buildChannelAliases(name, group, tvgId);
 
     const item = {
       id: `${type}_${i}_${name}`.replace(/\s+/g, "_"),
@@ -208,6 +258,10 @@ export async function loadM3U(url) {
       type,
       year,
       description,
+      tvgId,
+      channelKey: normalizeText(name),
+      cleanChannelKey: normalizeText(cleanChannelName(name)),
+      aliases,
     };
 
     if (type === "movie") {

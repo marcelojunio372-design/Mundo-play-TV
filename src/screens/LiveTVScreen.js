@@ -142,9 +142,7 @@ export default function LiveTVScreen({
 
   useEffect(() => {
     return () => {
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
-      }
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       if (fullscreenReconnectTimerRef.current) {
         clearTimeout(fullscreenReconnectTimerRef.current);
       }
@@ -195,7 +193,8 @@ export default function LiveTVScreen({
     return findNowAndNextForChannel(
       epgItems,
       safeText(selectedChannel.name),
-      safeText(selectedChannel.group)
+      safeText(selectedChannel.group),
+      safeText(selectedChannel.tvgId)
     );
   }, [epgItems, selectedChannel]);
 
@@ -250,9 +249,7 @@ export default function LiveTVScreen({
   };
 
   const scheduleReconnect = () => {
-    if (reconnectTimerRef.current) {
-      clearTimeout(reconnectTimerRef.current);
-    }
+    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
 
     reconnectTimerRef.current = setTimeout(() => {
       setRetryKey((prev) => prev + 1);
@@ -547,7 +544,7 @@ export default function LiveTVScreen({
                 ref={fullscreenVideoRef}
                 source={{ uri: selectedChannel.url }}
                 style={styles.fullscreenVideo}
-                resizeMode={ResizeMode.COVER}
+                resizeMode={ResizeMode.CONTAIN}
                 shouldPlay
                 useNativeControls
                 onLoadStart={() => setFullscreenError("")}
@@ -770,9 +767,8 @@ const styles = StyleSheet.create({
   },
 
   previewBox: {
-    width: isPhone ? "64%" : "70%",
-    alignSelf: "center",
-    height: isPhone ? 108 : 230,
+    width: "100%",
+    aspectRatio: 16 / 9,
     borderRadius: 8,
     overflow: "hidden",
     backgroundColor: "#000",
@@ -934,8 +930,7 @@ const styles = StyleSheet.create({
   },
 
   fullscreenVideoWrap: {
-    width: "100%",
-    height: height * 0.72,
+    flex: 1,
     backgroundColor: "#000",
   },
 
@@ -946,8 +941,6 @@ const styles = StyleSheet.create({
   },
 
   fullscreenEpg: {
-    flex: 1,
-    padding: 14,
-    backgroundColor: "#05070d",
+    display: "none",
   },
 });
