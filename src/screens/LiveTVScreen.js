@@ -19,7 +19,7 @@ import {
   formatProgramTime,
 } from "../services/epgService";
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 const isPhone = width < 900;
 
 const FAVORITES_KEY = "mundoplaytv_live_favorites";
@@ -492,7 +492,7 @@ export default function LiveTVScreen({
                     : "Grupo: -"}
                 </Text>
 
-                <Text style={styles.epgDesc} numberOfLines={5}>
+                <Text style={styles.epgDesc} numberOfLines={4}>
                   {nowProgram?.desc ||
                     "Programação atual não encontrada para este canal."}
                 </Text>
@@ -521,10 +521,32 @@ export default function LiveTVScreen({
         onRequestClose={closeFullscreen}
         statusBarTranslucent
       >
-        <SafeAreaView style={styles.fullscreenContainer}>
+        <View style={styles.fullscreenContainer}>
           <StatusBar hidden />
 
-          <View style={styles.fullscreenTop}>
+          {selectedChannel?.url ? (
+            <Video
+              key={`${selectedChannel.url}_${fullscreenRetryKey}_fullscreen`}
+              ref={fullscreenVideoRef}
+              source={{ uri: selectedChannel.url }}
+              style={styles.fullscreenVideoAbsolute}
+              resizeMode={ResizeMode.COVER}
+              shouldPlay
+              useNativeControls
+              onLoadStart={() => setFullscreenError("")}
+              onReadyForDisplay={() => setFullscreenError("")}
+              onError={() => {
+                setFullscreenError("Reconectando sinal...");
+                scheduleFullscreenReconnect();
+              }}
+            />
+          ) : (
+            <View style={styles.previewEmpty}>
+              <Text style={styles.previewEmptyText}>Sem sinal</Text>
+            </View>
+          )}
+
+          <View style={styles.fullscreenTopOverlay}>
             <TouchableOpacity
               onPress={closeFullscreen}
               style={styles.fullscreenBackBtn}
@@ -537,69 +559,51 @@ export default function LiveTVScreen({
             </Text>
           </View>
 
-          <View style={styles.fullscreenVideoWrap}>
-            {selectedChannel?.url ? (
-              <Video
-                key={`${selectedChannel.url}_${fullscreenRetryKey}_fullscreen`}
-                ref={fullscreenVideoRef}
-                source={{ uri: selectedChannel.url }}
-                style={styles.fullscreenVideo}
-                resizeMode={ResizeMode.CONTAIN}
-                shouldPlay
-                useNativeControls
-                onLoadStart={() => setFullscreenError("")}
-                onReadyForDisplay={() => setFullscreenError("")}
-                onError={() => {
-                  setFullscreenError("Reconectando sinal...");
-                  scheduleFullscreenReconnect();
-                }}
-              />
-            ) : (
-              <View style={styles.previewEmpty}>
-                <Text style={styles.previewEmptyText}>Sem sinal</Text>
-              </View>
-            )}
-          </View>
-
           {!!fullscreenError && (
-            <Text style={styles.playerStatusText}>{fullscreenError}</Text>
+            <Text style={styles.fullscreenStatusText}>{fullscreenError}</Text>
           )}
 
-          <View style={styles.fullscreenEpg}>
+          <View style={styles.fullscreenEpgOverlay}>
             <Text style={styles.epgHeader}>EPG</Text>
 
-            <Text style={styles.epgTime}>
-              {nowProgram ? formatProgramTime(nowProgram) : "Ao vivo agora"}
-            </Text>
+            {epgLoading ? (
+              <Text style={styles.epgDesc}>Carregando programação...</Text>
+            ) : (
+              <>
+                <Text style={styles.epgTime}>
+                  {nowProgram ? formatProgramTime(nowProgram) : "Ao vivo agora"}
+                </Text>
 
-            <Text style={styles.epgTitle} numberOfLines={2}>
-              {nowProgram?.title || selectedChannel?.name || "Sem canal"}
-            </Text>
+                <Text style={styles.epgTitle} numberOfLines={2}>
+                  {nowProgram?.title || selectedChannel?.name || "Sem canal"}
+                </Text>
 
-            <Text style={styles.epgSub} numberOfLines={1}>
-              {selectedChannel?.group
-                ? `Grupo: ${selectedChannel.group}`
-                : "Grupo: -"}
-            </Text>
+                <Text style={styles.epgSub} numberOfLines={1}>
+                  {selectedChannel?.group
+                    ? `Grupo: ${selectedChannel.group}`
+                    : "Grupo: -"}
+                </Text>
 
-            <Text style={styles.epgDesc} numberOfLines={4}>
-              {nowProgram?.desc ||
-                "Programação atual não encontrada para este canal."}
-            </Text>
+                <Text style={styles.epgDesc} numberOfLines={3}>
+                  {nowProgram?.desc ||
+                    "Programação atual não encontrada para este canal."}
+                </Text>
 
-            <View style={styles.nextProgramBox}>
-              <Text style={styles.nextProgramLabel}>Próximo</Text>
+                <View style={styles.nextProgramBox}>
+                  <Text style={styles.nextProgramLabel}>Próximo</Text>
 
-              <Text style={styles.nextProgramTitle} numberOfLines={2}>
-                {nextProgram?.title || "Sem próximo programa"}
-              </Text>
+                  <Text style={styles.nextProgramTitle} numberOfLines={2}>
+                    {nextProgram?.title || "Sem próximo programa"}
+                  </Text>
 
-              <Text style={styles.nextProgramTime} numberOfLines={1}>
-                {nextProgram ? formatProgramTime(nextProgram) : ""}
-              </Text>
-            </View>
+                  <Text style={styles.nextProgramTime} numberOfLines={1}>
+                    {nextProgram ? formatProgramTime(nextProgram) : ""}
+                  </Text>
+                </View>
+              </>
+            )}
           </View>
-        </SafeAreaView>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -768,7 +772,7 @@ const styles = StyleSheet.create({
 
   previewBox: {
     width: "100%",
-    aspectRatio: 16 / 9,
+    height: isPhone ? 92 : 180,
     borderRadius: 8,
     overflow: "hidden",
     backgroundColor: "#000",
@@ -898,21 +902,29 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
   },
 
-  fullscreenTop: {
-    height: 56,
+  fullscreenVideoAbsolute: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#000",
+  },
+
+  fullscreenTopOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
     flexDirection: "row",
     alignItems: "center",
+    paddingTop: isPhone ? 18 : 24,
     paddingHorizontal: 10,
-    backgroundColor: "#05070d",
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.08)",
+    paddingBottom: 10,
+    backgroundColor: "rgba(0,0,0,0.38)",
   },
 
   fullscreenBackBtn: {
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: "#102033",
+    backgroundColor: "rgba(16,32,51,0.88)",
   },
 
   fullscreenBackText: {
@@ -929,18 +941,24 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
-  fullscreenVideoWrap: {
-    flex: 1,
-    backgroundColor: "#000",
+  fullscreenStatusText: {
+    position: "absolute",
+    top: isPhone ? 68 : 78,
+    alignSelf: "center",
+    color: "#ffd94d",
+    fontSize: isPhone ? 8 : 11,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
 
-  fullscreenVideo: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: "#000",
-  },
-
-  fullscreenEpg: {
-    display: "none",
+  fullscreenEpgOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: isPhone ? 10 : 14,
+    backgroundColor: "rgba(5,7,13,0.80)",
   },
 });
