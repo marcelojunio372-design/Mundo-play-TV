@@ -1,8 +1,14 @@
+function safeText(value) {
+  if (value === null || value === undefined) return "";
+  return String(value).trim();
+}
+
 function decodeXml(text = "") {
   return String(text)
     .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">");
 }
@@ -134,12 +140,17 @@ function extractProgrammes(xml = "", channelMap = {}) {
     const stop = parseXmltvDate(match[2]);
     const channelId = decodeXml(match[3] || "").trim();
     const body = match[4] || "";
+
     const title = extractTag(body, "title");
     const desc = extractTag(body, "desc");
     const category = extractTag(body, "category");
     const channelInfo = channelMap[channelId] || null;
 
-    const aliases = buildAliases(channelId, channelInfo?.displayNames || []);
+    const aliases = buildAliases(
+      channelId,
+      channelInfo?.displayNames || [],
+      category
+    );
 
     programmes.push({
       channel: channelId,
@@ -182,7 +193,7 @@ function itemTime(date) {
   return date instanceof Date ? date.getTime() : 0;
 }
 
-function scoreProgrammeMatch(programme, aliases = [], tvgId = "") {
+function scoreProgrammeMatch(programme, aliases = []) {
   const programAliases = Array.isArray(programme?.aliases)
     ? programme.aliases
     : [
@@ -190,25 +201,14 @@ function scoreProgrammeMatch(programme, aliases = [], tvgId = "") {
         programme?.cleanChannelKey || "",
       ].filter(Boolean);
 
-  const normalizedTvgId = normalizeText(tvgId);
   let score = 0;
-
-  if (normalizedTvgId) {
-    if (
-      normalizedTvgId === programme?.channelKey ||
-      normalizedTvgId === programme?.cleanChannelKey ||
-      programAliases.includes(normalizedTvgId)
-    ) {
-      score = Math.max(score, 1000);
-    }
-  }
 
   for (const channelAlias of aliases) {
     for (const programAlias of programAliases) {
       if (!channelAlias || !programAlias) continue;
 
       if (channelAlias === programAlias) {
-        score = Math.max(score, 160);
+        score = Math.max(score, 140);
         continue;
       }
 
@@ -216,7 +216,7 @@ function scoreProgrammeMatch(programme, aliases = [], tvgId = "") {
         channelAlias.startsWith(programAlias) ||
         programAlias.startsWith(channelAlias)
       ) {
-        score = Math.max(score, 130);
+        score = Math.max(score, 110);
         continue;
       }
 
@@ -224,7 +224,7 @@ function scoreProgrammeMatch(programme, aliases = [], tvgId = "") {
         channelAlias.includes(programAlias) ||
         programAlias.includes(channelAlias)
       ) {
-        score = Math.max(score, 110);
+        score = Math.max(score, 90);
         continue;
       }
 
@@ -238,7 +238,7 @@ function scoreProgrammeMatch(programme, aliases = [], tvgId = "") {
           channelShort.includes(programShort) ||
           programShort.includes(channelShort))
       ) {
-        score = Math.max(score, 95);
+        score = Math.max(score, 85);
       }
     }
   }
@@ -249,22 +249,27 @@ function scoreProgrammeMatch(programme, aliases = [], tvgId = "") {
 export function findNowAndNextForChannel(
   epgItems = [],
   channelName = "",
-  channelGroup = "",
+  group = "",
   tvgId = ""
 ) {
   const now = new Date();
-  const aliases = buildAliases(channelName, channelGroup, tvgId);
 
-  if ((!aliases.length && !tvgId) || !epgItems?.length) {
+  const aliases = buildAliases(
+    safeText(channelName),
+    safeText(group),
+    safeText(tvgId)
+  );
+
+  if (!aliases.length || !epgItems?.length) {
     return { nowProgram: null, nextProgram: null };
   }
 
   const scoredMatches = epgItems
     .map((item) => ({
       ...item,
-      _score: scoreProgrammeMatch(item, aliases, tvgId),
+      _score: scoreProgrammeMatch(item, aliases),
     }))
-    .filter((item) => item._score >= 95)
+    .filter((item) => item._score >= 85)
     .sort((a, b) => {
       if (b._score !== a._score) return b._score - a._score;
       return itemTime(a.start) - itemTime(b.start);
@@ -275,8 +280,9 @@ export function findNowAndNextForChannel(
   }
 
   const bestScore = scoredMatches[0]._score;
+
   const bestMatches = scoredMatches.filter(
-    (item) => item._score >= Math.max(95, bestScore - 25)
+    (item) => item._score >= Math.max(85, bestScore - 25)
   );
 
   const orderedMatches = [...bestMatches].sort(
@@ -297,16 +303,25 @@ export function findNowAndNextForChannel(
         if (!item.start || !current.stop) return false;
         return item.start >= current.stop;
       }) || null;
-  } else {
-    nextProgram =
-      orderedMatches.find((item) => item.start && item.start > now) || null;
   }
 
   if (!nextProgram) {
-    const upcoming = orderedMatches.filter((item) => item.start && item.start > now);
-    if (upcoming.length) {
-      nextProgram = upcoming[0];
-    }
+    nextProgram =
+      orderedMatches.find((item) => {
+        if (!item.start) return false;
+        return item.start > now;
+      }) || null;
+  }
+
+  if (!nextProgram && current) {
+    const sameChannelFuture = scoredMatches
+      .filter((item) => {
+        if (!item.start || !current.stop) return false;
+        return item.start >= current.stop;
+      })
+      .sort((a, b) => itemTime(a.start) - itemTime(b.start));
+
+    nextProgram = sameChannelFuture[0] || null;
   }
 
   return {
