@@ -8,6 +8,7 @@ function decodeEntities(text = "") {
     .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">");
 }
@@ -37,11 +38,10 @@ function cleanChannelName(name = "") {
     .trim();
 }
 
-function buildChannelAliases(name = "", group = "") {
+function buildChannelAliases(name = "", group = "", tvgId = "", tvgName = "") {
   const original = decodeEntities(safeText(name));
   const clean = cleanChannelName(original);
-
-  const rawParts = `${original} ${group}`
+  const rawParts = `${original} ${group} ${tvgId} ${tvgName}`
     .split(/[\-|/|]+/g)
     .map((item) => item.trim())
     .filter(Boolean);
@@ -50,7 +50,7 @@ function buildChannelAliases(name = "", group = "") {
     .map((item) => cleanChannelName(item))
     .filter(Boolean);
 
-  const aliases = [original, clean, ...rawParts, ...cleanParts]
+  const aliases = [original, clean, tvgId, tvgName, ...rawParts, ...cleanParts]
     .map((item) => normalizeText(item))
     .filter(Boolean);
 
@@ -58,7 +58,8 @@ function buildChannelAliases(name = "", group = "") {
 }
 
 function extractAttr(line = "", attr = "") {
-  const match = line.match(new RegExp(`${attr}="([^"]*)"`, "i"));
+  const escaped = attr.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = line.match(new RegExp(`${escaped}="([^"]*)"`, "i"));
   return match ? decodeEntities(match[1]) : "";
 }
 
@@ -80,6 +81,14 @@ function extractName(extinf = "") {
 
 function extractLogo(extinf = "") {
   return extractAttr(extinf, "tvg-logo") || extractAttr(extinf, "logo") || "";
+}
+
+function extractTvgId(extinf = "") {
+  return safeText(extractAttr(extinf, "tvg-id"));
+}
+
+function extractTvgName(extinf = "") {
+  return safeText(extractAttr(extinf, "tvg-name"));
 }
 
 function extractYear(name = "", group = "") {
@@ -159,9 +168,7 @@ function inferType(name = "", group = "", url = "") {
     /\/movie\/|type=movie|action=get_vod_stream|\/vod\//i.test(link);
 
   const bySeriesUrl =
-    /\/series\/|type=series|action=get_series|action=get_series_info/i.test(
-      link
-    );
+    /\/series\/|type=series|action=get_series|action=get_series_info/i.test(link);
 
   const liveGroupForced =
     /abertos|esportes|not[ií]cias|document[aá]rios|religiosos|variedades|globo|sbt|record|band|discovery|ao vivo|tv ao vivo|24h|canais 24h/.test(
@@ -233,10 +240,12 @@ export async function loadM3U(url) {
     const name = extractName(extinf);
     const group = extractGroup(extinf);
     const logo = extractLogo(extinf);
+    const tvgId = extractTvgId(extinf);
+    const tvgName = extractTvgName(extinf);
     const type = inferType(name, group, streamUrl);
     const year = extractYear(name, group);
     const description = extractDescription(extinf, name, group);
-    const aliases = buildChannelAliases(name, group);
+    const aliases = buildChannelAliases(name, group, tvgId, tvgName);
 
     const item = {
       id: `${type}_${i}_${name}`.replace(/\s+/g, "_"),
@@ -247,6 +256,8 @@ export async function loadM3U(url) {
       type,
       year,
       description,
+      tvgId,
+      tvgName,
       channelKey: normalizeText(name),
       cleanChannelKey: normalizeText(cleanChannelName(name)),
       aliases,
