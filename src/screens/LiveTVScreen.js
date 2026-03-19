@@ -240,14 +240,6 @@ export default function LiveTVScreen({
     setSearch("");
   };
 
-  const handleSelectChannel = async (index) => {
-    setSelectedChannelIndex(index);
-    const item = visibleChannels[index];
-    if (item) {
-      await addToRecent(item);
-    }
-  };
-
   const scheduleReconnect = () => {
     if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
 
@@ -264,6 +256,17 @@ export default function LiveTVScreen({
     fullscreenReconnectTimerRef.current = setTimeout(() => {
       setFullscreenRetryKey((prev) => prev + 1);
     }, 2500);
+  };
+
+  const handleSelectChannel = async (index) => {
+    setSelectedChannelIndex(index);
+    const item = visibleChannels[index];
+
+    if (item) {
+      await addToRecent(item);
+      setPlayerError("");
+      setRetryKey((prev) => prev + 1);
+    }
   };
 
   const openFullscreen = async () => {
@@ -284,22 +287,6 @@ export default function LiveTVScreen({
     }
 
     setShowFullscreen(false);
-  };
-
-  const handlePlay = async () => {
-    try {
-      await addToRecent(selectedChannel);
-      setPlayerError("");
-      await videoRef.current?.playAsync?.();
-    } catch (e) {
-      setRetryKey((prev) => prev + 1);
-    }
-  };
-
-  const handlePause = async () => {
-    try {
-      await videoRef.current?.pauseAsync?.();
-    } catch (e) {}
   };
 
   return (
@@ -422,7 +409,11 @@ export default function LiveTVScreen({
         </View>
 
         <View style={styles.rightPanel}>
-          <View style={styles.previewBox}>
+          <TouchableOpacity
+            activeOpacity={0.95}
+            style={styles.previewBox}
+            onPress={openFullscreen}
+          >
             {selectedChannel?.url ? (
               <Video
                 key={`${selectedChannel.url}_${retryKey}`}
@@ -430,7 +421,7 @@ export default function LiveTVScreen({
                 source={{ uri: selectedChannel.url }}
                 style={styles.previewVideo}
                 resizeMode={ResizeMode.COVER}
-                useNativeControls
+                useNativeControls={false}
                 shouldPlay
                 isLooping={false}
                 onLoadStart={() => setPlayerError("")}
@@ -445,34 +436,22 @@ export default function LiveTVScreen({
                 <Text style={styles.previewEmptyText}>Selecione um canal</Text>
               </View>
             )}
-          </View>
+          </TouchableOpacity>
 
           {!!playerError && (
             <Text style={styles.playerStatusText}>{playerError}</Text>
           )}
 
-          <View style={styles.previewActions}>
-            <TouchableOpacity style={styles.actionBtnSmall} onPress={handlePlay}>
-              <Text style={styles.actionBtnText}>PLAY</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.actionBtnSmall} onPress={handlePause}>
-              <Text style={styles.actionBtnText}>PAUSE</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.actionBtnSmall} onPress={openFullscreen}>
-              <Text style={styles.actionBtnText}>FULL</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.actionBtnSmall} onPress={toggleFavorite}>
-              <Text style={styles.actionBtnText}>
-                {isFavorite ? "★ FAVORITO" : "☆ FAVORITAR"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
           <View style={styles.epgBox}>
-            <Text style={styles.epgHeader}>EPG</Text>
+            <View style={styles.epgTopRow}>
+              <Text style={styles.epgHeader}>EPG</Text>
+
+              <TouchableOpacity style={styles.favoriteBtn} onPress={toggleFavorite}>
+                <Text style={styles.favoriteBtnText}>
+                  {isFavorite ? "★ FAVORITO" : "☆ FAVORITAR"}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             {epgLoading ? (
               <Text style={styles.epgDesc}>Carregando programação...</Text>
@@ -492,7 +471,7 @@ export default function LiveTVScreen({
                     : "Grupo: -"}
                 </Text>
 
-                <Text style={styles.epgDesc} numberOfLines={4}>
+                <Text style={styles.epgDesc} numberOfLines={3}>
                   {nowProgram?.desc ||
                     "Programação atual não encontrada para este canal."}
                 </Text>
@@ -525,21 +504,27 @@ export default function LiveTVScreen({
           <StatusBar hidden />
 
           {selectedChannel?.url ? (
-            <Video
-              key={`${selectedChannel.url}_${fullscreenRetryKey}_fullscreen`}
-              ref={fullscreenVideoRef}
-              source={{ uri: selectedChannel.url }}
-              style={styles.fullscreenVideoAbsolute}
-              resizeMode={ResizeMode.COVER}
-              shouldPlay
-              useNativeControls
-              onLoadStart={() => setFullscreenError("")}
-              onReadyForDisplay={() => setFullscreenError("")}
-              onError={() => {
-                setFullscreenError("Reconectando sinal...");
-                scheduleFullscreenReconnect();
-              }}
-            />
+            <TouchableOpacity
+              activeOpacity={1}
+              style={styles.fullscreenVideoTouch}
+              onPress={closeFullscreen}
+            >
+              <Video
+                key={`${selectedChannel.url}_${fullscreenRetryKey}_fullscreen`}
+                ref={fullscreenVideoRef}
+                source={{ uri: selectedChannel.url }}
+                style={styles.fullscreenVideoAbsolute}
+                resizeMode={ResizeMode.COVER}
+                shouldPlay
+                useNativeControls={false}
+                onLoadStart={() => setFullscreenError("")}
+                onReadyForDisplay={() => setFullscreenError("")}
+                onError={() => {
+                  setFullscreenError("Reconectando sinal...");
+                  scheduleFullscreenReconnect();
+                }}
+              />
+            </TouchableOpacity>
           ) : (
             <View style={styles.previewEmpty}>
               <Text style={styles.previewEmptyText}>Sem sinal</Text>
@@ -584,7 +569,7 @@ export default function LiveTVScreen({
                     : "Grupo: -"}
                 </Text>
 
-                <Text style={styles.epgDesc} numberOfLines={3}>
+                <Text style={styles.epgDesc} numberOfLines={2}>
                   {nowProgram?.desc ||
                     "Programação atual não encontrada para este canal."}
                 </Text>
@@ -592,7 +577,7 @@ export default function LiveTVScreen({
                 <View style={styles.nextProgramBox}>
                   <Text style={styles.nextProgramLabel}>Próximo</Text>
 
-                  <Text style={styles.nextProgramTitle} numberOfLines={2}>
+                  <Text style={styles.nextProgramTitle} numberOfLines={1}>
                     {nextProgram?.title || "Sem próximo programa"}
                   </Text>
 
@@ -772,7 +757,7 @@ const styles = StyleSheet.create({
 
   previewBox: {
     width: "100%",
-    height: isPhone ? 92 : 180,
+    height: isPhone ? 115 : 220,
     borderRadius: 8,
     overflow: "hidden",
     backgroundColor: "#000",
@@ -804,33 +789,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  previewActions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-
-  actionBtnSmall: {
-    minWidth: isPhone ? 58 : 86,
-    height: isPhone ? 32 : 40,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#38d7ff",
-    backgroundColor: "rgba(56,215,255,0.10)",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: isPhone ? 8 : 12,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-
-  actionBtnText: {
-    color: "#38d7ff",
-    fontSize: isPhone ? 8 : 12,
-    fontWeight: "900",
-  },
-
   epgBox: {
     flex: 1,
     backgroundColor: "#10183f",
@@ -838,11 +796,35 @@ const styles = StyleSheet.create({
     padding: isPhone ? 10 : 14,
   },
 
+  epgTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+
+  favoriteBtn: {
+    minWidth: isPhone ? 88 : 120,
+    height: isPhone ? 28 : 34,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#38d7ff",
+    backgroundColor: "rgba(56,215,255,0.10)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
+
+  favoriteBtnText: {
+    color: "#38d7ff",
+    fontSize: isPhone ? 7.5 : 10,
+    fontWeight: "900",
+  },
+
   epgHeader: {
     color: "#38d7ff",
     fontSize: isPhone ? 10 : 14,
     fontWeight: "900",
-    marginBottom: 6,
   },
 
   epgTime: {
@@ -902,6 +884,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
   },
 
+  fullscreenVideoTouch: {
+    flex: 1,
+  },
+
   fullscreenVideoAbsolute: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "#000",
@@ -917,7 +903,7 @@ const styles = StyleSheet.create({
     paddingTop: isPhone ? 18 : 24,
     paddingHorizontal: 10,
     paddingBottom: 10,
-    backgroundColor: "rgba(0,0,0,0.38)",
+    backgroundColor: "rgba(0,0,0,0.35)",
   },
 
   fullscreenBackBtn: {
@@ -959,6 +945,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     padding: isPhone ? 10 : 14,
-    backgroundColor: "rgba(5,7,13,0.80)",
+    backgroundColor: "rgba(5,7,13,0.78)",
   },
 });
