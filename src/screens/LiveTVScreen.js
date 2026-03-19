@@ -56,6 +56,20 @@ function buildCategories(channels = [], favorites = [], recents = []) {
   ];
 }
 
+function getProgressPercent(program) {
+  if (!program?.start || !program?.stop) return 0;
+
+  const now = Date.now();
+  const start = program.start.getTime();
+  const stop = program.stop.getTime();
+
+  if (stop <= start) return 0;
+  if (now <= start) return 0;
+  if (now >= stop) return 100;
+
+  return Math.max(0, Math.min(100, ((now - start) / (stop - start)) * 100));
+}
+
 export default function LiveTVScreen({
   session,
   onOpenHome,
@@ -77,11 +91,15 @@ export default function LiveTVScreen({
   const [fullscreenRetryKey, setFullscreenRetryKey] = useState(0);
   const [playerError, setPlayerError] = useState("");
   const [fullscreenError, setFullscreenError] = useState("");
+  const [isPaused, setIsPaused] = useState(false);
+  const [isFullscreenPaused, setIsFullscreenPaused] = useState(false);
+  const [showFullscreenUi, setShowFullscreenUi] = useState(true);
 
   const videoRef = useRef(null);
   const fullscreenVideoRef = useRef(null);
   const reconnectTimerRef = useRef(null);
   const fullscreenReconnectTimerRef = useRef(null);
+  const fullscreenUiTimerRef = useRef(null);
 
   useEffect(() => {
     async function loadSavedData() {
@@ -138,6 +156,8 @@ export default function LiveTVScreen({
     setFullscreenRetryKey((prev) => prev + 1);
     setPlayerError("");
     setFullscreenError("");
+    setIsPaused(false);
+    setIsFullscreenPaused(false);
   }, [selectedChannel?.url]);
 
   useEffect(() => {
@@ -145,6 +165,9 @@ export default function LiveTVScreen({
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       if (fullscreenReconnectTimerRef.current) {
         clearTimeout(fullscreenReconnectTimerRef.current);
+      }
+      if (fullscreenUiTimerRef.current) {
+        clearTimeout(fullscreenUiTimerRef.current);
       }
     };
   }, []);
@@ -197,6 +220,8 @@ export default function LiveTVScreen({
       safeText(selectedChannel.tvgId)
     );
   }, [epgItems, selectedChannel]);
+
+  const progressPercent = useMemo(() => getProgressPercent(nowProgram), [nowProgram]);
 
   const persistFavorites = async (ids) => {
     try {
@@ -258,6 +283,29 @@ export default function LiveTVScreen({
     }, 2500);
   };
 
+  const resetFullscreenUiTimer = () => {
+    setShowFullscreenUi(true);
+
+    if (fullscreenUiTimerRef.current) {
+      clearTimeout(fullscreenUiTimerRef.current);
+    }
+
+    fullscreenUiTimerRef.current = setTimeout(() => {
+      setShowFullscreenUi(false);
+    }, 2500);
+  };
+
+  const toggleFullscreenUi = () => {
+    if (showFullscreenUi) {
+      setShowFullscreenUi(false);
+      if (fullscreenUiTimerRef.current) {
+        clearTimeout(fullscreenUiTimerRef.current);
+      }
+    } else {
+      resetFullscreenUiTimer();
+    }
+  };
+
   const handleSelectChannel = async (index) => {
     setSelectedChannelIndex(index);
     const item = visibleChannels[index];
@@ -266,6 +314,8 @@ export default function LiveTVScreen({
       await addToRecent(item);
       setPlayerError("");
       setRetryKey((prev) => prev + 1);
+      setIsPaused(false);
+      setIsFullscreenPaused(false);
     }
   };
 
@@ -274,7 +324,9 @@ export default function LiveTVScreen({
     await addToRecent(selectedChannel);
     setFullscreenError("");
     setFullscreenRetryKey((prev) => prev + 1);
+    setIsFullscreenPaused(false);
     setShowFullscreen(true);
+    resetFullscreenUiTimer();
   };
 
   const closeFullscreen = async () => {
@@ -286,7 +338,50 @@ export default function LiveTVScreen({
       clearTimeout(fullscreenReconnectTimerRef.current);
     }
 
+    if (fullscreenUiTimerRef.current) {
+      clearTimeout(fullscreenUiTimerRef.current);
+    }
+
     setShowFullscreen(false);
+  };
+
+  const togglePauseMain = async () => {
+    try {
+      if (isPaused) {
+        await videoRef.current?.playAsync?.();
+        setIsPaused(false);
+      } else {
+        await videoRef.current?.pauseAsync?.();
+        setIsPaused(true);
+      }
+    } catch (e) {}
+  };
+
+  const togglePauseFullscreen = async () => {
+    try {
+      if (isFullscreenPaused) {
+        await fullscreenVideoRef.current?.playAsync?.();
+        setIsFullscreenPaused(false);
+      } else {
+        await fullscreenVideoRef.current?.pauseAsync?.();
+        setIsFullscreenPaused(true);
+      }
+      resetFullscreenUiTimer();
+    } catch (e) {}
+  };
+
+  const goToPreviousChannel = async () => {
+    if (!visibleChannels.length) return;
+    const nextIndex =
+      selectedChannelIndex <= 0 ? visibleChannels.length - 1 : selectedChannelIndex - 1;
+    await handleSelectChannel(nextIndex);
+  };
+
+  const goToNextChannel = async () => {
+    if (!visibleChannels.length) return;
+    const nextIndex =
+      selectedChannelIndex >= visibleChannels.length - 1 ? 0 : selectedChannelIndex + 1;
+    await handleSelectChannel(nextIndex);
   };
 
   return (
@@ -422,7 +517,7 @@ export default function LiveTVScreen({
                 style={styles.previewVideo}
                 resizeMode={ResizeMode.COVER}
                 useNativeControls={false}
-                shouldPlay
+                shouldPlay={!isPaused}
                 isLooping={false}
                 onLoadStart={() => setPlayerError("")}
                 onReadyForDisplay={() => setPlayerError("")}
@@ -444,13 +539,41 @@ export default function LiveTVScreen({
 
           <View style={styles.epgBox}>
             <View style={styles.epgTopRow}>
-              <Text style={styles.epgHeader}>EPG</Text>
-
-              <TouchableOpacity style={styles.favoriteBtn} onPress={toggleFavorite}>
-                <Text style={styles.favoriteBtnText}>
-                  {isFavorite ? "★ FAVORITO" : "☆ FAVORITAR"}
+              <View style={styles.channelInfoWrap}>
+                <Text style={styles.channelNumberLarge}>
+                  {selectedChannelIndex + 1}
                 </Text>
-              </TouchableOpacity>
+                <View style={styles.channelMetaWrap}>
+                  <Text style={styles.epgHeader} numberOfLines={1}>
+                    {selectedChannel?.name || "Sem canal"}
+                  </Text>
+                  <Text style={styles.epgSub} numberOfLines={1}>
+                    {selectedChannel?.group || "Canal"}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.epgActions}>
+                <TouchableOpacity style={styles.smallControlBtn} onPress={goToPreviousChannel}>
+                  <Text style={styles.smallControlBtnText}>◀</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.smallControlBtn} onPress={togglePauseMain}>
+                  <Text style={styles.smallControlBtnText}>
+                    {isPaused ? "PLAY" : "PAUSE"}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.smallControlBtn} onPress={goToNextChannel}>
+                  <Text style={styles.smallControlBtnText}>▶</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.favoriteBtn} onPress={toggleFavorite}>
+                  <Text style={styles.favoriteBtnText}>
+                    {isFavorite ? "★" : "☆"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {epgLoading ? (
@@ -465,11 +588,11 @@ export default function LiveTVScreen({
                   {nowProgram?.title || selectedChannel?.name || "Sem canal selecionado"}
                 </Text>
 
-                <Text style={styles.epgSub} numberOfLines={1}>
-                  {selectedChannel?.group
-                    ? `Grupo: ${selectedChannel.group}`
-                    : "Grupo: -"}
-                </Text>
+                <View style={styles.progressTrack}>
+                  <View
+                    style={[styles.progressFill, { width: `${progressPercent}%` }]}
+                  />
+                </View>
 
                 <Text style={styles.epgDesc} numberOfLines={3}>
                   {nowProgram?.desc ||
@@ -500,95 +623,99 @@ export default function LiveTVScreen({
         onRequestClose={closeFullscreen}
         statusBarTranslucent
       >
-        <View style={styles.fullscreenContainer}>
-          <StatusBar hidden />
-
+        <TouchableOpacity
+          activeOpacity={1}
+          style={styles.fullscreenContainer}
+          onPress={toggleFullscreenUi}
+        >
           {selectedChannel?.url ? (
-            <TouchableOpacity
-              activeOpacity={1}
-              style={styles.fullscreenVideoTouch}
-              onPress={closeFullscreen}
-            >
-              <Video
-                key={`${selectedChannel.url}_${fullscreenRetryKey}_fullscreen`}
-                ref={fullscreenVideoRef}
-                source={{ uri: selectedChannel.url }}
-                style={styles.fullscreenVideoAbsolute}
-                resizeMode={ResizeMode.COVER}
-                shouldPlay
-                useNativeControls={false}
-                onLoadStart={() => setFullscreenError("")}
-                onReadyForDisplay={() => setFullscreenError("")}
-                onError={() => {
-                  setFullscreenError("Reconectando sinal...");
-                  scheduleFullscreenReconnect();
-                }}
-              />
-            </TouchableOpacity>
+            <Video
+              key={`${selectedChannel.url}_${fullscreenRetryKey}_fullscreen`}
+              ref={fullscreenVideoRef}
+              source={{ uri: selectedChannel.url }}
+              style={styles.fullscreenVideoAbsolute}
+              resizeMode={ResizeMode.COVER}
+              shouldPlay={!isFullscreenPaused}
+              useNativeControls={false}
+              onLoadStart={() => setFullscreenError("")}
+              onReadyForDisplay={() => setFullscreenError("")}
+              onError={() => {
+                setFullscreenError("Reconectando sinal...");
+                scheduleFullscreenReconnect();
+              }}
+            />
           ) : (
             <View style={styles.previewEmpty}>
               <Text style={styles.previewEmptyText}>Sem sinal</Text>
             </View>
           )}
 
-          <View style={styles.fullscreenTopOverlay}>
-            <TouchableOpacity
-              onPress={closeFullscreen}
-              style={styles.fullscreenBackBtn}
-            >
-              <Text style={styles.fullscreenBackText}>VOLTAR</Text>
-            </TouchableOpacity>
+          {showFullscreenUi && (
+            <>
+              <View style={styles.fullscreenTopOverlay}>
+                <TouchableOpacity
+                  onPress={closeFullscreen}
+                  style={styles.fullscreenBackBtn}
+                >
+                  <Text style={styles.fullscreenBackText}>VOLTAR</Text>
+                </TouchableOpacity>
 
-            <Text style={styles.fullscreenTitle} numberOfLines={1}>
-              {selectedChannel?.name || "Canal"}
-            </Text>
-          </View>
-
-          {!!fullscreenError && (
-            <Text style={styles.fullscreenStatusText}>{fullscreenError}</Text>
-          )}
-
-          <View style={styles.fullscreenEpgOverlay}>
-            <Text style={styles.epgHeader}>EPG</Text>
-
-            {epgLoading ? (
-              <Text style={styles.epgDesc}>Carregando programação...</Text>
-            ) : (
-              <>
-                <Text style={styles.epgTime}>
-                  {nowProgram ? formatProgramTime(nowProgram) : "Ao vivo agora"}
+                <Text style={styles.fullscreenTitle} numberOfLines={1}>
+                  {selectedChannel?.name || "Canal"}
                 </Text>
 
-                <Text style={styles.epgTitle} numberOfLines={2}>
-                  {nowProgram?.title || selectedChannel?.name || "Sem canal"}
-                </Text>
+                <View style={styles.fullscreenControlsRight}>
+                  <TouchableOpacity
+                    style={styles.pauseBtn}
+                    onPress={goToPreviousChannel}
+                  >
+                    <Text style={styles.pauseBtnText}>◀</Text>
+                  </TouchableOpacity>
 
-                <Text style={styles.epgSub} numberOfLines={1}>
-                  {selectedChannel?.group
-                    ? `Grupo: ${selectedChannel.group}`
-                    : "Grupo: -"}
-                </Text>
+                  <TouchableOpacity
+                    style={styles.pauseBtn}
+                    onPress={togglePauseFullscreen}
+                  >
+                    <Text style={styles.pauseBtnText}>
+                      {isFullscreenPaused ? "PLAY" : "PAUSE"}
+                    </Text>
+                  </TouchableOpacity>
 
-                <Text style={styles.epgDesc} numberOfLines={2}>
-                  {nowProgram?.desc ||
-                    "Programação atual não encontrada para este canal."}
-                </Text>
-
-                <View style={styles.nextProgramBox}>
-                  <Text style={styles.nextProgramLabel}>Próximo</Text>
-
-                  <Text style={styles.nextProgramTitle} numberOfLines={1}>
-                    {nextProgram?.title || "Sem próximo programa"}
-                  </Text>
-
-                  <Text style={styles.nextProgramTime} numberOfLines={1}>
-                    {nextProgram ? formatProgramTime(nextProgram) : ""}
-                  </Text>
+                  <TouchableOpacity
+                    style={styles.pauseBtn}
+                    onPress={goToNextChannel}
+                  >
+                    <Text style={styles.pauseBtnText}>▶</Text>
+                  </TouchableOpacity>
                 </View>
-              </>
-            )}
-          </View>
-        </View>
+              </View>
+
+              {!!fullscreenError && (
+                <Text style={styles.fullscreenStatusText}>{fullscreenError}</Text>
+              )}
+
+              <View style={styles.fullscreenEpgOverlay}>
+                <Text style={styles.overlayNowLine} numberOfLines={1}>
+                  {nowProgram
+                    ? `Agora: ${formatProgramTime(nowProgram)}  ${nowProgram.title || selectedChannel?.name || ""}`
+                    : `Agora: ${selectedChannel?.name || "Sem canal"}`}
+                </Text>
+
+                <View style={styles.progressTrackFullscreen}>
+                  <View
+                    style={[styles.progressFill, { width: `${progressPercent}%` }]}
+                  />
+                </View>
+
+                <Text style={styles.overlayNextLine} numberOfLines={1}>
+                  {nextProgram
+                    ? `Próximo: ${formatProgramTime(nextProgram)}  ${nextProgram.title || ""}`
+                    : "Próximo: Sem próximo programa"}
+                </Text>
+              </View>
+            </>
+          )}
+        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );
@@ -757,7 +884,7 @@ const styles = StyleSheet.create({
 
   previewBox: {
     width: "100%",
-    height: isPhone ? 115 : 220,
+    height: isPhone ? 118 : 220,
     borderRadius: 8,
     overflow: "hidden",
     backgroundColor: "#000",
@@ -803,8 +930,69 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
 
+  channelInfoWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    marginRight: 8,
+  },
+
+  channelNumberLarge: {
+    color: "#38d7ff",
+    fontSize: isPhone ? 16 : 22,
+    fontWeight: "900",
+    marginRight: 10,
+  },
+
+  channelMetaWrap: {
+    flex: 1,
+  },
+
+  epgActions: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  smallControlBtn: {
+    minWidth: isPhone ? 40 : 52,
+    height: isPhone ? 28 : 34,
+    borderRadius: 8,
+    backgroundColor: "rgba(7,20,35,0.85)",
+    borderWidth: 1,
+    borderColor: "#38d7ff",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    marginRight: 8,
+  },
+
+  smallControlBtnText: {
+    color: "#38d7ff",
+    fontSize: isPhone ? 8 : 10,
+    fontWeight: "900",
+  },
+
+  pauseBtn: {
+    minWidth: isPhone ? 58 : 74,
+    height: isPhone ? 30 : 34,
+    borderRadius: 8,
+    backgroundColor: "rgba(7,20,35,0.85)",
+    borderWidth: 1,
+    borderColor: "#38d7ff",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    marginLeft: 8,
+  },
+
+  pauseBtnText: {
+    color: "#38d7ff",
+    fontSize: isPhone ? 8 : 10,
+    fontWeight: "900",
+  },
+
   favoriteBtn: {
-    minWidth: isPhone ? 88 : 120,
+    minWidth: isPhone ? 40 : 44,
     height: isPhone ? 28 : 34,
     borderRadius: 8,
     borderWidth: 1,
@@ -817,7 +1005,7 @@ const styles = StyleSheet.create({
 
   favoriteBtnText: {
     color: "#38d7ff",
-    fontSize: isPhone ? 7.5 : 10,
+    fontSize: isPhone ? 12 : 14,
     fontWeight: "900",
   },
 
@@ -838,19 +1026,42 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: isPhone ? 10.5 : 15,
     fontWeight: "900",
-    marginBottom: 4,
+    marginBottom: 6,
   },
 
   epgSub: {
     color: "#c4d1df",
     fontSize: isPhone ? 8.5 : 11,
-    marginBottom: 6,
   },
 
   epgDesc: {
     color: "#d7e1ec",
     fontSize: isPhone ? 8.5 : 11,
     lineHeight: isPhone ? 13 : 17,
+  },
+
+  progressTrack: {
+    width: "100%",
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    overflow: "hidden",
+    marginBottom: 8,
+  },
+
+  progressTrackFullscreen: {
+    width: "100%",
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.20)",
+    overflow: "hidden",
+    marginBottom: 6,
+  },
+
+  progressFill: {
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: "#38d7ff",
   },
 
   nextProgramBox: {
@@ -884,10 +1095,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
   },
 
-  fullscreenVideoTouch: {
-    flex: 1,
-  },
-
   fullscreenVideoAbsolute: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "#000",
@@ -900,10 +1107,11 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingTop: isPhone ? 18 : 24,
     paddingHorizontal: 10,
-    paddingBottom: 10,
-    backgroundColor: "rgba(0,0,0,0.35)",
+    paddingBottom: 8,
+    backgroundColor: "rgba(0,0,0,0.18)",
   },
 
   fullscreenBackBtn: {
@@ -923,13 +1131,19 @@ const styles = StyleSheet.create({
     flex: 1,
     color: "#fff",
     marginLeft: 12,
+    marginRight: 12,
     fontSize: isPhone ? 12 : 16,
     fontWeight: "800",
   },
 
+  fullscreenControlsRight: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
   fullscreenStatusText: {
     position: "absolute",
-    top: isPhone ? 68 : 78,
+    top: isPhone ? 70 : 80,
     alignSelf: "center",
     color: "#ffd94d",
     fontSize: isPhone ? 8 : 11,
@@ -944,7 +1158,21 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    padding: isPhone ? 10 : 14,
-    backgroundColor: "rgba(5,7,13,0.78)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "rgba(5,7,13,0.30)",
+  },
+
+  overlayNowLine: {
+    color: "#ffffff",
+    fontSize: isPhone ? 8 : 11,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+
+  overlayNextLine: {
+    color: "#d8e5f0",
+    fontSize: isPhone ? 7.5 : 10,
+    fontWeight: "600",
   },
 });
