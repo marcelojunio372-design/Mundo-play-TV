@@ -112,143 +112,35 @@ function extractDescription(extinf = "", name = "", group = "") {
     return safeText(name || "Conteúdo de série.");
   }
 
-  if (/movie|filme|cinema|lançamento|vod/.test(text)) {
+  if (/movie|filme|cinema|lançamento|lancamento|vod/.test(text)) {
     return safeText(name || "Conteúdo de filme.");
   }
 
   return safeText(name || "");
 }
 
-function looksLikeLiveGroup(group = "") {
-  const text = safeText(group).toLowerCase();
-
-  return /abertos|tv aberta|esportes|sport|not[ií]cias|news|document[aá]rios|religiosos|variedades|infantil|kids|globo|sbt|record|band|discovery|history|national geographic|natgeo|24h|ao vivo|tv ao vivo|canais|regionais|locais/.test(
-    text
-  );
-}
-
-function looksLikeMovieGroup(group = "") {
-  const text = safeText(group).toLowerCase();
-
-  return /filmes|filme|movies|movie|cinema|lançamento|lancamento|terror|ação|acao|com[eé]dia|comedia|drama|romance|anima[cç][aã]o|suspense|dublado|legendado|nacional|adult/.test(
-    text
-  );
-}
-
-function looksLikeSeriesGroup(group = "") {
-  const text = safeText(group).toLowerCase();
-
-  return /s[eé]ries|series|temporadas|season|novelas|doramas|anime/.test(text);
-}
-
-function looksLikeMovieName(name = "") {
-  const text = safeText(name).toLowerCase();
-  return /\b(19\d{2}|20\d{2})\b/.test(text);
-}
-
-function isSeriesByText(name = "", group = "", url = "") {
-  const text = `${name} ${group} ${url}`.toLowerCase();
-
-  return /series|séries|temporada|epis[oó]dio|season|cap[ií]tulo|s\d{1,2}e\d{1,2}|novelas|anime|dorama/.test(
-    text
-  );
-}
-
-function isMovieByText(name = "", group = "", url = "") {
-  const text = `${name} ${group} ${url}`.toLowerCase();
-
-  return /movie|filme|cinema|vod|lançamento|lancamento|ação|acao|terror|drama|romance|com[eé]dia|comedia|anima[cç][aã]o/.test(
-    text
-  );
-}
-
-function hasLiveUrl(url = "") {
+function inferType(name = "", group = "", url = "", tvgId = "", tvgName = "") {
   const text = safeText(url).toLowerCase();
-
-  return (
-    /\/live\//.test(text) ||
-    /type=live/.test(text) ||
-    /\/play\/live/.test(text) ||
-    /\.(m3u8|ts)(\?|$)/.test(text)
-  );
-}
-
-function hasMovieUrl(url = "") {
-  const text = safeText(url).toLowerCase();
-
-  return (
-    /\/movie\//.test(text) ||
-    /type=movie/.test(text) ||
-    /action=get_vod_stream/.test(text) ||
-    /\/vod\//.test(text)
-  );
-}
-
-function hasSeriesUrl(url = "") {
-  const text = safeText(url).toLowerCase();
-
-  return (
-    /\/series\//.test(text) ||
-    /type=series/.test(text) ||
-    /action=get_series/.test(text) ||
-    /action=get_series_info/.test(text)
-  );
-}
-
-function shouldForceLive(name = "", group = "", url = "") {
-  const text = `${name} ${group} ${url}`.toLowerCase();
 
   if (
-    /warner channel|hbo|telecine|premiere|sportv|discovery|history|tnt|space|megapix|canal brasil|globo|sbt|record|band|multishow|gnt|viva|fox|fx|sony|axn|a&e|amc|agrobrasil|amazon sat|all sports|espn|cnn|bandnews|globonews/.test(
-      text
-    )
+    /\/movie\//.test(text) ||
+    /action=get_vod_stream/.test(text) ||
+    /type=movie/.test(text) ||
+    /\/vod\//.test(text)
   ) {
-    return true;
+    return "movie";
   }
 
-  return hasLiveUrl(url) || looksLikeLiveGroup(group);
-}
-
-function inferType(name = "", group = "", url = "", tvgId = "", tvgName = "") {
-  const merged = `${name} ${group} ${url} ${tvgId} ${tvgName}`.toLowerCase();
-
-  if (hasMovieUrl(url)) return "movie";
-  if (hasSeriesUrl(url)) return "series";
-
-  if (looksLikeSeriesGroup(group) || isSeriesByText(name, group, url)) {
+  if (
+    /\/series\//.test(text) ||
+    /action=get_series/.test(text) ||
+    /action=get_series_info/.test(text) ||
+    /type=series/.test(text)
+  ) {
     return "series";
   }
 
-  if (looksLikeMovieGroup(group) || isMovieByText(name, group, url)) {
-    return "movie";
-  }
-
-  if (shouldForceLive(name, group, url)) {
-    return "live";
-  }
-
-  if (looksLikeLiveGroup(group)) {
-    return "live";
-  }
-
-  if (hasLiveUrl(url) && !looksLikeMovieGroup(group) && !looksLikeSeriesGroup(group)) {
-    return "live";
-  }
-
-  if (
-    looksLikeMovieName(name) &&
-    !looksLikeLiveGroup(group) &&
-    !hasLiveUrl(url)
-  ) {
-    return "movie";
-  }
-
-  if (/vod|filme|movie|series|séries|temporada|epis[oó]dio/.test(merged)) {
-    if (/series|séries|temporada|epis[oó]dio/.test(merged)) return "series";
-    return "movie";
-  }
-
-  return "unknown";
+  return "live";
 }
 
 function buildCategories(items = []) {
@@ -313,10 +205,6 @@ export async function loadM3U(url) {
     const description = extractDescription(extinf, name, group);
     const aliases = buildChannelAliases(name, group, tvgId, tvgName);
 
-    if (type === "unknown") {
-      continue;
-    }
-
     const item = {
       id: `${type}_${i}_${name}`.replace(/\s+/g, "_"),
       name,
@@ -337,7 +225,7 @@ export async function loadM3U(url) {
       movies.push(item);
     } else if (type === "series") {
       series.push(item);
-    } else if (type === "live") {
+    } else {
       live.push(item);
     }
   }
