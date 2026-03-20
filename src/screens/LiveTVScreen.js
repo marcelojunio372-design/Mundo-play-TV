@@ -24,6 +24,8 @@ const isPhone = width < 900;
 
 const FAVORITES_KEY = "mundoplaytv_live_favorites";
 const RECENTS_KEY = "mundoplaytv_live_recents";
+const CATEGORY_ROW_HEIGHT = isPhone ? 34 : 46;
+const CHANNEL_ROW_HEIGHT = isPhone ? 38 : 48;
 
 function safeText(value) {
   if (value === null || value === undefined) return "";
@@ -140,7 +142,7 @@ export default function LiveTVScreen({
     async function fetchEPG() {
       try {
         setEpgLoading(true);
-        const data = await loadEPG();
+        const data = await loadEPG(session);
 
         if (active) {
           setEpgItems(Array.isArray(data) ? data : []);
@@ -161,7 +163,7 @@ export default function LiveTVScreen({
     return () => {
       active = false;
     };
-  }, []);
+  }, [session]);
 
   const favoriteChannels = useMemo(() => {
     const favoriteSet = new Set(favoriteIds);
@@ -189,6 +191,12 @@ export default function LiveTVScreen({
       return name.includes(term) || group.includes(term);
     });
   }, [baseChannels, search]);
+
+  useEffect(() => {
+    if (selectedChannelIndex >= visibleChannels.length) {
+      setSelectedChannelIndex(0);
+    }
+  }, [visibleChannels.length, selectedChannelIndex]);
 
   const selectedChannel =
     visibleChannels[selectedChannelIndex] || visibleChannels[0] || null;
@@ -262,13 +270,13 @@ export default function LiveTVScreen({
     } catch (e) {}
   };
 
-  const addToRecent = async (channel) => {
+  const addToRecent = (channel) => {
     const id = getChannelStorageId(channel);
     if (!id) return;
 
     const updated = [id, ...recentIds.filter((item) => item !== id)].slice(0, 50);
     setRecentIds(updated);
-    await persistRecents(updated);
+    persistRecents(updated);
   };
 
   const toggleFavorite = async () => {
@@ -297,7 +305,7 @@ export default function LiveTVScreen({
 
     reconnectTimerRef.current = setTimeout(() => {
       setRetryKey((prev) => prev + 1);
-    }, 2500);
+    }, 1500);
   };
 
   const scheduleFullscreenReconnect = () => {
@@ -307,7 +315,7 @@ export default function LiveTVScreen({
 
     fullscreenReconnectTimerRef.current = setTimeout(() => {
       setFullscreenRetryKey((prev) => prev + 1);
-    }, 2500);
+    }, 1500);
   };
 
   const resetFullscreenUiTimer = () => {
@@ -333,12 +341,12 @@ export default function LiveTVScreen({
     }
   };
 
-  const handleSelectChannel = async (index) => {
+  const handleSelectChannel = (index) => {
     setSelectedChannelIndex(index);
     const item = visibleChannels[index];
 
     if (item) {
-      await addToRecent(item);
+      addToRecent(item);
       setPlayerError("");
       setRetryKey((prev) => prev + 1);
       setIsPaused(false);
@@ -346,9 +354,9 @@ export default function LiveTVScreen({
     }
   };
 
-  const handleChannelPress = async (index) => {
+  const handleChannelPress = (index) => {
     const sameChannel = index === selectedChannelIndex;
-    await handleSelectChannel(index);
+    handleSelectChannel(index);
 
     if (sameChannel) {
       setTimeout(() => {
@@ -357,9 +365,9 @@ export default function LiveTVScreen({
     }
   };
 
-  const openFullscreen = async () => {
+  const openFullscreen = () => {
     if (!selectedChannel?.url) return;
-    await addToRecent(selectedChannel);
+    addToRecent(selectedChannel);
     setFullscreenError("");
     setFullscreenRetryKey((prev) => prev + 1);
     setIsFullscreenPaused(false);
@@ -408,18 +416,83 @@ export default function LiveTVScreen({
     } catch (e) {}
   };
 
-  const goToPreviousChannel = async () => {
+  const goToPreviousChannel = () => {
     if (!visibleChannels.length) return;
     const nextIndex =
       selectedChannelIndex <= 0 ? visibleChannels.length - 1 : selectedChannelIndex - 1;
-    await handleSelectChannel(nextIndex);
+    handleSelectChannel(nextIndex);
   };
 
-  const goToNextChannel = async () => {
+  const goToNextChannel = () => {
     if (!visibleChannels.length) return;
     const nextIndex =
       selectedChannelIndex >= visibleChannels.length - 1 ? 0 : selectedChannelIndex + 1;
-    await handleSelectChannel(nextIndex);
+    handleSelectChannel(nextIndex);
+  };
+
+  const renderCategoryRow = ({ item, index }) => {
+    const active = index === selectedCategory;
+
+    return (
+      <TouchableOpacity
+        style={[styles.categoryRow, active && styles.categoryActive]}
+        onPress={() => handleSelectCategory(index)}
+        activeOpacity={0.8}
+      >
+        <Text
+          style={[
+            styles.categoryText,
+            active && styles.categoryTextActive,
+          ]}
+          numberOfLines={1}
+        >
+          {item.name}
+        </Text>
+
+        <Text
+          style={[
+            styles.categoryCount,
+            active && styles.categoryTextActive,
+          ]}
+        >
+          {item.items.length}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderChannelRow = ({ item, index }) => {
+    const active = index === selectedChannelIndex;
+    const rowFavorite = favoriteIds.includes(getChannelStorageId(item));
+
+    return (
+      <TouchableOpacity
+        style={[styles.channelRow, active && styles.channelRowActive]}
+        onPress={() => handleChannelPress(index)}
+        activeOpacity={0.8}
+      >
+        <View style={styles.channelNumberBox}>
+          <Text style={styles.channelNumber}>{index + 1}</Text>
+        </View>
+
+        <View style={styles.channelTextWrap}>
+          <Text
+            style={[
+              styles.channelName,
+              active && styles.channelNameActive,
+            ]}
+            numberOfLines={1}
+          >
+            {rowFavorite ? "★ " : ""}
+            {item.name || "Sem nome"}
+          </Text>
+
+          <Text style={styles.channelSub} numberOfLines={1}>
+            {item.group || "Canal"}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
   };
 
   return (
@@ -452,7 +525,10 @@ export default function LiveTVScreen({
         <View style={styles.searchWrap}>
           <TextInput
             value={search}
-            onChangeText={setSearch}
+            onChangeText={(text) => {
+              setSearch(text);
+              setSelectedChannelIndex(0);
+            }}
             placeholder="Buscar canal..."
             placeholderTextColor="#94a7bb"
             style={styles.searchInput}
@@ -465,35 +541,16 @@ export default function LiveTVScreen({
           <FlatList
             data={categories}
             keyExtractor={(item, index) => `${item.name}_${index}`}
-            renderItem={({ item, index }) => {
-              const active = index === selectedCategory;
-
-              return (
-                <TouchableOpacity
-                  style={[styles.categoryRow, active && styles.categoryActive]}
-                  onPress={() => handleSelectCategory(index)}
-                >
-                  <Text
-                    style={[
-                      styles.categoryText,
-                      active && styles.categoryTextActive,
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {item.name}
-                  </Text>
-
-                  <Text
-                    style={[
-                      styles.categoryCount,
-                      active && styles.categoryTextActive,
-                    ]}
-                  >
-                    {item.items.length}
-                  </Text>
-                </TouchableOpacity>
-              );
-            }}
+            renderItem={renderCategoryRow}
+            getItemLayout={(_, index) => ({
+              length: CATEGORY_ROW_HEIGHT,
+              offset: CATEGORY_ROW_HEIGHT * index,
+              index,
+            })}
+            initialNumToRender={18}
+            maxToRenderPerBatch={18}
+            windowSize={8}
+            removeClippedSubviews
           />
         </View>
 
@@ -506,38 +563,16 @@ export default function LiveTVScreen({
             <FlatList
               data={visibleChannels}
               keyExtractor={(item, index) => item.id || `${item.name}_${index}`}
-              renderItem={({ item, index }) => {
-                const active = index === selectedChannelIndex;
-                const rowFavorite = favoriteIds.includes(getChannelStorageId(item));
-
-                return (
-                  <TouchableOpacity
-                    style={[styles.channelRow, active && styles.channelRowActive]}
-                    onPress={() => handleChannelPress(index)}
-                  >
-                    <View style={styles.channelNumberBox}>
-                      <Text style={styles.channelNumber}>{index + 1}</Text>
-                    </View>
-
-                    <View style={styles.channelTextWrap}>
-                      <Text
-                        style={[
-                          styles.channelName,
-                          active && styles.channelNameActive,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {rowFavorite ? "★ " : ""}
-                        {item.name || "Sem nome"}
-                      </Text>
-
-                      <Text style={styles.channelSub} numberOfLines={1}>
-                        {item.group || "Canal"}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              }}
+              renderItem={renderChannelRow}
+              getItemLayout={(_, index) => ({
+                length: CHANNEL_ROW_HEIGHT,
+                offset: CHANNEL_ROW_HEIGHT * index,
+                index,
+              })}
+              initialNumToRender={28}
+              maxToRenderPerBatch={28}
+              windowSize={10}
+              removeClippedSubviews
               ListEmptyComponent={
                 <View style={styles.emptyList}>
                   <Text style={styles.emptyListText}>Nenhum canal encontrado</Text>
@@ -600,21 +635,37 @@ export default function LiveTVScreen({
               </View>
 
               <View style={styles.epgActions}>
-                <TouchableOpacity style={styles.smallControlBtn} onPress={goToPreviousChannel}>
+                <TouchableOpacity
+                  style={styles.smallControlBtn}
+                  onPress={goToPreviousChannel}
+                  activeOpacity={0.8}
+                >
                   <Text style={styles.smallControlBtnText}>◀</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.smallControlBtn} onPress={togglePauseMain}>
+                <TouchableOpacity
+                  style={styles.smallControlBtn}
+                  onPress={togglePauseMain}
+                  activeOpacity={0.8}
+                >
                   <Text style={styles.smallControlBtnText}>
                     {isPaused ? "PLAY" : "PAUSE"}
                   </Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.smallControlBtn} onPress={goToNextChannel}>
+                <TouchableOpacity
+                  style={styles.smallControlBtn}
+                  onPress={goToNextChannel}
+                  activeOpacity={0.8}
+                >
                   <Text style={styles.smallControlBtnText}>▶</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.favoriteBtn} onPress={toggleFavorite}>
+                <TouchableOpacity
+                  style={styles.favoriteBtn}
+                  onPress={toggleFavorite}
+                  activeOpacity={0.8}
+                >
                   <Text style={styles.favoriteBtnText}>
                     {isFavorite ? "★" : "☆"}
                   </Text>
@@ -1204,3 +1255,4 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
 });
+

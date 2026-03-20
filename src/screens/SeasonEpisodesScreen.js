@@ -10,24 +10,26 @@ import {
   Modal,
   Dimensions,
 } from "react-native";
-import { Video } from "expo-av";
+import { Video, ResizeMode } from "expo-av";
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 const isPhone = width < 900;
 
 export default function SeasonEpisodesScreen({ series, season, onBack }) {
-  const episodes = season?.episodes || [];
+  const episodes = Array.isArray(season?.episodes) ? season.episodes : [];
   const videoRef = useRef(null);
   const [selectedEpisode, setSelectedEpisode] = useState(null);
+  const [statusText, setStatusText] = useState("");
 
   const openEpisode = (item) => {
     if (!item?.url) return;
+    setStatusText("");
     setSelectedEpisode(item);
   };
 
   const closePlayer = async () => {
     try {
-      await videoRef.current?.pauseAsync?.();
+      await videoRef.current?.stopAsync?.();
     } catch (e) {}
     setSelectedEpisode(null);
   };
@@ -36,7 +38,7 @@ export default function SeasonEpisodesScreen({ series, season, onBack }) {
     <SafeAreaView style={styles.container}>
       <View style={styles.leftPanel}>
         <TouchableOpacity onPress={onBack} style={styles.backWrap}>
-          <Text style={styles.backText}>↩</Text>
+          <Text style={styles.backText}>VOLTAR</Text>
         </TouchableOpacity>
 
         <Text style={styles.seasonTitle}>
@@ -85,49 +87,54 @@ export default function SeasonEpisodesScreen({ series, season, onBack }) {
         animationType="fade"
         transparent={false}
         onRequestClose={closePlayer}
+        statusBarTranslucent
       >
-        <SafeAreaView style={styles.playerScreen}>
-          <View style={styles.playerTop}>
+        <View style={styles.playerScreen}>
+          {selectedEpisode?.url ? (
+            <Video
+              ref={videoRef}
+              source={{ uri: selectedEpisode.url }}
+              style={styles.fullscreenVideo}
+              resizeMode={ResizeMode.CONTAIN}
+              useNativeControls
+              shouldPlay
+              onLoadStart={() => setStatusText("Carregando episódio...")}
+              onLoad={() => setStatusText("")}
+              onReadyForDisplay={() => setStatusText("")}
+              onError={() => setStatusText("Falha ao reproduzir este episódio.")}
+            />
+          ) : (
+            <View style={styles.playerEmpty}>
+              <Text style={styles.playerEmptyText}>URL do episódio não encontrada</Text>
+            </View>
+          )}
+
+          <View style={styles.playerTopOverlay}>
             <TouchableOpacity onPress={closePlayer} style={styles.playerBackBtn}>
               <Text style={styles.playerBackText}>VOLTAR</Text>
             </TouchableOpacity>
+          </View>
 
+          <View style={styles.playerBottomOverlay}>
             <Text style={styles.playerTitle} numberOfLines={1}>
               {selectedEpisode?.title || "Episódio"}
             </Text>
-          </View>
 
-          <View style={styles.playerBox}>
-            {selectedEpisode?.url ? (
-              <Video
-                ref={videoRef}
-                source={{ uri: selectedEpisode.url }}
-                style={styles.video}
-                resizeMode="contain"
-                useNativeControls
-                shouldPlay
-              />
-            ) : (
-              <View style={styles.playerEmpty}>
-                <Text style={styles.playerEmptyText}>URL do episódio não encontrada</Text>
-              </View>
-            )}
-          </View>
-
-          <View style={styles.playerInfo}>
-            <Text style={styles.playerInfoTitle}>
-              {selectedEpisode?.title || "Episódio"}
-            </Text>
-
-            <Text style={styles.playerInfoMeta}>
+            <Text style={styles.playerMeta} numberOfLines={1}>
               {season?.name || "Temporada"} • {series?.name || "Série"}
             </Text>
 
-            <Text style={styles.playerInfoDesc}>
+            <Text style={styles.playerDesc} numberOfLines={3}>
               {selectedEpisode?.description || "Descrição do episódio."}
             </Text>
           </View>
-        </SafeAreaView>
+
+          {!!statusText && (
+            <View style={styles.statusOverlay}>
+              <Text style={styles.statusText}>{statusText}</Text>
+            </View>
+          )}
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -148,11 +155,15 @@ const styles = StyleSheet.create({
 
   backWrap: {
     marginBottom: 30,
+    backgroundColor: "#102033",
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
   },
 
   backText: {
-    color: "#fff",
-    fontSize: isPhone ? 22 : 30,
+    color: "#38d7ff",
+    fontSize: isPhone ? 14 : 18,
     fontWeight: "900",
   },
 
@@ -223,21 +234,41 @@ const styles = StyleSheet.create({
 
   playerScreen: {
     flex: 1,
-    backgroundColor: "#05070d",
+    backgroundColor: "#000",
   },
 
-  playerTop: {
-    height: 54,
-    flexDirection: "row",
+  fullscreenVideo: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#000",
+  },
+
+  playerEmpty: {
+    flex: 1,
     alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#000",
+  },
+
+  playerEmptyText: {
+    color: "#fff",
+    fontSize: 14,
+  },
+
+  playerTopOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingTop: isPhone ? 18 : 26,
     paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.08)",
+    paddingBottom: 8,
+    backgroundColor: "rgba(0,0,0,0.20)",
   },
 
   playerBackBtn: {
+    alignSelf: "flex-start",
     paddingVertical: 8,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     backgroundColor: "#102033",
     borderRadius: 8,
   },
@@ -248,57 +279,46 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 
+  playerBottomOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+
   playerTitle: {
-    flex: 1,
     color: "#fff",
-    marginLeft: 12,
-    fontSize: isPhone ? 12 : 16,
-    fontWeight: "800",
-  },
-
-  playerBox: {
-    width: "100%",
-    height: isPhone ? height * 0.34 : height * 0.55,
-    backgroundColor: "#000",
-  },
-
-  video: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: "#000",
-  },
-
-  playerEmpty: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  playerEmptyText: {
-    color: "#fff",
-    fontSize: 14,
-  },
-
-  playerInfo: {
-    padding: 14,
-  },
-
-  playerInfoTitle: {
-    color: "#fff",
-    fontSize: isPhone ? 18 : 24,
+    fontSize: isPhone ? 16 : 22,
     fontWeight: "900",
     marginBottom: 6,
   },
 
-  playerInfoMeta: {
+  playerMeta: {
     color: "#c7d2df",
     fontSize: isPhone ? 11 : 14,
     marginBottom: 8,
   },
 
-  playerInfoDesc: {
+  playerDesc: {
     color: "#e7edf5",
     fontSize: isPhone ? 12 : 15,
     lineHeight: isPhone ? 18 : 22,
+  },
+
+  statusOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.35)",
+    paddingHorizontal: 20,
+  },
+
+  statusText: {
+    color: "#fff",
+    textAlign: "center",
+    fontSize: isPhone ? 11 : 14,
   },
 });

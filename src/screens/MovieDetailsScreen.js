@@ -23,6 +23,12 @@ export default function MovieDetailsScreen({ movie, onBack }) {
 
   if (!movie) return null;
 
+  const description =
+    movie.description ||
+    movie.plot ||
+    movie.synopsis ||
+    "Sem descrição na lista.";
+
   const openPlayer = () => {
     if (!movie?.url) return;
     setStatusText("");
@@ -40,10 +46,10 @@ export default function MovieDetailsScreen({ movie, onBack }) {
     <SafeAreaView style={styles.container}>
       <ImageBackground
         source={
-          movie.cover
-            ? { uri: movie.cover }
-            : movie.backdrop
+          movie.backdrop
             ? { uri: movie.backdrop }
+            : movie.cover
+            ? { uri: movie.cover }
             : movie.logo
             ? { uri: movie.logo }
             : undefined
@@ -76,14 +82,7 @@ export default function MovieDetailsScreen({ movie, onBack }) {
               </Text>
 
               <Text style={styles.label}>Descrição</Text>
-              <Text style={styles.desc}>
-                {movie.description || "Sem descrição na lista."}
-              </Text>
-
-              <Text style={styles.label}>Link</Text>
-              <Text style={styles.urlText}>
-                {movie.url || "Link não disponível"}
-              </Text>
+              <Text style={styles.desc}>{description}</Text>
             </View>
           </View>
         </ScrollView>
@@ -96,55 +95,39 @@ export default function MovieDetailsScreen({ movie, onBack }) {
         onRequestClose={closePlayer}
         statusBarTranslucent
       >
-        <SafeAreaView style={styles.playerScreen}>
-          <View style={styles.playerTop}>
+        <View style={styles.playerScreen}>
+          <Video
+            ref={videoRef}
+            source={{ uri: movie.url }}
+            style={styles.fullscreenVideo}
+            resizeMode={ResizeMode.CONTAIN}
+            useNativeControls
+            shouldPlay
+            isLooping={false}
+            onLoadStart={() => setStatusText("Carregando vídeo...")}
+            onLoad={() => setStatusText("")}
+            onReadyForDisplay={() => setStatusText("")}
+            onError={(error) => {
+              const msg =
+                typeof error === "string"
+                  ? error
+                  : error?.errorString || "Falha ao reproduzir este vídeo.";
+              setStatusText(msg);
+            }}
+          />
+
+          <View style={styles.playerTopOverlay}>
             <TouchableOpacity onPress={closePlayer} style={styles.playerBackBtn}>
               <Text style={styles.playerBackText}>VOLTAR</Text>
             </TouchableOpacity>
-
-            <Text style={styles.playerTitle} numberOfLines={1}>
-              {movie.name || "Filme"}
-            </Text>
           </View>
 
-          <View style={styles.playerBox}>
-            <Video
-              ref={videoRef}
-              source={{ uri: movie.url }}
-              style={styles.video}
-              resizeMode={ResizeMode.CONTAIN}
-              useNativeControls
-              shouldPlay
-              isLooping={false}
-              onLoadStart={() => setStatusText("Carregando vídeo...")}
-              onLoad={() => setStatusText("")}
-              onReadyForDisplay={() => setStatusText("")}
-              onError={(error) => {
-                const msg =
-                  typeof error === "string"
-                    ? error
-                    : error?.errorString || "Falha ao reproduzir este vídeo.";
-                setStatusText(msg);
-              }}
-            />
-
-            {!!statusText && (
-              <View style={styles.statusOverlay}>
-                <Text style={styles.statusText}>{statusText}</Text>
-              </View>
-            )}
-          </View>
-
-          <ScrollView style={styles.playerInfo}>
-            <Text style={styles.playerInfoTitle}>{movie.name || "Filme"}</Text>
-            <Text style={styles.playerInfoMeta}>
-              {(movie.year || "-") + " • " + (movie.group || "Filmes")}
-            </Text>
-            <Text style={styles.playerInfoDesc}>
-              {movie.description || "Sem descrição na lista."}
-            </Text>
-          </ScrollView>
-        </SafeAreaView>
+          {!!statusText && (
+            <View style={styles.statusOverlay}>
+              <Text style={styles.statusText}>{statusText}</Text>
+            </View>
+          )}
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -255,27 +238,29 @@ const styles = StyleSheet.create({
     lineHeight: isPhone ? 18 : 24,
   },
 
-  urlText: {
-    color: "#d6e6ff",
-    fontSize: isPhone ? 10 : 13,
-    lineHeight: isPhone ? 15 : 19,
-  },
-
   playerScreen: {
     flex: 1,
-    backgroundColor: "#05070d",
+    backgroundColor: "#000",
   },
 
-  playerTop: {
-    height: 54,
-    flexDirection: "row",
-    alignItems: "center",
+  fullscreenVideo: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#000",
+  },
+
+  playerTopOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingTop: isPhone ? 18 : 26,
     paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.08)",
+    paddingBottom: 8,
+    backgroundColor: "rgba(0,0,0,0.22)",
   },
 
   playerBackBtn: {
+    alignSelf: "flex-start",
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
@@ -288,31 +273,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 
-  playerTitle: {
-    flex: 1,
-    color: "#fff",
-    marginLeft: 12,
-    fontSize: isPhone ? 12 : 16,
-    fontWeight: "800",
-  },
-
-  playerBox: {
-    width: "100%",
-    height: height * 0.42,
-    backgroundColor: "#000",
-  },
-
-  video: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: "#000",
-  },
-
   statusOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: "rgba(0,0,0,0.35)",
     paddingHorizontal: 20,
   },
 
@@ -320,29 +285,5 @@ const styles = StyleSheet.create({
     color: "#fff",
     textAlign: "center",
     fontSize: isPhone ? 11 : 14,
-  },
-
-  playerInfo: {
-    flex: 1,
-    padding: 14,
-  },
-
-  playerInfoTitle: {
-    color: "#fff",
-    fontSize: isPhone ? 18 : 24,
-    fontWeight: "900",
-    marginBottom: 8,
-  },
-
-  playerInfoMeta: {
-    color: "#cfd8e3",
-    fontSize: isPhone ? 11 : 14,
-    marginBottom: 14,
-  },
-
-  playerInfoDesc: {
-    color: "#e9edf2",
-    fontSize: isPhone ? 12 : 15,
-    lineHeight: isPhone ? 18 : 23,
   },
 });

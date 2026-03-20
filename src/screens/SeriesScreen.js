@@ -1,3 +1,4 @@
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   SafeAreaView,
@@ -123,6 +124,12 @@ export default function SeriesScreen({
     });
   }, [baseSeries, search]);
 
+  const persistFavorites = async (ids) => {
+    try {
+      await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(ids));
+    } catch (e) {}
+  };
+
   const persistRecents = async (ids) => {
     try {
       await AsyncStorage.setItem(RECENTS_KEY, JSON.stringify(ids));
@@ -136,6 +143,22 @@ export default function SeriesScreen({
     const updated = [id, ...recentIds.filter((item) => item !== id)].slice(0, 30);
     setRecentIds(updated);
     await persistRecents(updated);
+  };
+
+  const toggleFavorite = async (serie) => {
+    const id = getSeriesStorageId(serie);
+    if (!id) return;
+
+    let updated = [];
+
+    if (favoriteIds.includes(id)) {
+      updated = favoriteIds.filter((item) => item !== id);
+    } else {
+      updated = [id, ...favoriteIds];
+    }
+
+    setFavoriteIds(updated);
+    await persistFavorites(updated);
   };
 
   const handleSelectSeries = async (serie) => {
@@ -237,27 +260,40 @@ export default function SeriesScreen({
             <FlatList
               data={visibleSeries}
               keyExtractor={(item, index) => item.id || `${item.name}_${index}`}
-              numColumns={isPhone ? 3 : 5}
+              numColumns={isPhone ? 4 : 6}
               columnWrapperStyle={styles.rowWrap}
               renderItem={({ item }) => {
+                const favorite = favoriteIds.includes(getSeriesStorageId(item));
+
                 return (
-                  <TouchableOpacity
-                    style={styles.card}
-                    onPress={() => handleSelectSeries(item)}
-                  >
-                    <Image
-                      source={item.logo ? { uri: item.logo } : undefined}
-                      style={styles.poster}
-                    />
+                  <View style={styles.card}>
+                    <TouchableOpacity
+                      style={styles.favoriteBtn}
+                      onPress={() => toggleFavorite(item)}
+                    >
+                      <Text style={styles.favoriteBtnText}>
+                        {favorite ? "★" : "☆"}
+                      </Text>
+                    </TouchableOpacity>
 
-                    <Text style={styles.cardTitle} numberOfLines={2}>
-                      {item.name}
-                    </Text>
+                    <TouchableOpacity
+                      style={styles.cardTouch}
+                      onPress={() => handleSelectSeries(item)}
+                    >
+                      <Image
+                        source={item.logo ? { uri: item.logo } : undefined}
+                        style={styles.poster}
+                      />
 
-                    <Text style={styles.cardMeta} numberOfLines={1}>
-                      {(item.year || "-") + " • " + (item.group || "Séries")}
-                    </Text>
-                  </TouchableOpacity>
+                      <Text style={styles.cardTitle} numberOfLines={2}>
+                        {item.name}
+                      </Text>
+
+                      <Text style={styles.cardMeta} numberOfLines={2}>
+                        {(item.year || "-") + " • " + (item.group || "Séries")}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 );
               }}
               ListEmptyComponent={
@@ -398,13 +434,37 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    width: isPhone ? "31.5%" : "18.6%",
+    width: isPhone ? "23.5%" : "15.8%",
+    position: "relative",
     marginBottom: isPhone ? 8 : 12,
+  },
+
+  cardTouch: {
+    width: "100%",
+  },
+
+  favoriteBtn: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    zIndex: 5,
+    width: isPhone ? 22 : 28,
+    height: isPhone ? 22 : 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  favoriteBtnText: {
+    color: "#ffe04f",
+    fontSize: isPhone ? 12 : 16,
+    fontWeight: "900",
   },
 
   poster: {
     width: "100%",
-    aspectRatio: 0.7,
+    aspectRatio: 0.67,
     borderRadius: 8,
     backgroundColor: "#2a3550",
     marginBottom: 5,
@@ -412,15 +472,16 @@ const styles = StyleSheet.create({
 
   cardTitle: {
     color: "#f0f0f0",
-    fontSize: isPhone ? 8.5 : 12,
+    fontSize: isPhone ? 7.5 : 11,
     fontWeight: "700",
-    lineHeight: isPhone ? 11 : 16,
+    lineHeight: isPhone ? 10 : 15,
   },
 
   cardMeta: {
-    color: "#c9d3df",
-    fontSize: isPhone ? 7 : 10,
+    color: "#adb9ca",
+    fontSize: isPhone ? 6.5 : 9,
     marginTop: 2,
+    lineHeight: isPhone ? 9 : 13,
   },
 
   emptyWrap: {

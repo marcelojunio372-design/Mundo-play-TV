@@ -46,7 +46,7 @@ export default function HomeScreen({
       {
         id: "fallback_home",
         name: "MUNDO PLAY TV",
-        description: "Abra Filmes ou Séries para atualizar o conteúdo desta lista.",
+        description: "Conteúdo carregado com sucesso. Abra Live TV, Filmes ou Séries.",
         logo: "",
         cover: "",
         backdrop: "",
@@ -88,8 +88,8 @@ export default function HomeScreen({
   };
 
   const heroUri =
-    item?.cover ||
     item?.backdrop ||
+    item?.cover ||
     item?.fanart ||
     item?.poster ||
     item?.logo ||
@@ -99,7 +99,6 @@ export default function HomeScreen({
     item?.logo ||
     item?.poster ||
     item?.cover ||
-    item?.backdrop ||
     "";
 
   return (
@@ -139,7 +138,7 @@ export default function HomeScreen({
                 <Image source={{ uri: posterUri }} style={styles.poster} />
               ) : (
                 <View style={styles.posterFallback}>
-                  <Text style={styles.posterFallbackText}>MUNDO PLAY TV</Text>
+                  <Text style={styles.posterFallbackText}>MUNDO{"\n"}PLAY TV</Text>
                 </View>
               )}
 
@@ -156,13 +155,13 @@ export default function HomeScreen({
                   {(item?.year || "-") + " • " + (item?.group || "Destaques")}
                 </Text>
 
-                <Text style={styles.desc} numberOfLines={3}>
+                <Text style={styles.desc} numberOfLines={4}>
                   {item?.description || "Conteúdo disponível"}
                 </Text>
 
                 <View style={styles.button}>
                   <Text style={styles.buttonText}>
-                    {item?.id === "fallback_home" ? "AGUARDANDO CACHE" : "TOQUE PARA ABRIR"}
+                    {item?.id === "fallback_home" ? "CONTEÚDO PRONTO" : "TOQUE PARA ABRIR"}
                   </Text>
                 </View>
               </View>
@@ -175,7 +174,7 @@ export default function HomeScreen({
 }
 
 const Btn = ({ text, onPress }) => (
-  <TouchableOpacity style={styles.sideBtn} onPress={onPress}>
+  <TouchableOpacity style={styles.sideBtn} onPress={onPress} activeOpacity={0.8}>
     <Text style={styles.sideText}>{text}</Text>
   </TouchableOpacity>
 );
@@ -247,13 +246,12 @@ const styles = StyleSheet.create({
 
   heroImage: {
     resizeMode: "cover",
-    transform: [{ scale: 0.86 }],
-    opacity: 0.95,
+    opacity: 0.72,
   },
 
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.40)",
+    backgroundColor: "rgba(0,0,0,0.48)",
   },
 
   heroContent: {

@@ -170,10 +170,39 @@ function extractProgrammes(xml = "", channelMap = {}) {
   return programmes;
 }
 
-export async function loadEPG() {
+function buildXmltvUrl(session = null) {
+  const server = safeText(session?.server);
+  const username = safeText(session?.username);
+  const password = safeText(session?.password);
+
+  if (server && username && password) {
+    return `${server.replace(/\/+$/, "")}/xmltv.php?username=${encodeURIComponent(
+      username
+    )}&password=${encodeURIComponent(password)}`;
+  }
+
+  const rawUrl = safeText(session?.url);
+  if (!rawUrl) return "";
+
   try {
-    const url =
-      "http://epics.zip/xmltv.php?username=Marcelo123&password=128518957";
+    const parsed = new URL(rawUrl);
+    const urlUsername = safeText(parsed.searchParams.get("username"));
+    const urlPassword = safeText(parsed.searchParams.get("password"));
+
+    if (urlUsername && urlPassword) {
+      return `${parsed.origin}/xmltv.php?username=${encodeURIComponent(
+        urlUsername
+      )}&password=${encodeURIComponent(urlPassword)}`;
+    }
+  } catch (e) {}
+
+  return "";
+}
+
+export async function loadEPG(session = null) {
+  try {
+    const url = buildXmltvUrl(session);
+    if (!url) return [];
 
     const response = await fetch(url);
     const xml = await response.text();
@@ -193,22 +222,42 @@ function itemTime(date) {
   return date instanceof Date ? date.getTime() : 0;
 }
 
-function scoreProgrammeMatch(programme, aliases = []) {
-  const programAliases = Array.isArray(programme?.aliases)
-    ? programme.aliases
-    : [
-        programme?.channelKey || "",
-        programme?.cleanChannelKey || "",
-      ].filter(Boolean);
+function scoreProgrammeMatch(item, aliases = [], tvgId = "", tvgName = "") {
+  const itemAliases = Array.isArray(item?.aliases)
+    ? item.aliases
+    : [item?.channelKey || "", item?.cleanChannelKey || ""].filter(Boolean);
+
+  const normalizedTvgId = normalizeText(tvgId);
+  const normalizedTvgName = normalizeText(tvgName);
 
   let score = 0;
 
+  if (normalizedTvgId) {
+    if (
+      item.channelKey === normalizedTvgId ||
+      item.cleanChannelKey === normalizedTvgId ||
+      itemAliases.includes(normalizedTvgId)
+    ) {
+      score = Math.max(score, 1000);
+    }
+  }
+
+  if (normalizedTvgName) {
+    if (
+      itemAliases.includes(normalizedTvgName) ||
+      item.channelKey === normalizedTvgName ||
+      item.cleanChannelKey === normalizedTvgName
+    ) {
+      score = Math.max(score, 920);
+    }
+  }
+
   for (const channelAlias of aliases) {
-    for (const programAlias of programAliases) {
+    for (const programAlias of itemAliases) {
       if (!channelAlias || !programAlias) continue;
 
       if (channelAlias === programAlias) {
-        score = Math.max(score, 140);
+        score = Math.max(score, 820);
         continue;
       }
 
@@ -216,7 +265,7 @@ function scoreProgrammeMatch(programme, aliases = []) {
         channelAlias.startsWith(programAlias) ||
         programAlias.startsWith(channelAlias)
       ) {
-        score = Math.max(score, 110);
+        score = Math.max(score, 650);
         continue;
       }
 
@@ -224,7 +273,7 @@ function scoreProgrammeMatch(programme, aliases = []) {
         channelAlias.includes(programAlias) ||
         programAlias.includes(channelAlias)
       ) {
-        score = Math.max(score, 90);
+        score = Math.max(score, 500);
         continue;
       }
 
@@ -238,7 +287,7 @@ function scoreProgrammeMatch(programme, aliases = []) {
           channelShort.includes(programShort) ||
           programShort.includes(channelShort))
       ) {
-        score = Math.max(score, 85);
+        score = Math.max(score, 380);
       }
     }
   }
@@ -250,14 +299,16 @@ export function findNowAndNextForChannel(
   epgItems = [],
   channelName = "",
   group = "",
-  tvgId = ""
+  tvgId = "",
+  tvgName = ""
 ) {
   const now = new Date();
 
   const aliases = buildAliases(
     safeText(channelName),
     safeText(group),
-    safeText(tvgId)
+    safeText(tvgId),
+    safeText(tvgName)
   );
 
   if (!aliases.length || !epgItems?.length) {
@@ -267,9 +318,9 @@ export function findNowAndNextForChannel(
   const scoredMatches = epgItems
     .map((item) => ({
       ...item,
-      _score: scoreProgrammeMatch(item, aliases),
+      _score: scoreProgrammeMatch(item, aliases, tvgId, tvgName),
     }))
-    .filter((item) => item._score >= 85)
+    .filter((item) => item._score >= 380)
     .sort((a, b) => {
       if (b._score !== a._score) return b._score - a._score;
       return itemTime(a.start) - itemTime(b.start);
@@ -281,11 +332,11 @@ export function findNowAndNextForChannel(
 
   const bestScore = scoredMatches[0]._score;
 
-  const bestMatches = scoredMatches.filter(
-    (item) => item._score >= Math.max(85, bestScore - 25)
+  const candidateMatches = scoredMatches.filter(
+    (item) => item._score >= Math.max(380, bestScore - 220)
   );
 
-  const orderedMatches = [...bestMatches].sort(
+  const orderedMatches = [...candidateMatches].sort(
     (a, b) => itemTime(a.start) - itemTime(b.start)
   );
 
@@ -311,17 +362,6 @@ export function findNowAndNextForChannel(
         if (!item.start) return false;
         return item.start > now;
       }) || null;
-  }
-
-  if (!nextProgram && current) {
-    const sameChannelFuture = scoredMatches
-      .filter((item) => {
-        if (!item.start || !current.stop) return false;
-        return item.start >= current.stop;
-      })
-      .sort((a, b) => itemTime(a.start) - itemTime(b.start));
-
-    nextProgram = sameChannelFuture[0] || null;
   }
 
   return {
