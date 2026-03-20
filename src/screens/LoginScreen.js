@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -9,6 +9,9 @@ import {
   Alert,
   ScrollView,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const LOGIN_STORAGE_KEY = "mundoplaytv_login_data_v1";
 
 export default function LoginScreen({ onLogin }) {
   const [mode, setMode] = useState("m3u");
@@ -18,6 +21,54 @@ export default function LoginScreen({ onLogin }) {
   const [password, setPassword] = useState("");
   const [mac] = useState("00:1A:79:12:34:56");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    async function loadSavedLogin() {
+      try {
+        const raw = await AsyncStorage.getItem(LOGIN_STORAGE_KEY);
+        if (!raw) return;
+
+        const saved = JSON.parse(raw);
+
+        setMode(saved?.mode || "m3u");
+        setM3uUrl(saved?.m3uUrl || "");
+        setServerUrl(saved?.serverUrl || "");
+        setUsername(saved?.username || "");
+        setPassword(saved?.password || "");
+      } catch (e) {}
+    }
+
+    loadSavedLogin();
+  }, []);
+
+  const saveLoginData = async (payload = {}) => {
+    try {
+      await AsyncStorage.setItem(
+        LOGIN_STORAGE_KEY,
+        JSON.stringify({
+          mode: payload.mode || mode,
+          m3uUrl: payload.m3uUrl || "",
+          serverUrl: payload.serverUrl || "",
+          username: payload.username || "",
+          password: payload.password || "",
+        })
+      );
+    } catch (e) {}
+  };
+
+  const clearSavedLogin = async () => {
+    try {
+      await AsyncStorage.removeItem(LOGIN_STORAGE_KEY);
+      setMode("m3u");
+      setM3uUrl("");
+      setServerUrl("");
+      setUsername("");
+      setPassword("");
+      Alert.alert("OK", "Dados salvos apagados.");
+    } catch (e) {
+      Alert.alert("Erro", "Não foi possível apagar os dados salvos.");
+    }
+  };
 
   const normalizeUrl = (url) => {
     const value = String(url || "").trim();
@@ -36,6 +87,14 @@ export default function LoginScreen({ onLogin }) {
 
     try {
       setLoading(true);
+
+      await saveLoginData({
+        mode: "m3u",
+        m3uUrl: finalUrl,
+        serverUrl: "",
+        username: "",
+        password: "",
+      });
 
       onLogin({
         type: "m3u",
@@ -64,6 +123,14 @@ export default function LoginScreen({ onLogin }) {
 
     try {
       setLoading(true);
+
+      await saveLoginData({
+        mode: "xtream",
+        m3uUrl: "",
+        serverUrl: base,
+        username,
+        password,
+      });
 
       onLogin({
         type: "xtream",
@@ -175,6 +242,10 @@ export default function LoginScreen({ onLogin }) {
             </Text>
           </TouchableOpacity>
 
+          <TouchableOpacity style={styles.clearBtn} onPress={clearSavedLogin}>
+            <Text style={styles.clearBtnText}>APAGAR DADOS SALVOS</Text>
+          </TouchableOpacity>
+
           <View style={styles.footerRow}>
             <Text style={styles.footerMac}>MAC: {mac}</Text>
             <Text style={styles.footer}>Login IPTV profissional</Text>
@@ -275,6 +346,23 @@ const styles = StyleSheet.create({
     color: "#04121d",
     fontWeight: "900",
     fontSize: 15,
+  },
+
+  clearBtn: {
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "#0c1f31",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10,
+  },
+
+  clearBtnText: {
+    color: "#ffb3b3",
+    fontWeight: "800",
+    fontSize: 13,
   },
 
   footerRow: {
