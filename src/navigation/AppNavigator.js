@@ -58,9 +58,19 @@ export default function AppNavigator() {
     try {
       setIsLoadingData(true);
       const data = await loadM3U(session.url);
+
+      console.log("RELOAD URL:", session.url);
+      console.log(
+        "RELOAD M3U:",
+        data?.live?.length || 0,
+        data?.movies?.length || 0,
+        data?.series?.length || 0
+      );
+
       setSession((prev) => ({ ...prev, data }));
       return true;
     } catch (e) {
+      console.log("ERRO RELOAD M3U:", String(e?.message || e));
       return false;
     } finally {
       setIsLoadingData(false);
@@ -80,6 +90,14 @@ export default function AppNavigator() {
       try {
         const data = await loadM3U(session.url);
 
+        console.log("URL carregada:", session.url);
+        console.log(
+          "M3U carregada:",
+          data?.live?.length || 0,
+          data?.movies?.length || 0,
+          data?.series?.length || 0
+        );
+
         if (!active) return;
 
         setSession((prev) => {
@@ -89,9 +107,13 @@ export default function AppNavigator() {
       } catch (e) {
         if (!active) return;
 
+        console.log("ERRO loadM3U:", String(e?.message || e));
+
         Alert.alert(
           "Aviso",
-          "Entrou no aplicativo, mas a lista ainda não carregou. Tente recarregar nas configurações."
+          `Entrou no aplicativo, mas a lista falhou: ${String(
+            e?.message || e
+          )}`
         );
       } finally {
         if (active) {

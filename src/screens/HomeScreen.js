@@ -15,6 +15,7 @@ const isPhone = width < 900;
 
 export default function HomeScreen({
   session,
+  isLoadingData,
   onOpenLive,
   onOpenMovies,
   onOpenSeries,
@@ -45,8 +46,10 @@ export default function HomeScreen({
     return [
       {
         id: "fallback_home",
-        name: "MUNDO PLAY TV",
-        description: "Lançamentos e destaques da sua lista.",
+        name: isLoadingData ? "CARREGANDO CONTEÚDO..." : "MUNDO PLAY TV",
+        description: isLoadingData
+          ? "A lista está sendo carregada em segundo plano."
+          : "Lançamentos e destaques da sua lista.",
         logo: "",
         cover: "",
         backdrop: "",
@@ -56,9 +59,13 @@ export default function HomeScreen({
         mediaType: "movie",
       },
     ];
-  }, [movies, series]);
+  }, [movies, series, isLoadingData]);
 
   const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    setIndex(0);
+  }, [featured.length]);
 
   useEffect(() => {
     if (!featured.length) return;
@@ -74,6 +81,7 @@ export default function HomeScreen({
 
   const openFeatured = () => {
     if (!item) return;
+    if (item.id === "fallback_home") return;
 
     if (item.mediaType === "series") {
       onSelectSeries?.(item);
@@ -101,34 +109,53 @@ export default function HomeScreen({
           <Btn text="SAIR" onPress={onLogout} />
         </View>
 
-        <TouchableOpacity style={styles.main} onPress={openFeatured} activeOpacity={0.92}>
+        <TouchableOpacity
+          style={styles.main}
+          onPress={openFeatured}
+          activeOpacity={0.92}
+          disabled={item?.id === "fallback_home"}
+        >
           <ImageBackground
-            source={{
-              uri:
-                item?.cover ||
-                item?.backdrop ||
-                item?.fanart ||
-                item?.poster ||
-                item?.logo ||
-                "https://i.imgur.com/6Z8FQ0C.jpg",
-            }}
+            source={
+              item?.cover ||
+              item?.backdrop ||
+              item?.fanart ||
+              item?.poster ||
+              item?.logo
+                ? {
+                    uri:
+                      item?.cover ||
+                      item?.backdrop ||
+                      item?.fanart ||
+                      item?.poster ||
+                      item?.logo ||
+                      "",
+                  }
+                : undefined
+            }
             style={styles.hero}
             imageStyle={styles.heroImage}
           >
             <View style={styles.overlay} />
 
             <View style={styles.heroContent}>
-              <Image
-                source={{
-                  uri:
-                    item?.logo ||
-                    item?.poster ||
-                    item?.cover ||
-                    item?.backdrop ||
-                    "https://i.imgur.com/6Z8FQ0C.jpg",
-                }}
-                style={styles.poster}
-              />
+              {(item?.logo || item?.poster || item?.cover || item?.backdrop) ? (
+                <Image
+                  source={{
+                    uri:
+                      item?.logo ||
+                      item?.poster ||
+                      item?.cover ||
+                      item?.backdrop ||
+                      "",
+                  }}
+                  style={styles.poster}
+                />
+              ) : (
+                <View style={styles.posterFallback}>
+                  <Text style={styles.posterFallbackText}>MUNDO PLAY TV</Text>
+                </View>
+              )}
 
               <View style={styles.info}>
                 <Text style={styles.type}>
@@ -148,7 +175,9 @@ export default function HomeScreen({
                 </Text>
 
                 <View style={styles.button}>
-                  <Text style={styles.buttonText}>TOQUE PARA ABRIR</Text>
+                  <Text style={styles.buttonText}>
+                    {isLoadingData ? "CARREGANDO..." : "TOQUE PARA ABRIR"}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -227,10 +256,13 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     overflow: "hidden",
     justifyContent: "center",
+    backgroundColor: "#09111d",
   },
 
   heroImage: {
     resizeMode: "cover",
+    transform: [{ scale: 0.86 }],
+    opacity: 0.95,
   },
 
   overlay: {
@@ -253,54 +285,70 @@ const styles = StyleSheet.create({
     backgroundColor: "#132235",
   },
 
+  posterFallback: {
+    width: isPhone ? 105 : 160,
+    height: isPhone ? 155 : 235,
+    borderRadius: 12,
+    marginRight: isPhone ? 16 : 24,
+    backgroundColor: "#132235",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 10,
+  },
+
+  posterFallbackText: {
+    color: "#38d7ff",
+    fontWeight: "900",
+    textAlign: "center",
+    fontSize: isPhone ? 16 : 22,
+  },
+
   info: {
     flex: 1,
-    backgroundColor: "rgba(18,22,34,0.30)",
-    borderRadius: 16,
-    padding: isPhone ? 14 : 20,
-    maxWidth: isPhone ? "58%" : "62%",
   },
 
   type: {
     color: "#38d7ff",
+    fontSize: isPhone ? 12 : 15,
     fontWeight: "900",
     marginBottom: 6,
-    fontSize: isPhone ? 11 : 15,
   },
 
   title: {
     color: "#fff",
-    fontSize: isPhone ? 24 : 36,
+    fontSize: isPhone ? 24 : 40,
     fontWeight: "900",
+    marginBottom: 8,
   },
 
   meta: {
-    color: "#d8e2ed",
-    marginTop: 8,
-    fontSize: isPhone ? 11 : 14,
+    color: "#d0d9e2",
+    fontSize: isPhone ? 12 : 16,
+    marginBottom: 10,
   },
 
   desc: {
-    color: "#ffffff",
-    marginTop: 12,
-    fontSize: isPhone ? 12 : 16,
-    lineHeight: isPhone ? 18 : 24,
+    color: "#f0f4f8",
+    fontSize: isPhone ? 14 : 18,
+    lineHeight: isPhone ? 20 : 26,
+    marginBottom: 20,
   },
 
   button: {
-    marginTop: 18,
-    borderColor: "#38d7ff",
-    borderWidth: 1,
-    paddingVertical: isPhone ? 10 : 12,
-    paddingHorizontal: isPhone ? 16 : 18,
-    borderRadius: 10,
+    minHeight: 48,
+    borderRadius: 14,
+    paddingHorizontal: 20,
+    alignItems: "center",
+    justifyContent: "center",
     alignSelf: "flex-start",
-    backgroundColor: "rgba(56,215,255,0.12)",
+    borderWidth: 2,
+    borderColor: "#38d7ff",
+    backgroundColor: "rgba(56,215,255,0.08)",
   },
 
   buttonText: {
     color: "#38d7ff",
     fontWeight: "900",
-    fontSize: isPhone ? 12 : 13,
+    fontSize: isPhone ? 14 : 18,
   },
 });
