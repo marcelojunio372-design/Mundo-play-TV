@@ -41,6 +41,7 @@ function cleanChannelName(name = "") {
 function buildChannelAliases(name = "", group = "", tvgId = "", tvgName = "") {
   const original = decodeEntities(safeText(name));
   const clean = cleanChannelName(original);
+
   const rawParts = `${original} ${group} ${tvgId} ${tvgName}`
     .split(/[\-|/|]+/g)
     .map((item) => item.trim())
@@ -118,18 +119,37 @@ function extractDescription(extinf = "", name = "", group = "") {
   return safeText(name || "");
 }
 
-function isLiveByGroup(group = "") {
+function looksLikeLiveGroup(group = "") {
   const text = safeText(group).toLowerCase();
 
-  return /abertos|esportes|not[ií]cias|document[aá]rios|religiosos|variedades|globo|sbt|record|band|discovery|canais|ao vivo|tv ao vivo|24h|fhd|hd|sd|uhd|4k/.test(
+  return /abertos|tv aberta|esportes|sport|not[ií]cias|news|document[aá]rios|religiosos|variedades|infantil|kids|globo|sbt|record|band|discovery|history|national geographic|natgeo|24h|ao vivo|tv ao vivo|canais|regionais|locais/.test(
     text
   );
+}
+
+function looksLikeMovieGroup(group = "") {
+  const text = safeText(group).toLowerCase();
+
+  return /filmes|filme|movies|movie|cinema|lançamento|lancamento|terror|ação|acao|com[eé]dia|comedia|drama|romance|anima[cç][aã]o|suspense|dublado|legendado|nacional|adult/.test(
+    text
+  );
+}
+
+function looksLikeSeriesGroup(group = "") {
+  const text = safeText(group).toLowerCase();
+
+  return /s[eé]ries|series|temporadas|season|novelas|doramas|anime/.test(text);
+}
+
+function looksLikeMovieName(name = "") {
+  const text = safeText(name).toLowerCase();
+  return /\b(19\d{2}|20\d{2})\b/.test(text);
 }
 
 function isSeriesByText(name = "", group = "", url = "") {
   const text = `${name} ${group} ${url}`.toLowerCase();
 
-  return /series|séries|temporada|epis[oó]dio|season|cap[ií]tulo|s\d{1,2}e\d{1,2}|novelas/.test(
+  return /series|séries|temporada|epis[oó]dio|season|cap[ií]tulo|s\d{1,2}e\d{1,2}|novelas|anime|dorama/.test(
     text
   );
 }
@@ -137,52 +157,98 @@ function isSeriesByText(name = "", group = "", url = "") {
 function isMovieByText(name = "", group = "", url = "") {
   const text = `${name} ${group} ${url}`.toLowerCase();
 
-  return /movie|filme|cinema|vod|lançamento|ação|terror|drama|romance|com[eé]dia|anima[cç][aã]o/.test(
+  return /movie|filme|cinema|vod|lançamento|lancamento|ação|acao|terror|drama|romance|com[eé]dia|comedia|anima[cç][aã]o/.test(
     text
+  );
+}
+
+function hasLiveUrl(url = "") {
+  const text = safeText(url).toLowerCase();
+
+  return (
+    /\/live\//.test(text) ||
+    /type=live/.test(text) ||
+    /\/play\/live/.test(text) ||
+    /\.(m3u8|ts)(\?|$)/.test(text)
+  );
+}
+
+function hasMovieUrl(url = "") {
+  const text = safeText(url).toLowerCase();
+
+  return (
+    /\/movie\//.test(text) ||
+    /type=movie/.test(text) ||
+    /action=get_vod_stream/.test(text) ||
+    /\/vod\//.test(text)
+  );
+}
+
+function hasSeriesUrl(url = "") {
+  const text = safeText(url).toLowerCase();
+
+  return (
+    /\/series\//.test(text) ||
+    /type=series/.test(text) ||
+    /action=get_series/.test(text) ||
+    /action=get_series_info/.test(text)
   );
 }
 
 function shouldForceLive(name = "", group = "", url = "") {
   const text = `${name} ${group} ${url}`.toLowerCase();
 
-  if (/warner channel|hbo|telecine|premiere|sportv|discovery|history|tnt|space|megapix|canal brasil|globo|sbt|record|band|multishow|gnt|viva|fox|fx|sony|axn|a&e|amc|agrobrasil|amazon sat|all sports/.test(text)) {
+  if (
+    /warner channel|hbo|telecine|premiere|sportv|discovery|history|tnt|space|megapix|canal brasil|globo|sbt|record|band|multishow|gnt|viva|fox|fx|sony|axn|a&e|amc|agrobrasil|amazon sat|all sports|espn|cnn|bandnews|globonews/.test(
+      text
+    )
+  ) {
     return true;
   }
 
-  if (/\bhd\b|\bsd\b|\bfhd\b|\buhd\b|\b4k\b/.test(text)) {
-    return true;
-  }
-
-  if (/\/live\//.test(text)) {
-    return true;
-  }
-
-  return false;
+  return hasLiveUrl(url) || looksLikeLiveGroup(group);
 }
 
-function inferType(name = "", group = "", url = "") {
-  const link = safeText(url).toLowerCase();
-  const groupText = safeText(group).toLowerCase();
+function inferType(name = "", group = "", url = "", tvgId = "", tvgName = "") {
+  const merged = `${name} ${group} ${url} ${tvgId} ${tvgName}`.toLowerCase();
 
-  const byMovieUrl =
-    /\/movie\/|type=movie|action=get_vod_stream|\/vod\//i.test(link);
+  if (hasMovieUrl(url)) return "movie";
+  if (hasSeriesUrl(url)) return "series";
 
-  const bySeriesUrl =
-    /\/series\/|type=series|action=get_series|action=get_series_info/i.test(link);
+  if (looksLikeSeriesGroup(group) || isSeriesByText(name, group, url)) {
+    return "series";
+  }
 
-  const liveGroupForced =
-    /abertos|esportes|not[ií]cias|document[aá]rios|religiosos|variedades|globo|sbt|record|band|discovery|ao vivo|tv ao vivo|24h|canais 24h/.test(
-      groupText
-    );
+  if (looksLikeMovieGroup(group) || isMovieByText(name, group, url)) {
+    return "movie";
+  }
 
-  if (shouldForceLive(name, group, url)) return "live";
-  if (byMovieUrl) return "movie";
-  if (bySeriesUrl) return "series";
-  if (liveGroupForced) return "live";
-  if (isSeriesByText(name, group, url) && !isLiveByGroup(group)) return "series";
-  if (isMovieByText(name, group, url) && !isLiveByGroup(group)) return "movie";
+  if (shouldForceLive(name, group, url)) {
+    return "live";
+  }
 
-  return "live";
+  if (looksLikeLiveGroup(group)) {
+    return "live";
+  }
+
+  if (hasLiveUrl(url) && !looksLikeMovieGroup(group) && !looksLikeSeriesGroup(group)) {
+    return "live";
+  }
+
+  if (
+    looksLikeMovieName(name) &&
+    !looksLikeLiveGroup(group) &&
+    !hasLiveUrl(url)
+  ) {
+    return "movie";
+  }
+
+  if (/vod|filme|movie|series|séries|temporada|epis[oó]dio/.test(merged)) {
+    if (/series|séries|temporada|epis[oó]dio/.test(merged)) return "series";
+    return "movie";
+  }
+
+  return "unknown";
 }
 
 function buildCategories(items = []) {
@@ -242,10 +308,14 @@ export async function loadM3U(url) {
     const logo = extractLogo(extinf);
     const tvgId = extractTvgId(extinf);
     const tvgName = extractTvgName(extinf);
-    const type = inferType(name, group, streamUrl);
+    const type = inferType(name, group, streamUrl, tvgId, tvgName);
     const year = extractYear(name, group);
     const description = extractDescription(extinf, name, group);
     const aliases = buildChannelAliases(name, group, tvgId, tvgName);
+
+    if (type === "unknown") {
+      continue;
+    }
 
     const item = {
       id: `${type}_${i}_${name}`.replace(/\s+/g, "_"),
@@ -267,7 +337,7 @@ export async function loadM3U(url) {
       movies.push(item);
     } else if (type === "series") {
       series.push(item);
-    } else {
+    } else if (type === "live") {
       live.push(item);
     }
   }
