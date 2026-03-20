@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -48,6 +48,8 @@ function buildCategories(items = [], favorites = [], recents = []) {
 
 export default function SeriesScreen({
   session,
+  isRefreshingData,
+  onRefreshSession,
   onBack,
   onOpenLive,
   onOpenMovies,
@@ -55,6 +57,7 @@ export default function SeriesScreen({
   onSelectSeries,
 }) {
   const series = session?.data?.series || [];
+  const autoRefreshedRef = useRef(false);
 
   const [favoriteIds, setFavoriteIds] = useState([]);
   const [recentIds, setRecentIds] = useState([]);
@@ -82,6 +85,15 @@ export default function SeriesScreen({
     loadSavedData();
   }, []);
 
+  useEffect(() => {
+    if (series.length > 0) return;
+    if (!session?.url) return;
+    if (autoRefreshedRef.current) return;
+
+    autoRefreshedRef.current = true;
+    onRefreshSession?.();
+  }, [series.length, session?.url, onRefreshSession]);
+
   const favoriteSeries = useMemo(() => {
     const favoriteSet = new Set(favoriteIds);
     return series.filter((item) => favoriteSet.has(getSeriesStorageId(item)));
@@ -106,11 +118,8 @@ export default function SeriesScreen({
       const name = safeText(item.name).toLowerCase();
       const group = safeText(item.group).toLowerCase();
       const year = safeText(item.year).toLowerCase();
-      return (
-        name.includes(term) ||
-        group.includes(term) ||
-        year.includes(term)
-      );
+
+      return name.includes(term) || group.includes(term) || year.includes(term);
     });
   }, [baseSeries, search]);
 
@@ -220,41 +229,44 @@ export default function SeriesScreen({
             {categories[selectedCategory]?.name || "Tudo"} ({visibleSeries.length})
           </Text>
 
-          <FlatList
-            data={visibleSeries}
-            keyExtractor={(item, index) => item.id || `${item.name}_${index}`}
-            numColumns={isPhone ? 3 : 5}
-            columnWrapperStyle={styles.rowWrap}
-            renderItem={({ item }) => {
-              const favorite = favoriteIds.includes(getSeriesStorageId(item));
+          {series.length === 0 && isRefreshingData ? (
+            <View style={styles.emptyWrap}>
+              <Text style={styles.emptyText}>Atualizando séries...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={visibleSeries}
+              keyExtractor={(item, index) => item.id || `${item.name}_${index}`}
+              numColumns={isPhone ? 3 : 5}
+              columnWrapperStyle={styles.rowWrap}
+              renderItem={({ item }) => {
+                return (
+                  <TouchableOpacity
+                    style={styles.card}
+                    onPress={() => handleSelectSeries(item)}
+                  >
+                    <Image
+                      source={item.logo ? { uri: item.logo } : undefined}
+                      style={styles.poster}
+                    />
 
-              return (
-                <TouchableOpacity
-                  style={styles.card}
-                  onPress={() => handleSelectSeries(item)}
-                >
-                  <Image
-                    source={item.logo ? { uri: item.logo } : undefined}
-                    style={styles.poster}
-                  />
+                    <Text style={styles.cardTitle} numberOfLines={2}>
+                      {item.name}
+                    </Text>
 
-                  <Text style={styles.cardTitle} numberOfLines={2}>
-                    {favorite ? "★ " : ""}
-                    {item.name}
-                  </Text>
-
-                  <Text style={styles.cardMeta} numberOfLines={1}>
-                    {(item.year || "-") + " • " + (item.group || "Séries")}
-                  </Text>
-                </TouchableOpacity>
-              );
-            }}
-            ListEmptyComponent={
-              <View style={styles.emptyWrap}>
-                <Text style={styles.emptyText}>Nenhuma série encontrada</Text>
-              </View>
-            }
-          />
+                    <Text style={styles.cardMeta} numberOfLines={1}>
+                      {(item.year || "-") + " • " + (item.group || "Séries")}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              }}
+              ListEmptyComponent={
+                <View style={styles.emptyWrap}>
+                  <Text style={styles.emptyText}>Nenhuma série encontrada</Text>
+                </View>
+              }
+            />
+          )}
         </View>
       </View>
     </SafeAreaView>
@@ -413,6 +425,8 @@ const styles = StyleSheet.create({
 
   emptyWrap: {
     paddingVertical: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   emptyText: {

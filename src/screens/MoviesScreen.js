@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -51,6 +51,8 @@ function buildCategories(items = [], favorites = [], recents = []) {
 
 export default function MoviesScreen({
   session,
+  isRefreshingData,
+  onRefreshSession,
   onBack,
   onOpenLive,
   onOpenMovies,
@@ -58,6 +60,7 @@ export default function MoviesScreen({
   onSelectMovie,
 }) {
   const movies = session?.data?.movies || [];
+  const autoRefreshedRef = useRef(false);
 
   const [favoriteIds, setFavoriteIds] = useState([]);
   const [recentIds, setRecentIds] = useState([]);
@@ -85,6 +88,15 @@ export default function MoviesScreen({
     loadSavedData();
   }, []);
 
+  useEffect(() => {
+    if (movies.length > 0) return;
+    if (!session?.url) return;
+    if (autoRefreshedRef.current) return;
+
+    autoRefreshedRef.current = true;
+    onRefreshSession?.();
+  }, [movies.length, session?.url, onRefreshSession]);
+
   const favoriteMovies = useMemo(() => {
     const favoriteSet = new Set(favoriteIds);
     return movies.filter((item) => favoriteSet.has(getMovieStorageId(item)));
@@ -110,11 +122,7 @@ export default function MoviesScreen({
       const group = safeText(item.group).toLowerCase();
       const year = safeText(item.year).toLowerCase();
 
-      return (
-        name.includes(term) ||
-        group.includes(term) ||
-        year.includes(term)
-      );
+      return name.includes(term) || group.includes(term) || year.includes(term);
     });
   }, [baseMovies, search]);
 
@@ -246,51 +254,57 @@ export default function MoviesScreen({
             {categories[selectedCategory]?.name || "Tudo"} ({visibleMovies.length})
           </Text>
 
-          <FlatList
-            data={visibleMovies}
-            keyExtractor={(item, index) => item.id || `${item.name}_${index}`}
-            numColumns={isPhone ? 4 : 6}
-            columnWrapperStyle={styles.rowWrap}
-            renderItem={({ item }) => {
-              const favorite = favoriteIds.includes(getMovieStorageId(item));
+          {movies.length === 0 && isRefreshingData ? (
+            <View style={styles.emptyWrap}>
+              <Text style={styles.emptyText}>Atualizando filmes...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={visibleMovies}
+              keyExtractor={(item, index) => item.id || `${item.name}_${index}`}
+              numColumns={isPhone ? 4 : 6}
+              columnWrapperStyle={styles.rowWrap}
+              renderItem={({ item }) => {
+                const favorite = favoriteIds.includes(getMovieStorageId(item));
 
-              return (
-                <View style={styles.card}>
-                  <TouchableOpacity
-                    style={styles.favoriteBtn}
-                    onPress={() => toggleFavorite(item)}
-                  >
-                    <Text style={styles.favoriteBtnText}>
-                      {favorite ? "★" : "☆"}
-                    </Text>
-                  </TouchableOpacity>
+                return (
+                  <View style={styles.card}>
+                    <TouchableOpacity
+                      style={styles.favoriteBtn}
+                      onPress={() => toggleFavorite(item)}
+                    >
+                      <Text style={styles.favoriteBtnText}>
+                        {favorite ? "★" : "☆"}
+                      </Text>
+                    </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={styles.cardTouch}
-                    onPress={() => handleSelectMovie(item)}
-                  >
-                    <Image
-                      source={item.logo ? { uri: item.logo } : undefined}
-                      style={styles.poster}
-                    />
+                    <TouchableOpacity
+                      style={styles.cardTouch}
+                      onPress={() => handleSelectMovie(item)}
+                    >
+                      <Image
+                        source={item.logo ? { uri: item.logo } : undefined}
+                        style={styles.poster}
+                      />
 
-                    <Text style={styles.cardTitle} numberOfLines={2}>
-                      {item.name}
-                    </Text>
+                      <Text style={styles.cardTitle} numberOfLines={2}>
+                        {item.name}
+                      </Text>
 
-                    <Text style={styles.cardMeta} numberOfLines={2}>
-                      {(item.year || "-") + " • " + (item.group || "Filmes")}
-                    </Text>
-                  </TouchableOpacity>
+                      <Text style={styles.cardMeta} numberOfLines={2}>
+                        {(item.year || "-") + " • " + (item.group || "Filmes")}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              }}
+              ListEmptyComponent={
+                <View style={styles.emptyWrap}>
+                  <Text style={styles.emptyText}>Nenhum filme encontrado</Text>
                 </View>
-              );
-            }}
-            ListEmptyComponent={
-              <View style={styles.emptyWrap}>
-                <Text style={styles.emptyText}>Nenhum filme encontrado</Text>
-              </View>
-            }
-          />
+              }
+            />
+          )}
         </View>
       </View>
     </SafeAreaView>
@@ -474,6 +488,8 @@ const styles = StyleSheet.create({
 
   emptyWrap: {
     paddingVertical: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   emptyText: {

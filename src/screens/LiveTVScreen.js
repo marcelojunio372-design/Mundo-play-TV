@@ -72,6 +72,8 @@ function getProgressPercent(program) {
 
 export default function LiveTVScreen({
   session,
+  isRefreshingData,
+  onRefreshSession,
   onOpenHome,
   onOpenLive,
   onOpenMovies,
@@ -95,6 +97,7 @@ export default function LiveTVScreen({
   const [isFullscreenPaused, setIsFullscreenPaused] = useState(false);
   const [showFullscreenUi, setShowFullscreenUi] = useState(true);
 
+  const autoRefreshedRef = useRef(false);
   const videoRef = useRef(null);
   const fullscreenVideoRef = useRef(null);
   const reconnectTimerRef = useRef(null);
@@ -121,6 +124,15 @@ export default function LiveTVScreen({
 
     loadSavedData();
   }, []);
+
+  useEffect(() => {
+    if (channels.length > 0) return;
+    if (!session?.url) return;
+    if (autoRefreshedRef.current) return;
+
+    autoRefreshedRef.current = true;
+    onRefreshSession?.();
+  }, [channels.length, session?.url, onRefreshSession]);
 
   useEffect(() => {
     let active = true;
@@ -150,41 +162,6 @@ export default function LiveTVScreen({
       active = false;
     };
   }, []);
-
-  useEffect(() => {
-    setRetryKey((prev) => prev + 1);
-    setFullscreenRetryKey((prev) => prev + 1);
-    setPlayerError("");
-    setFullscreenError("");
-    setIsPaused(false);
-    setIsFullscreenPaused(false);
-  }, [selectedChannel?.url]);
-
-  useEffect(() => {
-    return () => {
-      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-      if (fullscreenReconnectTimerRef.current) {
-        clearTimeout(fullscreenReconnectTimerRef.current);
-      }
-      if (fullscreenUiTimerRef.current) {
-        clearTimeout(fullscreenUiTimerRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!showFullscreen) return;
-
-    setShowFullscreenUi(true);
-
-    if (fullscreenUiTimerRef.current) {
-      clearTimeout(fullscreenUiTimerRef.current);
-    }
-
-    fullscreenUiTimerRef.current = setTimeout(() => {
-      setShowFullscreenUi(false);
-    }, 2500);
-  }, [showFullscreen, fullscreenRetryKey]);
 
   const favoriteChannels = useMemo(() => {
     const favoriteSet = new Set(favoriteIds);
@@ -231,11 +208,47 @@ export default function LiveTVScreen({
       epgItems,
       safeText(selectedChannel.name),
       safeText(selectedChannel.group),
-      safeText(selectedChannel.tvgId)
+      safeText(selectedChannel.tvgId),
+      safeText(selectedChannel.tvgName)
     );
   }, [epgItems, selectedChannel]);
 
   const progressPercent = useMemo(() => getProgressPercent(nowProgram), [nowProgram]);
+
+  useEffect(() => {
+    setRetryKey((prev) => prev + 1);
+    setFullscreenRetryKey((prev) => prev + 1);
+    setPlayerError("");
+    setFullscreenError("");
+    setIsPaused(false);
+    setIsFullscreenPaused(false);
+  }, [selectedChannel?.url]);
+
+  useEffect(() => {
+    return () => {
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      if (fullscreenReconnectTimerRef.current) {
+        clearTimeout(fullscreenReconnectTimerRef.current);
+      }
+      if (fullscreenUiTimerRef.current) {
+        clearTimeout(fullscreenUiTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!showFullscreen) return;
+
+    setShowFullscreenUi(true);
+
+    if (fullscreenUiTimerRef.current) {
+      clearTimeout(fullscreenUiTimerRef.current);
+    }
+
+    fullscreenUiTimerRef.current = setTimeout(() => {
+      setShowFullscreenUi(false);
+    }, 2500);
+  }, [showFullscreen, fullscreenRetryKey]);
 
   const persistFavorites = async (ids) => {
     try {
@@ -485,47 +498,53 @@ export default function LiveTVScreen({
         </View>
 
         <View style={styles.centerPanel}>
-          <FlatList
-            data={visibleChannels}
-            keyExtractor={(item, index) => item.id || `${item.name}_${index}`}
-            renderItem={({ item, index }) => {
-              const active = index === selectedChannelIndex;
-              const rowFavorite = favoriteIds.includes(getChannelStorageId(item));
+          {channels.length === 0 && isRefreshingData ? (
+            <View style={styles.emptyList}>
+              <Text style={styles.emptyListText}>Atualizando canais...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={visibleChannels}
+              keyExtractor={(item, index) => item.id || `${item.name}_${index}`}
+              renderItem={({ item, index }) => {
+                const active = index === selectedChannelIndex;
+                const rowFavorite = favoriteIds.includes(getChannelStorageId(item));
 
-              return (
-                <TouchableOpacity
-                  style={[styles.channelRow, active && styles.channelRowActive]}
-                  onPress={() => handleChannelPress(index)}
-                >
-                  <View style={styles.channelNumberBox}>
-                    <Text style={styles.channelNumber}>{index + 1}</Text>
-                  </View>
+                return (
+                  <TouchableOpacity
+                    style={[styles.channelRow, active && styles.channelRowActive]}
+                    onPress={() => handleChannelPress(index)}
+                  >
+                    <View style={styles.channelNumberBox}>
+                      <Text style={styles.channelNumber}>{index + 1}</Text>
+                    </View>
 
-                  <View style={styles.channelTextWrap}>
-                    <Text
-                      style={[
-                        styles.channelName,
-                        active && styles.channelNameActive,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {rowFavorite ? "★ " : ""}
-                      {item.name || "Sem nome"}
-                    </Text>
+                    <View style={styles.channelTextWrap}>
+                      <Text
+                        style={[
+                          styles.channelName,
+                          active && styles.channelNameActive,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {rowFavorite ? "★ " : ""}
+                        {item.name || "Sem nome"}
+                      </Text>
 
-                    <Text style={styles.channelSub} numberOfLines={1}>
-                      {item.group || "Canal"}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            }}
-            ListEmptyComponent={
-              <View style={styles.emptyList}>
-                <Text style={styles.emptyListText}>Nenhum canal encontrado</Text>
-              </View>
-            }
-          />
+                      <Text style={styles.channelSub} numberOfLines={1}>
+                        {item.group || "Canal"}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              }}
+              ListEmptyComponent={
+                <View style={styles.emptyList}>
+                  <Text style={styles.emptyListText}>Nenhum canal encontrado</Text>
+                </View>
+              }
+            />
+          )}
         </View>
 
         <View style={styles.rightPanel}>
@@ -553,7 +572,9 @@ export default function LiveTVScreen({
               />
             ) : (
               <View style={styles.previewEmpty}>
-                <Text style={styles.previewEmptyText}>Selecione um canal</Text>
+                <Text style={styles.previewEmptyText}>
+                  {isRefreshingData ? "Atualizando canais..." : "Selecione um canal"}
+                </Text>
               </View>
             )}
           </TouchableOpacity>
@@ -566,7 +587,7 @@ export default function LiveTVScreen({
             <View style={styles.epgTopRow}>
               <View style={styles.channelInfoWrap}>
                 <Text style={styles.channelNumberLarge}>
-                  {selectedChannelIndex + 1}
+                  {selectedChannel ? selectedChannelIndex + 1 : "-"}
                 </Text>
                 <View style={styles.channelMetaWrap}>
                   <Text style={styles.epgHeader} numberOfLines={1}>
@@ -877,6 +898,7 @@ const styles = StyleSheet.create({
   },
 
   emptyList: {
+    flex: 1,
     paddingVertical: 20,
     alignItems: "center",
     justifyContent: "center",

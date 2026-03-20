@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Alert } from "react-native";
+import React, { useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import LoginScreen from "../screens/LoginScreen";
 import HomeScreen from "../screens/HomeScreen";
 import LiveTVScreen from "../screens/LiveTVScreen";
@@ -11,6 +11,8 @@ import SeasonEpisodesScreen from "../screens/SeasonEpisodesScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 import { loadM3U } from "../services/m3uService";
 
+const CACHE_KEY = "mundoplaytv_session_cache_v3";
+
 const EMPTY_DATA = {
   live: [],
   movies: [],
@@ -21,25 +23,66 @@ const EMPTY_DATA = {
   loadedAt: null,
 };
 
+function mergeData(data) {
+  return {
+    ...EMPTY_DATA,
+    ...(data || {}),
+    live: Array.isArray(data?.live) ? data.live : [],
+    movies: Array.isArray(data?.movies) ? data.movies : [],
+    series: Array.isArray(data?.series) ? data.series : [],
+    liveCategories: Array.isArray(data?.liveCategories) ? data.liveCategories : [],
+    movieCategories: Array.isArray(data?.movieCategories) ? data.movieCategories : [],
+    seriesCategories: Array.isArray(data?.seriesCategories) ? data.seriesCategories : [],
+  };
+}
+
+async function readCacheForUrl(url) {
+  try {
+    const raw = await AsyncStorage.getItem(CACHE_KEY);
+    if (!raw) return EMPTY_DATA;
+
+    const parsed = JSON.parse(raw);
+    if (parsed?.url !== url) return EMPTY_DATA;
+
+    return mergeData(parsed?.data);
+  } catch (e) {
+    return EMPTY_DATA;
+  }
+}
+
+async function writeCache(url, data) {
+  try {
+    await AsyncStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({
+        url,
+        data: mergeData(data),
+        savedAt: new Date().toISOString(),
+      })
+    );
+  } catch (e) {}
+}
+
 export default function AppNavigator() {
   const [session, setSession] = useState(null);
   const [screen, setScreen] = useState("home");
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [selectedSeries, setSelectedSeries] = useState(null);
   const [selectedSeason, setSelectedSeason] = useState(null);
-  const [isLoadingData, setIsLoadingData] = useState(false);
-  const hasLoadedOnceRef = useRef(false);
+  const [isRefreshingData, setIsRefreshingData] = useState(false);
 
-  const handleLogin = (payload) => {
+  const handleLogin = async (payload) => {
+    const cachedData = await readCacheForUrl(payload?.url);
+
     setSession({
       ...payload,
-      data: payload?.data || EMPTY_DATA,
+      data: mergeData(cachedData),
     });
+
     setScreen("home");
     setSelectedMovie(null);
     setSelectedSeries(null);
     setSelectedSeason(null);
-    hasLoadedOnceRef.current = false;
   };
 
   const handleLogout = () => {
@@ -48,86 +91,35 @@ export default function AppNavigator() {
     setSelectedMovie(null);
     setSelectedSeries(null);
     setSelectedSeason(null);
-    setIsLoadingData(false);
-    hasLoadedOnceRef.current = false;
+    setIsRefreshingData(false);
+  };
+
+  const handleRefreshSession = async () => {
+    if (!session?.url) return false;
+    if (isRefreshingData) return false;
+
+    try {
+      setIsRefreshingData(true);
+      const data = await loadM3U(session.url);
+      const safeData = mergeData(data);
+
+      setSession((prev) => {
+        if (!prev) return prev;
+        return { ...prev, data: safeData };
+      });
+
+      await writeCache(session.url, safeData);
+      return true;
+    } catch (e) {
+      return false;
+    } finally {
+      setIsRefreshingData(false);
+    }
   };
 
   const handleReload = async () => {
-    if (!session?.url) return false;
-
-    try {
-      setIsLoadingData(true);
-      const data = await loadM3U(session.url);
-
-      console.log("RELOAD URL:", session.url);
-      console.log(
-        "RELOAD M3U:",
-        data?.live?.length || 0,
-        data?.movies?.length || 0,
-        data?.series?.length || 0
-      );
-
-      setSession((prev) => ({ ...prev, data }));
-      return true;
-    } catch (e) {
-      console.log("ERRO RELOAD M3U:", String(e?.message || e));
-      return false;
-    } finally {
-      setIsLoadingData(false);
-    }
+    return handleRefreshSession();
   };
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadInitialData() {
-      if (!session?.url) return;
-      if (hasLoadedOnceRef.current) return;
-
-      hasLoadedOnceRef.current = true;
-      setIsLoadingData(true);
-
-      try {
-        const data = await loadM3U(session.url);
-
-        console.log("URL carregada:", session.url);
-        console.log(
-          "M3U carregada:",
-          data?.live?.length || 0,
-          data?.movies?.length || 0,
-          data?.series?.length || 0
-        );
-
-        if (!active) return;
-
-        setSession((prev) => {
-          if (!prev) return prev;
-          return { ...prev, data };
-        });
-      } catch (e) {
-        if (!active) return;
-
-        console.log("ERRO loadM3U:", String(e?.message || e));
-
-        Alert.alert(
-          "Aviso",
-          `Entrou no aplicativo, mas a lista falhou: ${String(
-            e?.message || e
-          )}`
-        );
-      } finally {
-        if (active) {
-          setIsLoadingData(false);
-        }
-      }
-    }
-
-    loadInitialData();
-
-    return () => {
-      active = false;
-    };
-  }, [session?.url]);
 
   if (!session) {
     return <LoginScreen onLogin={handleLogin} />;
@@ -137,12 +129,12 @@ export default function AppNavigator() {
     return (
       <LiveTVScreen
         session={session}
+        isRefreshingData={isRefreshingData}
+        onRefreshSession={handleRefreshSession}
         onOpenHome={() => setScreen("home")}
         onOpenLive={() => setScreen("live")}
         onOpenMovies={() => setScreen("movies")}
         onOpenSeries={() => setScreen("series")}
-        onOpenSettings={() => setScreen("settings")}
-        onLogout={handleLogout}
       />
     );
   }
@@ -151,6 +143,8 @@ export default function AppNavigator() {
     return (
       <MoviesScreen
         session={session}
+        isRefreshingData={isRefreshingData}
+        onRefreshSession={handleRefreshSession}
         onBack={() => setScreen("home")}
         onOpenLive={() => setScreen("live")}
         onOpenMovies={() => setScreen("movies")}
@@ -176,6 +170,8 @@ export default function AppNavigator() {
     return (
       <SeriesScreen
         session={session}
+        isRefreshingData={isRefreshingData}
+        onRefreshSession={handleRefreshSession}
         onBack={() => setScreen("home")}
         onOpenLive={() => setScreen("live")}
         onOpenMovies={() => setScreen("movies")}
@@ -225,7 +221,6 @@ export default function AppNavigator() {
   return (
     <HomeScreen
       session={session}
-      isLoadingData={isLoadingData}
       onOpenLive={() => setScreen("live")}
       onOpenMovies={() => setScreen("movies")}
       onOpenSeries={() => setScreen("series")}

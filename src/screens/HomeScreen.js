@@ -15,7 +15,6 @@ const isPhone = width < 900;
 
 export default function HomeScreen({
   session,
-  isLoadingData,
   onOpenLive,
   onOpenMovies,
   onOpenSeries,
@@ -46,10 +45,8 @@ export default function HomeScreen({
     return [
       {
         id: "fallback_home",
-        name: isLoadingData ? "CARREGANDO CONTEÚDO..." : "MUNDO PLAY TV",
-        description: isLoadingData
-          ? "A lista está sendo carregada em segundo plano."
-          : "Lançamentos e destaques da sua lista.",
+        name: "MUNDO PLAY TV",
+        description: "Abra Filmes ou Séries para atualizar o conteúdo desta lista.",
         logo: "",
         cover: "",
         backdrop: "",
@@ -59,7 +56,7 @@ export default function HomeScreen({
         mediaType: "movie",
       },
     ];
-  }, [movies, series, isLoadingData]);
+  }, [movies, series]);
 
   const [index, setIndex] = useState(0);
 
@@ -90,6 +87,21 @@ export default function HomeScreen({
     }
   };
 
+  const heroUri =
+    item?.cover ||
+    item?.backdrop ||
+    item?.fanart ||
+    item?.poster ||
+    item?.logo ||
+    "";
+
+  const posterUri =
+    item?.logo ||
+    item?.poster ||
+    item?.cover ||
+    item?.backdrop ||
+    "";
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topbar}>
@@ -116,41 +128,15 @@ export default function HomeScreen({
           disabled={item?.id === "fallback_home"}
         >
           <ImageBackground
-            source={
-              item?.cover ||
-              item?.backdrop ||
-              item?.fanart ||
-              item?.poster ||
-              item?.logo
-                ? {
-                    uri:
-                      item?.cover ||
-                      item?.backdrop ||
-                      item?.fanart ||
-                      item?.poster ||
-                      item?.logo ||
-                      "",
-                  }
-                : undefined
-            }
+            source={heroUri ? { uri: heroUri } : undefined}
             style={styles.hero}
             imageStyle={styles.heroImage}
           >
             <View style={styles.overlay} />
 
             <View style={styles.heroContent}>
-              {(item?.logo || item?.poster || item?.cover || item?.backdrop) ? (
-                <Image
-                  source={{
-                    uri:
-                      item?.logo ||
-                      item?.poster ||
-                      item?.cover ||
-                      item?.backdrop ||
-                      "",
-                  }}
-                  style={styles.poster}
-                />
+              {posterUri ? (
+                <Image source={{ uri: posterUri }} style={styles.poster} />
               ) : (
                 <View style={styles.posterFallback}>
                   <Text style={styles.posterFallbackText}>MUNDO PLAY TV</Text>
@@ -176,7 +162,7 @@ export default function HomeScreen({
 
                 <View style={styles.button}>
                   <Text style={styles.buttonText}>
-                    {isLoadingData ? "CARREGANDO..." : "TOQUE PARA ABRIR"}
+                    {item?.id === "fallback_home" ? "AGUARDANDO CACHE" : "TOQUE PARA ABRIR"}
                   </Text>
                 </View>
               </View>
