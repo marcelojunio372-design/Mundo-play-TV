@@ -9,7 +9,6 @@ import {
   Alert,
   ScrollView,
 } from "react-native";
-import { loadM3U } from "../services/m3uService";
 
 export default function LoginScreen({ onLogin }) {
   const [mode, setMode] = useState("m3u");
@@ -38,16 +37,14 @@ export default function LoginScreen({ onLogin }) {
     try {
       setLoading(true);
 
-      const data = await loadM3U(finalUrl);
-
       onLogin({
         type: "m3u",
         url: finalUrl,
         mac,
-        data,
+        data: null,
       });
     } catch (e) {
-      Alert.alert("Erro", "Falha ao carregar a lista M3U");
+      Alert.alert("Erro", "Falha ao iniciar login M3U");
     } finally {
       setLoading(false);
     }
@@ -68,8 +65,6 @@ export default function LoginScreen({ onLogin }) {
     try {
       setLoading(true);
 
-      const data = await loadM3U(playlistUrl);
-
       onLogin({
         type: "xtream",
         url: playlistUrl,
@@ -77,10 +72,10 @@ export default function LoginScreen({ onLogin }) {
         username,
         password,
         mac,
-        data,
+        data: null,
       });
     } catch (e) {
-      Alert.alert("Erro", "Falha ao carregar login usuário/senha");
+      Alert.alert("Erro", "Falha ao iniciar login usuário/senha");
     } finally {
       setLoading(false);
     }
@@ -176,7 +171,7 @@ export default function LoginScreen({ onLogin }) {
 
           <TouchableOpacity style={styles.btn} onPress={handleConnect}>
             <Text style={styles.btnText}>
-              {loading ? "CONECTANDO..." : "CONECTAR"}
+              {loading ? "ENTRANDO..." : "CONECTAR"}
             </Text>
           </TouchableOpacity>
 
@@ -218,42 +213,38 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "900",
     textAlign: "center",
+    marginBottom: 4,
   },
 
   sub: {
-    color: "#d4dee8",
-    fontSize: 12,
+    color: "#c6d4e3",
     textAlign: "center",
-    marginTop: 6,
-    marginBottom: 14,
+    marginBottom: 18,
   },
 
   tabs: {
     flexDirection: "row",
-    gap: 8,
+    backgroundColor: "#0d2234",
+    borderRadius: 12,
+    padding: 4,
     marginBottom: 14,
   },
 
   tab: {
     flex: 1,
-    minHeight: 40,
-    borderRadius: 12,
-    backgroundColor: "#102235",
+    minHeight: 42,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 8,
   },
 
   tabActive: {
-    backgroundColor: "rgba(56,215,255,0.16)",
-    borderWidth: 1,
-    borderColor: "#38d7ff",
+    backgroundColor: "#132c43",
   },
 
   tabText: {
-    color: "#fff",
-    fontSize: 10,
-    fontWeight: "800",
+    color: "#95aac0",
+    fontWeight: "700",
   },
 
   tabTextActive: {
@@ -261,18 +252,19 @@ const styles = StyleSheet.create({
   },
 
   input: {
-    width: "100%",
-    minHeight: 48,
+    height: 48,
     borderRadius: 12,
-    backgroundColor: "#102235",
+    backgroundColor: "#0c1f31",
     color: "#fff",
     paddingHorizontal: 14,
-    marginBottom: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
   },
 
   btn: {
-    minHeight: 50,
-    borderRadius: 14,
+    height: 50,
+    borderRadius: 12,
     backgroundColor: "#38d7ff",
     alignItems: "center",
     justifyContent: "center",
@@ -280,25 +272,24 @@ const styles = StyleSheet.create({
   },
 
   btnText: {
-    color: "#00131f",
-    fontSize: 12,
+    color: "#04121d",
     fontWeight: "900",
+    fontSize: 15,
   },
 
   footerRow: {
     marginTop: 16,
-    alignItems: "flex-start",
+    alignItems: "center",
   },
 
   footerMac: {
-    color: "#38d7ff",
-    fontSize: 10,
-    fontWeight: "900",
-    marginBottom: 6,
+    color: "#a8bed2",
+    fontSize: 12,
+    marginBottom: 4,
   },
 
   footer: {
-    color: "#8fa4ba",
-    fontSize: 10,
+    color: "#6f8497",
+    fontSize: 12,
   },
 });
