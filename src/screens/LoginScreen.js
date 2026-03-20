@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { loadM3U } from "../services/m3uService";
+import { loadXtream } from "../services/xtreamService";
 
 const LOGIN_STORAGE_KEY = "mundoplaytv_login_data_v1";
 
@@ -135,7 +136,7 @@ export default function LoginScreen({ onLogin }) {
         password,
       });
 
-      const data = await loadM3U(playlistUrl, { only: "all" });
+      const data = await loadXtream(base, username, password);
 
       onLogin({
         type: "xtream",
@@ -147,7 +148,7 @@ export default function LoginScreen({ onLogin }) {
         data,
       });
     } catch (e) {
-      Alert.alert("Erro", "Falha ao carregar login usuário/senha");
+      Alert.alert("Erro", "Falha ao carregar login Xtream");
     } finally {
       setLoading(false);
     }
@@ -243,7 +244,11 @@ export default function LoginScreen({ onLogin }) {
 
           <TouchableOpacity style={styles.btn} onPress={handleConnect}>
             <Text style={styles.btnText}>
-              {loading ? "CARREGANDO LISTA..." : "CONECTAR"}
+              {loading
+                ? mode === "xtream"
+                  ? "CARREGANDO XTREAM..."
+                  : "CARREGANDO M3U..."
+                : "CONECTAR"}
             </Text>
           </TouchableOpacity>
 
