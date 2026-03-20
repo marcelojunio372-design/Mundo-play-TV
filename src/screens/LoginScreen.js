@@ -10,6 +10,7 @@ import {
   ScrollView,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { loadM3U } from "../services/m3uService";
 
 const LOGIN_STORAGE_KEY = "mundoplaytv_login_data_v1";
 
@@ -96,14 +97,16 @@ export default function LoginScreen({ onLogin }) {
         password: "",
       });
 
+      const data = await loadM3U(finalUrl, { only: "all" });
+
       onLogin({
         type: "m3u",
         url: finalUrl,
         mac,
-        data: null,
+        data,
       });
     } catch (e) {
-      Alert.alert("Erro", "Falha ao iniciar login M3U");
+      Alert.alert("Erro", "Falha ao carregar a lista M3U");
     } finally {
       setLoading(false);
     }
@@ -132,6 +135,8 @@ export default function LoginScreen({ onLogin }) {
         password,
       });
 
+      const data = await loadM3U(playlistUrl, { only: "all" });
+
       onLogin({
         type: "xtream",
         url: playlistUrl,
@@ -139,10 +144,10 @@ export default function LoginScreen({ onLogin }) {
         username,
         password,
         mac,
-        data: null,
+        data,
       });
     } catch (e) {
-      Alert.alert("Erro", "Falha ao iniciar login usuário/senha");
+      Alert.alert("Erro", "Falha ao carregar login usuário/senha");
     } finally {
       setLoading(false);
     }
@@ -238,7 +243,7 @@ export default function LoginScreen({ onLogin }) {
 
           <TouchableOpacity style={styles.btn} onPress={handleConnect}>
             <Text style={styles.btnText}>
-              {loading ? "ENTRANDO..." : "CONECTAR"}
+              {loading ? "CARREGANDO LISTA..." : "CONECTAR"}
             </Text>
           </TouchableOpacity>
 
