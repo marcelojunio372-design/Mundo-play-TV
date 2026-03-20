@@ -11,7 +11,7 @@ import SeasonEpisodesScreen from "../screens/SeasonEpisodesScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 import { loadM3U } from "../services/m3uService";
 
-const CACHE_KEY = "mundoplaytv_session_cache_v4";
+const CACHE_KEY = "mundoplaytv_session_cache_v5";
 
 const EMPTY_DATA = {
   live: [],

@@ -119,25 +119,80 @@ function extractDescription(extinf = "", name = "", group = "") {
   return safeText(name || "");
 }
 
-function inferType(name = "", group = "", url = "", tvgId = "", tvgName = "") {
-  const text = safeText(url).toLowerCase();
+function looksLikeSeriesGroup(group = "", name = "") {
+  const text = `${group} ${name}`.toLowerCase();
 
+  return (
+    /s[eé]ries|series|temporadas|temporada|season|epis[oó]dio|episodios|novelas|animes|desenhos|kids|infantil/.test(
+      text
+    ) &&
+    !/filmes|movie|cinema|ao vivo|abertos|esportes|adult|xxx/.test(text)
+  );
+}
+
+function looksLikeMovieGroup(group = "", name = "") {
+  const text = `${group} ${name}`.toLowerCase();
+
+  return (
+    /filmes|movie|movies|cinema|lancamento|lançamento|terror|romance|comedia|comédia|acao|ação|drama|suspense|document[aá]rio|documentario|anima[cç][aã]o|desenho|infantil|faroeste/.test(
+      text
+    ) &&
+    !/s[eé]ries|series|temporada|season|epis[oó]dio/.test(text)
+  );
+}
+
+function looksLikeLiveGroup(group = "", name = "") {
+  const text = `${group} ${name}`.toLowerCase();
+
+  return /ao vivo|live|tv aberta|abertos|esportes|not[ií]cias|document[aá]rios|religiosos|canais|4k|24h|bbb|globo|sbt|record|band|rede|sportv|espn|premiere|telecine|hbo|warner|discovery|natgeo|animal planet/.test(
+    text
+  );
+}
+
+function inferType(name = "", group = "", url = "", tvgId = "", tvgName = "") {
+  const urlText = safeText(url).toLowerCase();
+  const metaText = `${name} ${group} ${tvgId} ${tvgName}`.toLowerCase();
+
+  // 1) prioridade: URL claramente identifica
   if (
-    /\/movie\//.test(text) ||
-    /action=get_vod_stream/.test(text) ||
-    /type=movie/.test(text) ||
-    /\/vod\//.test(text)
+    /\/movie\//.test(urlText) ||
+    /action=get_vod_stream/.test(urlText) ||
+    /type=movie/.test(urlText) ||
+    /\/vod\//.test(urlText)
   ) {
     return "movie";
   }
 
   if (
-    /\/series\//.test(text) ||
-    /action=get_series/.test(text) ||
-    /action=get_series_info/.test(text) ||
-    /type=series/.test(text)
+    /\/series\//.test(urlText) ||
+    /action=get_series/.test(urlText) ||
+    /action=get_series_info/.test(urlText) ||
+    /type=series/.test(urlText)
   ) {
     return "series";
+  }
+
+  // 2) depois tenta grupo/nome
+  if (looksLikeSeriesGroup(group, name)) {
+    return "series";
+  }
+
+  if (looksLikeMovieGroup(group, name)) {
+    return "movie";
+  }
+
+  // 3) sinais fortes de live
+  if (looksLikeLiveGroup(group, name)) {
+    return "live";
+  }
+
+  // 4) heurística final
+  if (/temporada|season|epis[oó]dio|s\d{1,2}e\d{1,2}/.test(metaText)) {
+    return "series";
+  }
+
+  if (/filme|movie|movies|cinema|vod|lancamento|lançamento/.test(metaText)) {
+    return "movie";
   }
 
   return "live";
@@ -207,6 +262,7 @@ export async function loadM3U(url, options = {}) {
 
     const name = extractName(extinf);
     const group = extractGroup(extinf);
+    const logo = extractLogo(extinf);
     const tvgId = extractTvgId(extinf);
     const tvgName = extractTvgName(extinf);
     const type = inferType(name, group, streamUrl, tvgId, tvgName);
@@ -215,7 +271,6 @@ export async function loadM3U(url, options = {}) {
       continue;
     }
 
-    const logo = extractLogo(extinf);
     const year = extractYear(name, group);
     const description = extractDescription(extinf, name, group);
     const aliases = buildChannelAliases(name, group, tvgId, tvgName);
