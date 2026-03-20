@@ -160,7 +160,17 @@ function buildCategories(items = []) {
     }));
 }
 
-export async function loadM3U(url) {
+function shouldKeepType(type, only = "all") {
+  if (only === "all") return true;
+  if (only === "live") return type === "live";
+  if (only === "movie") return type === "movie";
+  if (only === "series") return type === "series";
+  return true;
+}
+
+export async function loadM3U(url, options = {}) {
+  const only = safeText(options.only || "all").toLowerCase();
+
   const response = await fetch(url);
   const text = await response.text();
 
@@ -197,10 +207,15 @@ export async function loadM3U(url) {
 
     const name = extractName(extinf);
     const group = extractGroup(extinf);
-    const logo = extractLogo(extinf);
     const tvgId = extractTvgId(extinf);
     const tvgName = extractTvgName(extinf);
     const type = inferType(name, group, streamUrl, tvgId, tvgName);
+
+    if (!shouldKeepType(type, only)) {
+      continue;
+    }
+
+    const logo = extractLogo(extinf);
     const year = extractYear(name, group);
     const description = extractDescription(extinf, name, group);
     const aliases = buildChannelAliases(name, group, tvgId, tvgName);
