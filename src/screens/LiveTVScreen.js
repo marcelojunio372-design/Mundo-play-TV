@@ -10,10 +10,14 @@ import {
   TextInput,
   StatusBar,
   Modal,
-  PanResponder,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Video, ResizeMode } from "expo-av";
+import {
+  loadEPG,
+  findNowAndNextForChannel,
+  formatProgramTime,
+} from "../services/epgService";
 
 const { width } = Dimensions.get("window");
 const isPhone = width < 900;
@@ -22,8 +26,6 @@ const FAVORITES_KEY = "mundoplaytv_live_favorites";
 const RECENTS_KEY = "mundoplaytv_live_recents";
 const CATEGORY_ROW_HEIGHT = isPhone ? 34 : 46;
 const CHANNEL_ROW_HEIGHT = isPhone ? 38 : 48;
-const SWIPE_THRESHOLD = 50;
-const DOUBLE_TAP_DELAY = 260;
 
 function safeText(value) {
   if (value === null || value === undefined) return "";
@@ -75,14 +77,11 @@ export default function LiveTVScreen({
   const [isPaused, setIsPaused] = useState(false);
   const [isFullscreenPaused, setIsFullscreenPaused] = useState(false);
   const [showFullscreen, setShowFullscreen] = useState(false);
-  const [showControls, setShowControls] = useState(true);
-  const [showFullscreenControls, setShowFullscreenControls] = useState(true);
+  const [epgItems, setEpgItems] = useState([]);
+  const [epgLoading, setEpgLoading] = useState(false);
 
   const videoRef = useRef(null);
   const fullscreenVideoRef = useRef(null);
-  const controlsTimerRef = useRef(null);
-  const fullscreenControlsTimerRef = useRef(null);
-  const lastTapRef = useRef(0);
 
   useEffect(() => {
     async function loadSavedData() {
@@ -106,13 +105,32 @@ export default function LiveTVScreen({
   }, []);
 
   useEffect(() => {
-    return () => {
-      if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
-      if (fullscreenControlsTimerRef.current) {
-        clearTimeout(fullscreenControlsTimerRef.current);
+    let active = true;
+
+    async function fetchEpgData() {
+      try {
+        setEpgLoading(true);
+        const items = await loadEPG(session);
+        if (active) {
+          setEpgItems(Array.isArray(items) ? items : []);
+        }
+      } catch (e) {
+        if (active) {
+          setEpgItems([]);
+        }
+      } finally {
+        if (active) {
+          setEpgLoading(false);
+        }
       }
+    }
+
+    fetchEpgData();
+
+    return () => {
+      active = false;
     };
-  }, []);
+  }, [session]);
 
   const favoriteChannels = useMemo(() => {
     const favoriteSet = new Set(favoriteIds);
@@ -161,9 +179,21 @@ export default function LiveTVScreen({
     setFullscreenKey((prev) => prev + 1);
     setIsPaused(false);
     setIsFullscreenPaused(false);
-    resetControlsTimer();
-    resetFullscreenControlsTimer();
   }, [selectedChannel?.url]);
+
+  const { nowProgram, nextProgram } = useMemo(() => {
+    if (!selectedChannel) {
+      return { nowProgram: null, nextProgram: null };
+    }
+
+    return findNowAndNextForChannel(
+      epgItems,
+      safeText(selectedChannel.name),
+      safeText(selectedChannel.group),
+      safeText(selectedChannel.tvgId),
+      safeText(selectedChannel.tvgName || selectedChannel.name)
+    );
+  }, [epgItems, selectedChannel]);
 
   const persistFavorites = async (ids) => {
     try {
@@ -199,8 +229,6 @@ export default function LiveTVScreen({
 
     setFavoriteIds(updated);
     await persistFavorites(updated);
-    resetControlsTimer();
-    resetFullscreenControlsTimer();
   };
 
   const handleSelectCategory = (index) => {
@@ -217,15 +245,6 @@ export default function LiveTVScreen({
     }
   };
 
-  const reloadPlayer = async () => {
-    try {
-      await videoRef.current?.stopAsync?.();
-    } catch (e) {}
-    setPlayerKey((prev) => prev + 1);
-    setIsPaused(false);
-    resetControlsTimer();
-  };
-
   const togglePauseMain = async () => {
     try {
       if (isPaused) {
@@ -235,7 +254,6 @@ export default function LiveTVScreen({
         await videoRef.current?.pauseAsync?.();
         setIsPaused(true);
       }
-      resetControlsTimer();
     } catch (e) {}
   };
 
@@ -248,7 +266,6 @@ export default function LiveTVScreen({
         await fullscreenVideoRef.current?.pauseAsync?.();
         setIsFullscreenPaused(true);
       }
-      resetFullscreenControlsTimer();
     } catch (e) {}
   };
 
@@ -272,7 +289,6 @@ export default function LiveTVScreen({
     setFullscreenKey((prev) => prev + 1);
     setIsFullscreenPaused(false);
     setShowFullscreen(true);
-    resetFullscreenControlsTimer();
   };
 
   const closeFullscreen = async () => {
@@ -281,108 +297,6 @@ export default function LiveTVScreen({
     } catch (e) {}
     setShowFullscreen(false);
   };
-
-  const resetControlsTimer = () => {
-    setShowControls(true);
-
-    if (controlsTimerRef.current) {
-      clearTimeout(controlsTimerRef.current);
-    }
-
-    controlsTimerRef.current = setTimeout(() => {
-      setShowControls(false);
-    }, 2500);
-  };
-
-  const resetFullscreenControlsTimer = () => {
-    setShowFullscreenControls(true);
-
-    if (fullscreenControlsTimerRef.current) {
-      clearTimeout(fullscreenControlsTimerRef.current);
-    }
-
-    fullscreenControlsTimerRef.current = setTimeout(() => {
-      setShowFullscreenControls(false);
-    }, 2500);
-  };
-
-  const handleMainTap = async () => {
-    const now = Date.now();
-
-    if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
-      lastTapRef.current = 0;
-      await togglePauseMain();
-      return;
-    }
-
-    lastTapRef.current = now;
-
-    if (showControls) {
-      setShowControls(false);
-      if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
-    } else {
-      resetControlsTimer();
-    }
-  };
-
-  const handleFullscreenTap = async () => {
-    const now = Date.now();
-
-    if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
-      lastTapRef.current = 0;
-      await togglePauseFullscreen();
-      return;
-    }
-
-    lastTapRef.current = now;
-
-    if (showFullscreenControls) {
-      setShowFullscreenControls(false);
-      if (fullscreenControlsTimerRef.current) {
-        clearTimeout(fullscreenControlsTimerRef.current);
-      }
-    } else {
-      resetFullscreenControlsTimer();
-    }
-  };
-
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gestureState) => {
-          return Math.abs(gestureState.dx) > 20 && Math.abs(gestureState.dy) < 40;
-        },
-        onPanResponderRelease: async (_, gestureState) => {
-          if (gestureState.dx <= -SWIPE_THRESHOLD) {
-            await goToNextChannel();
-          } else if (gestureState.dx >= SWIPE_THRESHOLD) {
-            await goToPreviousChannel();
-          } else {
-            resetControlsTimer();
-          }
-        },
-      }),
-    [selectedChannelIndex, visibleChannels.length, recentIds]
-  );
-
-  const fullscreenPanResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gestureState) => {
-          return Math.abs(gestureState.dx) > 20 && Math.abs(gestureState.dy) < 40;
-        },
-        onPanResponderRelease: async (_, gestureState) => {
-          if (gestureState.dx <= -SWIPE_THRESHOLD) {
-            await goToNextChannel();
-          } else if (gestureState.dx >= SWIPE_THRESHOLD) {
-            await goToPreviousChannel();
-          } else {
-            resetFullscreenControlsTimer();
-          }
-        },
-      }),
-    [selectedChannelIndex, visibleChannels.length, recentIds]
-  );
 
   const renderCategoryRow = ({ item, index }) => {
     const active = index === selectedCategory;
@@ -419,9 +333,7 @@ export default function LiveTVScreen({
         onPress={() => handleSelectChannel(index)}
         activeOpacity={0.8}
       >
-        <View style={styles.channelNumberBox}>
-          <Text style={styles.channelNumber}>{index + 1}</Text>
-        </View>
+        <Text style={styles.channelNumber}>{index + 1}</Text>
 
         <View style={styles.channelTextWrap}>
           <Text
@@ -442,7 +354,7 @@ export default function LiveTVScreen({
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#10163a" />
+      <StatusBar barStyle="light-content" backgroundColor="#090c18" />
 
       <View style={styles.topnav}>
         <TouchableOpacity onPress={onOpenHome}>
@@ -475,7 +387,7 @@ export default function LiveTVScreen({
               setSelectedChannelIndex(0);
             }}
             placeholder="Buscar canal..."
-            placeholderTextColor="#94a7bb"
+            placeholderTextColor="#c2c6d2"
             style={styles.searchInput}
           />
         </View>
@@ -522,124 +434,110 @@ export default function LiveTVScreen({
         </View>
 
         <View style={styles.rightPanel}>
-          <View style={styles.previewBox} {...panResponder.panHandlers}>
-            <TouchableOpacity
-              activeOpacity={1}
-              style={styles.touchLayer}
-              onPress={handleMainTap}
-            >
-              {selectedChannel?.url ? (
-                <Video
-                  key={`${selectedChannel.url}_${playerKey}`}
-                  ref={videoRef}
-                  source={{ uri: selectedChannel.url }}
-                  style={styles.previewVideo}
-                  resizeMode={ResizeMode.COVER}
-                  shouldPlay={!isPaused}
-                  isLooping
-                  useNativeControls={false}
-                  onReadyForDisplay={() => {
-                    resetControlsTimer();
-                  }}
-                />
-              ) : (
-                <View style={styles.previewEmpty}>
-                  <Text style={styles.previewEmptyText}>Sem sinal</Text>
-                </View>
-              )}
+          <TouchableOpacity
+            style={styles.previewBox}
+            activeOpacity={0.92}
+            onPress={openFullscreen}
+          >
+            {selectedChannel?.url ? (
+              <Video
+                key={`${selectedChannel.url}_${playerKey}`}
+                ref={videoRef}
+                source={{ uri: selectedChannel.url }}
+                style={styles.previewVideo}
+                resizeMode={ResizeMode.COVER}
+                shouldPlay={!isPaused}
+                isLooping
+                useNativeControls={false}
+              />
+            ) : (
+              <View style={styles.previewEmpty}>
+                <Text style={styles.previewEmptyText}>Sem sinal</Text>
+              </View>
+            )}
+          </TouchableOpacity>
 
-              {showControls && (
-                <View style={styles.previewOverlay}>
-                  <View style={styles.previewTopRow}>
-                    <TouchableOpacity
-                      style={styles.overlayBtnTop}
-                      onPress={onOpenHome}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.overlayBtnText}>VOLTAR</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={styles.previewBottomRow}>
-                    <TouchableOpacity
-                      style={styles.overlayBtn}
-                      onPress={goToPreviousChannel}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.overlayBtnText}>◀</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.overlayBtn}
-                      onPress={togglePauseMain}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.overlayBtnText}>
-                        {isPaused ? "PLAY" : "PAUSE"}
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.overlayBtn}
-                      onPress={goToNextChannel}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.overlayBtnText}>▶</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.overlayBtn}
-                      onPress={toggleFavorite}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.overlayBtnText}>
-                        {isFavorite ? "★" : "☆"}
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.overlayBtn}
-                      onPress={reloadPlayer}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.overlayBtnText}>↻</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.overlayBtn}
-                      onPress={openFullscreen}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.overlayBtnText}>⛶</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.infoCard}>
-            <Text style={styles.infoTitle}>LIVE TV</Text>
-
-            <Text style={styles.infoText}>
-              Total de canais: {channels.length}
+          <View style={styles.infoPanel}>
+            <Text style={styles.channelTitle}>
+              {safeText(selectedChannel?.name) || "Sem canal"}
             </Text>
 
-            <Text style={styles.infoText}>
-              Categoria: {categories[selectedCategory]?.name || "-"}
+            <Text style={styles.epgTime}>
+              {nowProgram ? formatProgramTime(nowProgram) : "Sem horário atual"}
             </Text>
 
-            <Text style={styles.infoText}>
-              Canal: {safeText(selectedChannel?.name) || "-"}
+            <Text style={styles.epgCurrent} numberOfLines={2}>
+              {nowProgram?.title ||
+                (epgLoading
+                  ? "Carregando EPG..."
+                  : "Programação atual não encontrada")}
             </Text>
 
-            <Text style={styles.infoText}>
-              Grupo: {safeText(selectedChannel?.group) || "-"}
+            <Text style={styles.epgNextLabel}>Próximo</Text>
+
+            <Text style={styles.epgNext} numberOfLines={2}>
+              {nextProgram?.title || "Sem próximo programa"}
             </Text>
 
-            <Text style={styles.infoDesc}>
-              Controles estilo TV Box: toque mostra/esconde, toque duplo pausa, deslizar troca canal.
+            <Text style={styles.epgNextTime}>
+              {nextProgram ? formatProgramTime(nextProgram) : ""}
             </Text>
+
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={openFullscreen}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.actionBtnText}>ABRIR</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={toggleFavorite}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.actionBtnText}>
+                  {isFavorite ? "FAVORITO ✓" : "FAVORITO"}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={togglePauseMain}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.actionBtnText}>
+                  {isPaused ? "PLAY" : "PAUSE"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.smallButtonRow}>
+              <TouchableOpacity
+                style={styles.smallActionBtn}
+                onPress={goToPreviousChannel}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.smallActionBtnText}>◀</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.smallActionBtn}
+                onPress={goToNextChannel}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.smallActionBtnText}>▶</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.smallActionBtn}
+                onPress={onOpenHome}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.smallActionBtnText}>VOLTAR</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
@@ -651,83 +549,68 @@ export default function LiveTVScreen({
         onRequestClose={closeFullscreen}
       >
         <SafeAreaView style={styles.fullscreenContainer}>
-          <View style={styles.fullscreenTouchWrap} {...fullscreenPanResponder.panHandlers}>
+          {selectedChannel?.url ? (
+            <Video
+              key={`${selectedChannel.url}_${fullscreenKey}_fullscreen`}
+              ref={fullscreenVideoRef}
+              source={{ uri: selectedChannel.url }}
+              style={styles.fullscreenVideo}
+              resizeMode={ResizeMode.CONTAIN}
+              shouldPlay={!isFullscreenPaused}
+              isLooping
+              useNativeControls={false}
+            />
+          ) : (
+            <View style={styles.previewEmpty}>
+              <Text style={styles.previewEmptyText}>Sem sinal</Text>
+            </View>
+          )}
+
+          <View style={styles.fullscreenTopBar}>
             <TouchableOpacity
-              activeOpacity={1}
-              style={styles.touchLayer}
-              onPress={handleFullscreenTap}
+              style={styles.fullscreenBackBtn}
+              onPress={closeFullscreen}
+              activeOpacity={0.8}
             >
-              {selectedChannel?.url ? (
-                <Video
-                  key={`${selectedChannel.url}_${fullscreenKey}_fullscreen`}
-                  ref={fullscreenVideoRef}
-                  source={{ uri: selectedChannel.url }}
-                  style={styles.fullscreenVideo}
-                  resizeMode={ResizeMode.CONTAIN}
-                  shouldPlay={!isFullscreenPaused}
-                  isLooping
-                  useNativeControls={false}
-                  onReadyForDisplay={() => {
-                    resetFullscreenControlsTimer();
-                  }}
-                />
-              ) : (
-                <View style={styles.previewEmpty}>
-                  <Text style={styles.previewEmptyText}>Sem sinal</Text>
-                </View>
-              )}
+              <Text style={styles.fullscreenBackText}>VOLTAR</Text>
+            </TouchableOpacity>
+          </View>
 
-              {showFullscreenControls && (
-                <>
-                  <View style={styles.fullscreenTopBar}>
-                    <TouchableOpacity
-                      style={styles.fullscreenBackBtn}
-                      onPress={closeFullscreen}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.fullscreenBackText}>VOLTAR</Text>
-                    </TouchableOpacity>
-                  </View>
+          <View style={styles.fullscreenBottomBar}>
+            <TouchableOpacity
+              style={styles.fullscreenBtn}
+              onPress={goToPreviousChannel}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.fullscreenBtnText}>◀</Text>
+            </TouchableOpacity>
 
-                  <View style={styles.fullscreenBottomBar}>
-                    <TouchableOpacity
-                      style={styles.fullscreenBtn}
-                      onPress={goToPreviousChannel}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.fullscreenBtnText}>◀</Text>
-                    </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.fullscreenBtn}
+              onPress={togglePauseFullscreen}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.fullscreenBtnText}>
+                {isFullscreenPaused ? "PLAY" : "PAUSE"}
+              </Text>
+            </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={styles.fullscreenBtn}
-                      onPress={togglePauseFullscreen}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.fullscreenBtnText}>
-                        {isFullscreenPaused ? "PLAY" : "PAUSE"}
-                      </Text>
-                    </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.fullscreenBtn}
+              onPress={goToNextChannel}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.fullscreenBtnText}>▶</Text>
+            </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={styles.fullscreenBtn}
-                      onPress={goToNextChannel}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.fullscreenBtnText}>▶</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.fullscreenBtn}
-                      onPress={toggleFavorite}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.fullscreenBtnText}>
-                        {isFavorite ? "★" : "☆"}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </>
-              )}
+            <TouchableOpacity
+              style={styles.fullscreenBtn}
+              onPress={toggleFavorite}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.fullscreenBtnText}>
+                {isFavorite ? "★" : "☆"}
+              </Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -739,7 +622,7 @@ export default function LiveTVScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0a1031",
+    backgroundColor: "#050814",
   },
 
   topnav: {
@@ -749,38 +632,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "#10163a",
+    backgroundColor: "#050814",
   },
 
   topLink: {
-    color: "#dbdbdb",
+    color: "#d7d7d7",
     fontSize: isPhone ? 10 : 14,
   },
 
   topLinkActive: {
-    color: "#ffe24f",
+    color: "#f3df58",
     fontSize: isPhone ? 10 : 14,
     fontWeight: "900",
   },
 
   topSep: {
-    color: "#98a5b5",
+    color: "#c8c8c8",
     marginHorizontal: 8,
     fontSize: isPhone ? 10 : 14,
   },
 
   searchWrap: {
     marginLeft: "auto",
-    width: isPhone ? 100 : 180,
+    width: isPhone ? 120 : 220,
   },
 
   searchInput: {
-    height: isPhone ? 28 : 36,
-    borderRadius: 8,
-    backgroundColor: "#1a224d",
+    height: isPhone ? 30 : 38,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.35)",
+    backgroundColor: "rgba(0,0,0,0.25)",
     color: "#fff",
-    paddingHorizontal: 10,
-    fontSize: isPhone ? 9 : 12,
+    paddingHorizontal: 14,
+    fontSize: isPhone ? 10 : 13,
   },
 
   main: {
@@ -790,7 +675,7 @@ const styles = StyleSheet.create({
 
   leftPanel: {
     width: isPhone ? 108 : 220,
-    backgroundColor: "#2a1530",
+    backgroundColor: "#301f2d",
     borderRightWidth: 1,
     borderRightColor: "rgba(255,255,255,0.08)",
   },
@@ -806,7 +691,7 @@ const styles = StyleSheet.create({
   },
 
   categoryActive: {
-    backgroundColor: "rgba(255,226,79,0.12)",
+    backgroundColor: "rgba(243,223,88,0.18)",
   },
 
   categoryText: {
@@ -817,7 +702,7 @@ const styles = StyleSheet.create({
   },
 
   categoryTextActive: {
-    color: "#ffe24f",
+    color: "#f3df58",
     fontWeight: "900",
   },
 
@@ -828,7 +713,7 @@ const styles = StyleSheet.create({
 
   centerPanel: {
     width: isPhone ? 130 : 260,
-    backgroundColor: "#11183d",
+    backgroundColor: "#1a1730",
     borderRightWidth: 1,
     borderRightColor: "rgba(255,255,255,0.08)",
   },
@@ -843,17 +728,11 @@ const styles = StyleSheet.create({
   },
 
   channelRowActive: {
-    backgroundColor: "rgba(115,237,240,0.14)",
-  },
-
-  channelNumberBox: {
-    width: isPhone ? 24 : 34,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 6,
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
 
   channelNumber: {
+    width: isPhone ? 26 : 34,
     color: "#f2f2f2",
     fontSize: isPhone ? 7 : 10,
     fontWeight: "900",
@@ -870,7 +749,7 @@ const styles = StyleSheet.create({
   },
 
   channelNameActive: {
-    color: "#9efcff",
+    color: "#f3df58",
   },
 
   channelSub: {
@@ -894,22 +773,17 @@ const styles = StyleSheet.create({
 
   rightPanel: {
     flex: 1,
-    backgroundColor: "#0b1338",
     padding: isPhone ? 8 : 12,
+    backgroundColor: "#07112b",
   },
 
   previewBox: {
-    width: isPhone ? 300 : 420,
-    height: isPhone ? 300 : 420,
-    borderRadius: 12,
+    width: "100%",
+    height: isPhone ? 145 : 250,
+    borderRadius: 8,
     overflow: "hidden",
     backgroundColor: "#000",
     marginBottom: 10,
-    alignSelf: "center",
-  },
-
-  touchLayer: {
-    flex: 1,
   },
 
   previewVideo: {
@@ -930,92 +804,98 @@ const styles = StyleSheet.create({
     fontSize: isPhone ? 9 : 12,
   },
 
-  previewOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "space-between",
-    padding: 8,
-  },
-
-  previewTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-start",
-  },
-
-  previewBottomRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "rgba(0,0,0,0.35)",
-    borderRadius: 10,
-    padding: 6,
-  },
-
-  overlayBtnTop: {
-    minWidth: isPhone ? 70 : 86,
-    height: isPhone ? 32 : 36,
-    borderRadius: 8,
-    backgroundColor: "rgba(16,24,63,0.88)",
-    borderWidth: 1,
-    borderColor: "#38d7ff",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 10,
-  },
-
-  overlayBtn: {
-    minWidth: isPhone ? 38 : 46,
-    height: isPhone ? 32 : 36,
-    borderRadius: 8,
-    backgroundColor: "rgba(16,24,63,0.88)",
-    borderWidth: 1,
-    borderColor: "#38d7ff",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 6,
-    marginHorizontal: 2,
-  },
-
-  overlayBtnText: {
-    color: "#38d7ff",
-    fontSize: isPhone ? 8 : 10,
-    fontWeight: "900",
-  },
-
-  infoCard: {
+  infoPanel: {
     flex: 1,
-    backgroundColor: "#10183f",
-    borderRadius: 8,
-    padding: isPhone ? 10 : 14,
+    backgroundColor: "#07112b",
+    paddingHorizontal: 2,
   },
 
-  infoTitle: {
-    color: "#38d7ff",
-    fontSize: isPhone ? 11 : 16,
+  channelTitle: {
+    color: "#ffffff",
+    fontSize: isPhone ? 16 : 24,
     fontWeight: "900",
-    marginBottom: 10,
+    marginBottom: 8,
   },
 
-  infoText: {
-    color: "#e1e8f0",
-    fontSize: isPhone ? 9 : 12,
-    marginBottom: 6,
+  epgTime: {
+    color: "#f3df58",
+    fontSize: isPhone ? 10 : 13,
+    fontWeight: "800",
+    marginBottom: 8,
   },
 
-  infoDesc: {
-    color: "#c4d1df",
+  epgCurrent: {
+    color: "#ffffff",
+    fontSize: isPhone ? 11 : 16,
+    marginBottom: 14,
+  },
+
+  epgNextLabel: {
+    color: "#f3df58",
+    fontSize: isPhone ? 10 : 13,
+    fontWeight: "900",
+    marginBottom: 4,
+  },
+
+  epgNext: {
+    color: "#ffffff",
+    fontSize: isPhone ? 10 : 14,
+    marginBottom: 4,
+  },
+
+  epgNextTime: {
+    color: "#cfd7e2",
     fontSize: isPhone ? 9 : 12,
-    lineHeight: isPhone ? 14 : 18,
-    marginTop: 14,
+    marginBottom: 16,
+  },
+
+  buttonRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
+
+  actionBtn: {
+    flex: 1,
+    minHeight: isPhone ? 34 : 42,
+    borderRadius: 8,
+    backgroundColor: "#6f5aa3",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+    paddingHorizontal: 8,
+  },
+
+  actionBtnText: {
+    color: "#fff",
+    fontSize: isPhone ? 9 : 12,
+    fontWeight: "900",
+  },
+
+  smallButtonRow: {
+    flexDirection: "row",
+    marginTop: 10,
+  },
+
+  smallActionBtn: {
+    minHeight: isPhone ? 32 : 38,
+    borderRadius: 8,
+    backgroundColor: "rgba(111,90,163,0.75)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+    paddingHorizontal: 12,
+  },
+
+  smallActionBtnText: {
+    color: "#fff",
+    fontSize: isPhone ? 8.5 : 11,
+    fontWeight: "900",
   },
 
   fullscreenContainer: {
     flex: 1,
     backgroundColor: "#000",
-  },
-
-  fullscreenTouchWrap: {
-    flex: 1,
   },
 
   fullscreenVideo: {
@@ -1031,7 +911,7 @@ const styles = StyleSheet.create({
     paddingTop: isPhone ? 18 : 24,
     paddingHorizontal: 10,
     paddingBottom: 8,
-    backgroundColor: "rgba(0,0,0,0.20)",
+    backgroundColor: "rgba(0,0,0,0.18)",
   },
 
   fullscreenBackBtn: {
@@ -1039,11 +919,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: "rgba(16,32,51,0.88)",
+    backgroundColor: "rgba(20,26,45,0.90)",
   },
 
   fullscreenBackText: {
-    color: "#38d7ff",
+    color: "#fff",
     fontWeight: "900",
     fontSize: 12,
   },
@@ -1066,9 +946,7 @@ const styles = StyleSheet.create({
     minWidth: isPhone ? 58 : 74,
     height: isPhone ? 34 : 38,
     borderRadius: 8,
-    backgroundColor: "rgba(7,20,35,0.90)",
-    borderWidth: 1,
-    borderColor: "#38d7ff",
+    backgroundColor: "rgba(30,30,45,0.88)",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 10,
@@ -1076,7 +954,7 @@ const styles = StyleSheet.create({
   },
 
   fullscreenBtnText: {
-    color: "#38d7ff",
+    color: "#fff",
     fontSize: isPhone ? 8 : 10,
     fontWeight: "900",
   },
