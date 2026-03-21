@@ -10,6 +10,7 @@ import {
   TextInput,
   Modal,
   StatusBar,
+  ScrollView,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Video, ResizeMode } from "expo-av";
@@ -221,6 +222,20 @@ export default function LiveTVScreen({
   }, [epgItems, selectedChannel]);
 
   const progressPercent = useMemo(() => getProgressPercent(nowProgram), [nowProgram]);
+
+  const epgDebug = useMemo(() => {
+    return {
+      epgLoadedCount: Array.isArray(epgItems) ? epgItems.length : 0,
+      channelName: safeText(selectedChannel?.name),
+      channelGroup: safeText(selectedChannel?.group),
+      tvgId: safeText(selectedChannel?.tvgId),
+      tvgName: safeText(selectedChannel?.tvgName),
+      foundNow: !!nowProgram,
+      foundNext: !!nextProgram,
+      nowTitle: safeText(nowProgram?.title),
+      nextTitle: safeText(nextProgram?.title),
+    };
+  }, [epgItems, selectedChannel, nowProgram, nextProgram]);
 
   useEffect(() => {
     setRetryKey((prev) => prev + 1);
@@ -617,7 +632,11 @@ export default function LiveTVScreen({
             <Text style={styles.playerStatusText}>{playerError}</Text>
           )}
 
-          <View style={styles.epgBox}>
+          <ScrollView
+            style={styles.epgBox}
+            contentContainerStyle={styles.epgBoxContent}
+            showsVerticalScrollIndicator={false}
+          >
             <View style={styles.epgTopRow}>
               <View style={styles.channelInfoWrap}>
                 <Text style={styles.channelNumberLarge}>
@@ -706,9 +725,43 @@ export default function LiveTVScreen({
                     {nextProgram ? formatProgramTime(nextProgram) : ""}
                   </Text>
                 </View>
+
+                <View style={styles.debugBox}>
+                  <Text style={styles.debugTitle}>TESTE VISÍVEL EPG</Text>
+                  <Text style={styles.debugText}>
+                    EPG carregado: {epgLoading ? "carregando" : "sim"}
+                  </Text>
+                  <Text style={styles.debugText}>
+                    Quantidade de itens EPG: {epgDebug.epgLoadedCount}
+                  </Text>
+                  <Text style={styles.debugText}>
+                    Canal: {epgDebug.channelName || "-"}
+                  </Text>
+                  <Text style={styles.debugText}>
+                    Grupo: {epgDebug.channelGroup || "-"}
+                  </Text>
+                  <Text style={styles.debugText}>
+                    tvgId: {epgDebug.tvgId || "-"}
+                  </Text>
+                  <Text style={styles.debugText}>
+                    tvgName: {epgDebug.tvgName || "-"}
+                  </Text>
+                  <Text style={styles.debugText}>
+                    Achou agora: {epgDebug.foundNow ? "SIM" : "NÃO"}
+                  </Text>
+                  <Text style={styles.debugText}>
+                    Achou próximo: {epgDebug.foundNext ? "SIM" : "NÃO"}
+                  </Text>
+                  <Text style={styles.debugText}>
+                    Título agora: {epgDebug.nowTitle || "-"}
+                  </Text>
+                  <Text style={styles.debugText}>
+                    Título próximo: {epgDebug.nextTitle || "-"}
+                  </Text>
+                </View>
               </>
             )}
-          </View>
+          </ScrollView>
         </View>
       </View>
 
@@ -1004,6 +1057,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#10183f",
     borderRadius: 8,
+  },
+
+  epgBoxContent: {
     padding: isPhone ? 10 : 14,
   },
 
@@ -1172,6 +1228,28 @@ const styles = StyleSheet.create({
     color: "#c4d1df",
     fontSize: isPhone ? 8 : 10,
     marginTop: 4,
+  },
+
+  debugBox: {
+    marginTop: 12,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: "rgba(0,0,0,0.25)",
+    borderWidth: 1,
+    borderColor: "rgba(56,215,255,0.25)",
+  },
+
+  debugTitle: {
+    color: "#38d7ff",
+    fontSize: isPhone ? 9 : 11,
+    fontWeight: "900",
+    marginBottom: 6,
+  },
+
+  debugText: {
+    color: "#d7e1ec",
+    fontSize: isPhone ? 8 : 10,
+    marginBottom: 2,
   },
 
   fullscreenContainer: {
