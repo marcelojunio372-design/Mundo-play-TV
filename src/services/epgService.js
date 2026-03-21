@@ -31,6 +31,12 @@ function decodeXml(text = "") {
     .replace(/&gt;/g, ">");
 }
 
+function extractAttr(tagText = "", attr = "") {
+  const escaped = attr.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = tagText.match(new RegExp(`${escaped}="([^"]*)"`, "i"));
+  return match ? decodeXml(match[1]) : "";
+}
+
 function parseXmltvDate(value = "") {
   const raw = String(value || "").trim();
   if (!raw) return null;
@@ -110,13 +116,14 @@ function buildAliases(name = "", tvgId = "", tvgName = "") {
 
 function extractChannelMap(xml = "") {
   const channelMap = {};
-  const regex = /<channel\s+id="([^"]+)"[^>]*>([\s\S]*?)<\/channel>/gi;
+  const regex = /<channel\b([^>]*)>([\s\S]*?)<\/channel>/gi;
 
   let match;
 
   while ((match = regex.exec(xml))) {
-    const channelId = decodeXml(match[1] || "").trim();
+    const attrs = match[1] || "";
     const body = match[2] || "";
+    const channelId = extractAttr(attrs, "id");
     const displayNames = extractTags(body, "display-name");
 
     const aliases = Array.from(
@@ -140,16 +147,17 @@ function extractChannelMap(xml = "") {
 
 function extractProgrammes(xml = "", channelMap = {}) {
   const programmes = [];
-  const regex =
-    /<programme\s+start="([^"]+)"\s+stop="([^"]+)"\s+channel="([^"]+)"[^>]*>([\s\S]*?)<\/programme>/gi;
+  const regex = /<programme\b([^>]*)>([\s\S]*?)<\/programme>/gi;
 
   let match;
 
   while ((match = regex.exec(xml))) {
-    const start = parseXmltvDate(match[1]);
-    const stop = parseXmltvDate(match[2]);
-    const channelId = decodeXml(match[3] || "").trim();
-    const body = match[4] || "";
+    const attrs = match[1] || "";
+    const body = match[2] || "";
+
+    const start = parseXmltvDate(extractAttr(attrs, "start"));
+    const stop = parseXmltvDate(extractAttr(attrs, "stop"));
+    const channelId = safeText(extractAttr(attrs, "channel"));
 
     const title = extractTag(body, "title");
     const desc = extractTag(body, "desc");
@@ -269,7 +277,9 @@ export async function loadEPG(session = {}) {
 
     setDebugState({
       itemsParsed: programmes.length,
-      errorText: programmes.length ? "" : "XMLTV recebido, mas nenhum programme foi extraído.",
+      errorText: programmes.length
+        ? ""
+        : "XMLTV recebido, mas nenhum programme foi extraído.",
     });
 
     return programmes;
