@@ -37,6 +37,8 @@ function normalizeText(value = "") {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
+    .replace(/\b(fhd|hd|sd|uhd|4k|fullhd)\b/g, "")
+    .replace(/\b(tv|tvc|canal|channel)\b/g, "")
     .replace(/[^a-z0-9]/g, "");
 }
 
@@ -69,36 +71,19 @@ function extractTags(block = "", tag = "") {
   return values;
 }
 
-function splitNameParts(text = "") {
-  return String(text || "")
-    .split(/[\-|/|]+/g)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function buildAliases(...values) {
-  const rawValues = values
-    .flat()
-    .map((item) => decodeXml(String(item || "")).trim())
-    .filter(Boolean);
-
-  const expanded = [];
-
-  rawValues.forEach((value) => {
-    expanded.push(value);
-    expanded.push(cleanChannelName(value));
-
-    splitNameParts(value).forEach((part) => {
-      expanded.push(part);
-      expanded.push(cleanChannelName(part));
-    });
-  });
+function buildAliases(name = "", group = "", tvgId = "", tvgName = "") {
+  const raw = [
+    safeText(name),
+    safeText(group),
+    safeText(tvgId),
+    safeText(tvgName),
+    cleanChannelName(name),
+    cleanChannelName(tvgName),
+  ].filter(Boolean);
 
   return Array.from(
     new Set(
-      expanded
-        .map((item) => normalizeText(item))
-        .filter(Boolean)
+      raw.map((item) => normalizeText(item)).filter(Boolean)
     )
   );
 }
@@ -113,15 +98,17 @@ function extractChannelMap(xml = "") {
     const channelId = decodeXml(match[1] || "").trim();
     const body = match[2] || "";
     const displayNames = extractTags(body, "display-name");
-    const icons = [...body.matchAll(/<icon[^>]+src="([^"]+)"/gi)].map((m) =>
-      decodeXml(m[1] || "").trim()
-    );
 
     channelMap[channelId] = {
       id: channelId,
       displayNames,
-      aliases: buildAliases(channelId, displayNames),
-      icon: icons[0] || "",
+      aliases: Array.from(
+        new Set(
+          [channelId, ...displayNames]
+            .map((item) => normalizeText(item))
+            .filter(Boolean)
+        )
+      ),
     };
   }
 
@@ -143,27 +130,15 @@ function extractProgrammes(xml = "", channelMap = {}) {
 
     const title = extractTag(body, "title");
     const desc = extractTag(body, "desc");
-    const category = extractTag(body, "category");
     const channelInfo = channelMap[channelId] || null;
-
-    const aliases = buildAliases(
-      channelId,
-      channelInfo?.displayNames || [],
-      category
-    );
 
     programmes.push({
       channel: channelId,
-      displayNames: channelInfo?.displayNames || [],
-      channelKey: normalizeText(channelId),
-      cleanChannelKey: normalizeText(cleanChannelName(channelId)),
-      aliases,
+      aliases: channelInfo?.aliases || [normalizeText(channelId)].filter(Boolean),
       start,
       stop,
       title,
       desc,
-      category,
-      icon: channelInfo?.icon || "",
     });
   }
 
@@ -193,95 +168,18 @@ function itemTime(date) {
   return date instanceof Date ? date.getTime() : 0;
 }
 
-function aliasWords(text = "") {
-  const cleaned = cleanChannelName(text);
-  if (!cleaned) return [];
-  return cleaned.split(/\s+/).filter(Boolean);
-}
+function matchesChannel(itemAliases = [], aliases = []) {
+  for (const a of aliases) {
+    for (const b of itemAliases) {
+      if (!a || !b) continue;
 
-function countWordOverlap(a = "", b = "") {
-  const aw = aliasWords(a);
-  const bw = aliasWords(b);
-
-  if (!aw.length || !bw.length) return 0;
-
-  let count = 0;
-  aw.forEach((word) => {
-    if (bw.includes(word)) count += 1;
-  });
-
-  return count;
-}
-
-function scoreProgrammeMatch(item, aliases = [], tvgId = "", tvgName = "") {
-  const itemAliases = Array.isArray(item?.aliases)
-    ? item.aliases
-    : [item?.channelKey || "", item?.cleanChannelKey || ""].filter(Boolean);
-
-  const normalizedTvgId = normalizeText(tvgId);
-  const normalizedTvgName = normalizeText(tvgName);
-
-  let score = 0;
-
-  if (normalizedTvgId) {
-    if (
-      item.channelKey === normalizedTvgId ||
-      item.cleanChannelKey === normalizedTvgId ||
-      itemAliases.includes(normalizedTvgId)
-    ) {
-      score = Math.max(score, 1200);
+      if (a === b) return true;
+      if (a.includes(b)) return true;
+      if (b.includes(a)) return true;
     }
   }
 
-  if (normalizedTvgName) {
-    if (
-      itemAliases.includes(normalizedTvgName) ||
-      item.channelKey === normalizedTvgName ||
-      item.cleanChannelKey === normalizedTvgName
-    ) {
-      score = Math.max(score, 1100);
-    }
-  }
-
-  for (const channelAlias of aliases) {
-    for (const programAlias of itemAliases) {
-      if (!channelAlias || !programAlias) continue;
-
-      if (channelAlias === programAlias) {
-        score = Math.max(score, 1000);
-        continue;
-      }
-
-      if (
-        channelAlias.startsWith(programAlias) ||
-        programAlias.startsWith(channelAlias)
-      ) {
-        score = Math.max(score, 800);
-        continue;
-      }
-
-      if (
-        channelAlias.includes(programAlias) ||
-        programAlias.includes(channelAlias)
-      ) {
-        score = Math.max(score, 650);
-        continue;
-      }
-
-      const overlap = countWordOverlap(channelAlias, programAlias);
-
-      if (overlap >= 2) {
-        score = Math.max(score, 520);
-        continue;
-      }
-
-      if (overlap >= 1) {
-        score = Math.max(score, 380);
-      }
-    }
-  }
-
-  return score;
+  return false;
 }
 
 export function findNowAndNextForChannel(
@@ -293,79 +191,35 @@ export function findNowAndNextForChannel(
 ) {
   const now = new Date();
 
-  const aliases = buildAliases(
-    safeText(channelName),
-    safeText(group),
-    safeText(tvgId),
-    safeText(tvgName),
-    cleanChannelName(channelName),
-    cleanChannelName(tvgName)
-  );
+  const aliases = buildAliases(channelName, group, tvgId, tvgName);
 
-  if (!aliases.length || !epgItems?.length) {
+  if (!aliases.length || !Array.isArray(epgItems) || !epgItems.length) {
     return { nowProgram: null, nextProgram: null };
   }
 
-  const scoredMatches = epgItems
-    .map((item) => ({
-      ...item,
-      _score: scoreProgrammeMatch(item, aliases, tvgId, tvgName),
-    }))
-    .filter((item) => item._score >= 350)
-    .sort((a, b) => {
-      if (b._score !== a._score) return b._score - a._score;
-      return itemTime(a.start) - itemTime(b.start);
-    });
+  const matched = epgItems
+    .filter((item) => matchesChannel(item.aliases || [], aliases))
+    .sort((a, b) => itemTime(a.start) - itemTime(b.start));
 
-  if (!scoredMatches.length) {
+  if (!matched.length) {
     return { nowProgram: null, nextProgram: null };
   }
 
-  const bestScore = scoredMatches[0]._score;
-
-  const candidateMatches = scoredMatches.filter(
-    (item) => item._score >= Math.max(350, bestScore - 300)
-  );
-
-  const orderedMatches = [...candidateMatches].sort(
-    (a, b) => itemTime(a.start) - itemTime(b.start)
-  );
-
-  let current =
-    orderedMatches.find((item) => {
+  const nowProgram =
+    matched.find((item) => {
       if (!item.start || !item.stop) return false;
       return now >= item.start && now < item.stop;
     }) || null;
 
-  if (!current) {
-    current =
-      orderedMatches.find((item) => {
-        if (!item.start || !item.stop) return false;
-        const diff = Math.abs(now.getTime() - item.start.getTime());
-        return diff <= 60 * 60 * 1000;
-      }) || null;
-  }
-
-  let nextProgram = null;
-
-  if (current) {
-    nextProgram =
-      orderedMatches.find((item) => {
-        if (!item.start || !current.stop) return false;
-        return item.start >= current.stop;
-      }) || null;
-  }
-
-  if (!nextProgram) {
-    nextProgram =
-      orderedMatches.find((item) => {
-        if (!item.start) return false;
-        return item.start > now;
-      }) || null;
-  }
+  const nextProgram =
+    matched.find((item) => {
+      if (!item.start) return false;
+      if (nowProgram?.stop) return item.start >= nowProgram.stop;
+      return item.start > now;
+    }) || null;
 
   return {
-    nowProgram: current,
+    nowProgram,
     nextProgram,
   };
 }
@@ -385,3 +239,6 @@ export function formatProgramTime(program) {
 
   return `${start} - ${stop}`;
 }
+
+
+
