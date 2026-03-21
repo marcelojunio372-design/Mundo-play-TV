@@ -93,7 +93,7 @@ export default function LiveTVScreen({
   const [showFullscreen, setShowFullscreen] = useState(false);
   const [epgItems, setEpgItems] = useState([]);
   const [epgLoading, setEpgLoading] = useState(false);
-  const [showPlayerUi, setShowPlayerUi] = useState(true);
+  const [showBottomUi, setShowBottomUi] = useState(true);
 
   const videoRef = useRef(null);
   const fullscreenVideoRef = useRef(null);
@@ -194,7 +194,6 @@ export default function LiveTVScreen({
     setFullscreenKey((prev) => prev + 1);
     setIsPaused(false);
     setIsFullscreenPaused(false);
-    setShowPlayerUi(true);
   }, [selectedChannel?.url]);
 
   const { nowProgram, nextProgram } = useMemo(() => {
@@ -316,8 +315,8 @@ export default function LiveTVScreen({
     setShowFullscreen(false);
   };
 
-  const togglePlayerUi = () => {
-    setShowPlayerUi((prev) => !prev);
+  const toggleBottomUi = () => {
+    setShowBottomUi((prev) => !prev);
   };
 
   const renderCategoryRow = ({ item, index }) => {
@@ -481,7 +480,7 @@ export default function LiveTVScreen({
           <TouchableOpacity
             style={styles.previewBox}
             activeOpacity={1}
-            onPress={togglePlayerUi}
+            onPress={toggleBottomUi}
           >
             {selectedChannel?.url ? (
               <Video
@@ -501,7 +500,7 @@ export default function LiveTVScreen({
             )}
           </TouchableOpacity>
 
-          {showPlayerUi && (
+          {showBottomUi && (
             <View style={styles.infoPanel}>
               <Text style={styles.channelTitle}>
                 {safeText(selectedChannel?.name) || "Sem canal"}
@@ -544,59 +543,57 @@ export default function LiveTVScreen({
                 )}
               </View>
 
-              <View style={styles.buttonRow}>
+              <View style={styles.controlsRow}>
                 <TouchableOpacity
-                  style={styles.actionBtn}
-                  onPress={goToPreviousChannel}
+                  style={styles.controlBtn}
+                  onPress={onOpenHome}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.actionBtnText}>◀</Text>
+                  <Text style={styles.controlBtnText}>VOLTAR</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={styles.actionBtn}
+                  style={styles.controlBtn}
+                  onPress={goToPreviousChannel}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.controlBtnText}>◀</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.controlBtn}
                   onPress={togglePauseMain}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.actionBtnText}>
+                  <Text style={styles.controlBtnText}>
                     {isPaused ? "PLAY" : "PAUSE"}
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={styles.actionBtn}
+                  style={styles.controlBtn}
                   onPress={goToNextChannel}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.actionBtnText}>▶</Text>
+                  <Text style={styles.controlBtnText}>▶</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={styles.actionBtn}
+                  style={styles.controlBtn}
                   onPress={toggleFavorite}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.actionBtnText}>
+                  <Text style={styles.controlBtnText}>
                     {isFavorite ? "★" : "☆"}
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={styles.actionBtn}
+                  style={styles.controlBtn}
                   onPress={openFullscreen}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.actionBtnText}>ABRIR</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.smallButtonRow}>
-                <TouchableOpacity
-                  style={styles.smallActionBtn}
-                  onPress={onOpenHome}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.smallActionBtnText}>voltar</Text>
+                  <Text style={styles.controlBtnText}>TELA CHEIA</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -975,50 +972,30 @@ const styles = StyleSheet.create({
     fontSize: isPhone ? 9 : 12,
   },
 
-  buttonRow: {
+  controlsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    flexWrap: "wrap",
     marginTop: 2,
   },
 
-  actionBtn: {
-    width: "18.8%",
+  controlBtn: {
+    width: "15.8%",
     minHeight: isPhone ? 36 : 46,
     borderRadius: 8,
     backgroundColor: "#7561a6",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 4,
+    marginBottom: 8,
   },
 
-  actionBtnText: {
+  controlBtnText: {
     color: "#fff",
-    fontSize: isPhone ? 8 : 11,
+    fontSize: isPhone ? 7.5 : 10,
     fontWeight: "900",
     textAlign: "center",
-  },
-
-  smallButtonRow: {
-    flexDirection: "row",
-    marginTop: 10,
-    alignItems: "center",
-  },
-
-  smallActionBtn: {
-    minHeight: isPhone ? 32 : 38,
-    borderRadius: 8,
-    backgroundColor: "rgba(111,90,163,0.75)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 8,
-    paddingHorizontal: 12,
-  },
-
-  smallActionBtnText: {
-    color: "#fff",
-    fontSize: isPhone ? 8.5 : 11,
-    fontWeight: "900",
   },
 
   fullscreenContainer: {
