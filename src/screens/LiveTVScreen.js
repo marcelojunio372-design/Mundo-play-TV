@@ -10,6 +10,7 @@ import {
   TextInput,
   StatusBar,
   Modal,
+  PanResponder,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Video, ResizeMode } from "expo-av";
@@ -21,6 +22,8 @@ const FAVORITES_KEY = "mundoplaytv_live_favorites";
 const RECENTS_KEY = "mundoplaytv_live_recents";
 const CATEGORY_ROW_HEIGHT = isPhone ? 34 : 46;
 const CHANNEL_ROW_HEIGHT = isPhone ? 38 : 48;
+const SWIPE_THRESHOLD = 50;
+const DOUBLE_TAP_DELAY = 260;
 
 function safeText(value) {
   if (value === null || value === undefined) return "";
@@ -72,9 +75,14 @@ export default function LiveTVScreen({
   const [isPaused, setIsPaused] = useState(false);
   const [isFullscreenPaused, setIsFullscreenPaused] = useState(false);
   const [showFullscreen, setShowFullscreen] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const [showFullscreenControls, setShowFullscreenControls] = useState(true);
 
   const videoRef = useRef(null);
   const fullscreenVideoRef = useRef(null);
+  const controlsTimerRef = useRef(null);
+  const fullscreenControlsTimerRef = useRef(null);
+  const lastTapRef = useRef(0);
 
   useEffect(() => {
     async function loadSavedData() {
@@ -95,6 +103,15 @@ export default function LiveTVScreen({
     }
 
     loadSavedData();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+      if (fullscreenControlsTimerRef.current) {
+        clearTimeout(fullscreenControlsTimerRef.current);
+      }
+    };
   }, []);
 
   const favoriteChannels = useMemo(() => {
@@ -144,6 +161,8 @@ export default function LiveTVScreen({
     setFullscreenKey((prev) => prev + 1);
     setIsPaused(false);
     setIsFullscreenPaused(false);
+    resetControlsTimer();
+    resetFullscreenControlsTimer();
   }, [selectedChannel?.url]);
 
   const persistFavorites = async (ids) => {
@@ -180,6 +199,8 @@ export default function LiveTVScreen({
 
     setFavoriteIds(updated);
     await persistFavorites(updated);
+    resetControlsTimer();
+    resetFullscreenControlsTimer();
   };
 
   const handleSelectCategory = (index) => {
@@ -202,6 +223,7 @@ export default function LiveTVScreen({
     } catch (e) {}
     setPlayerKey((prev) => prev + 1);
     setIsPaused(false);
+    resetControlsTimer();
   };
 
   const togglePauseMain = async () => {
@@ -213,6 +235,7 @@ export default function LiveTVScreen({
         await videoRef.current?.pauseAsync?.();
         setIsPaused(true);
       }
+      resetControlsTimer();
     } catch (e) {}
   };
 
@@ -225,6 +248,7 @@ export default function LiveTVScreen({
         await fullscreenVideoRef.current?.pauseAsync?.();
         setIsFullscreenPaused(true);
       }
+      resetFullscreenControlsTimer();
     } catch (e) {}
   };
 
@@ -248,6 +272,7 @@ export default function LiveTVScreen({
     setFullscreenKey((prev) => prev + 1);
     setIsFullscreenPaused(false);
     setShowFullscreen(true);
+    resetFullscreenControlsTimer();
   };
 
   const closeFullscreen = async () => {
@@ -256,6 +281,108 @@ export default function LiveTVScreen({
     } catch (e) {}
     setShowFullscreen(false);
   };
+
+  const resetControlsTimer = () => {
+    setShowControls(true);
+
+    if (controlsTimerRef.current) {
+      clearTimeout(controlsTimerRef.current);
+    }
+
+    controlsTimerRef.current = setTimeout(() => {
+      setShowControls(false);
+    }, 2500);
+  };
+
+  const resetFullscreenControlsTimer = () => {
+    setShowFullscreenControls(true);
+
+    if (fullscreenControlsTimerRef.current) {
+      clearTimeout(fullscreenControlsTimerRef.current);
+    }
+
+    fullscreenControlsTimerRef.current = setTimeout(() => {
+      setShowFullscreenControls(false);
+    }, 2500);
+  };
+
+  const handleMainTap = async () => {
+    const now = Date.now();
+
+    if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
+      lastTapRef.current = 0;
+      await togglePauseMain();
+      return;
+    }
+
+    lastTapRef.current = now;
+
+    if (showControls) {
+      setShowControls(false);
+      if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+    } else {
+      resetControlsTimer();
+    }
+  };
+
+  const handleFullscreenTap = async () => {
+    const now = Date.now();
+
+    if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
+      lastTapRef.current = 0;
+      await togglePauseFullscreen();
+      return;
+    }
+
+    lastTapRef.current = now;
+
+    if (showFullscreenControls) {
+      setShowFullscreenControls(false);
+      if (fullscreenControlsTimerRef.current) {
+        clearTimeout(fullscreenControlsTimerRef.current);
+      }
+    } else {
+      resetFullscreenControlsTimer();
+    }
+  };
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          return Math.abs(gestureState.dx) > 20 && Math.abs(gestureState.dy) < 40;
+        },
+        onPanResponderRelease: async (_, gestureState) => {
+          if (gestureState.dx <= -SWIPE_THRESHOLD) {
+            await goToNextChannel();
+          } else if (gestureState.dx >= SWIPE_THRESHOLD) {
+            await goToPreviousChannel();
+          } else {
+            resetControlsTimer();
+          }
+        },
+      }),
+    [selectedChannelIndex, visibleChannels.length, recentIds]
+  );
+
+  const fullscreenPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          return Math.abs(gestureState.dx) > 20 && Math.abs(gestureState.dy) < 40;
+        },
+        onPanResponderRelease: async (_, gestureState) => {
+          if (gestureState.dx <= -SWIPE_THRESHOLD) {
+            await goToNextChannel();
+          } else if (gestureState.dx >= SWIPE_THRESHOLD) {
+            await goToPreviousChannel();
+          } else {
+            resetFullscreenControlsTimer();
+          }
+        },
+      }),
+    [selectedChannelIndex, visibleChannels.length, recentIds]
+  );
 
   const renderCategoryRow = ({ item, index }) => {
     const active = index === selectedCategory;
@@ -395,94 +522,101 @@ export default function LiveTVScreen({
         </View>
 
         <View style={styles.rightPanel}>
-          <TouchableOpacity
-            style={styles.previewBox}
-            activeOpacity={0.92}
-            onPress={openFullscreen}
-          >
-            {selectedChannel?.url ? (
-              <Video
-                key={`${selectedChannel.url}_${playerKey}`}
-                ref={videoRef}
-                source={{ uri: selectedChannel.url }}
-                style={styles.previewVideo}
-                resizeMode={ResizeMode.COVER}
-                shouldPlay={!isPaused}
-                isLooping
-                useNativeControls={false}
-              />
-            ) : (
-              <View style={styles.previewEmpty}>
-                <Text style={styles.previewEmptyText}>Sem sinal</Text>
-              </View>
-            )}
+          <View style={styles.previewBox} {...panResponder.panHandlers}>
+            <TouchableOpacity
+              activeOpacity={1}
+              style={styles.touchLayer}
+              onPress={handleMainTap}
+            >
+              {selectedChannel?.url ? (
+                <Video
+                  key={`${selectedChannel.url}_${playerKey}`}
+                  ref={videoRef}
+                  source={{ uri: selectedChannel.url }}
+                  style={styles.previewVideo}
+                  resizeMode={ResizeMode.COVER}
+                  shouldPlay={!isPaused}
+                  isLooping
+                  useNativeControls={false}
+                  onReadyForDisplay={() => {
+                    resetControlsTimer();
+                  }}
+                />
+              ) : (
+                <View style={styles.previewEmpty}>
+                  <Text style={styles.previewEmptyText}>Sem sinal</Text>
+                </View>
+              )}
 
-            <View style={styles.previewOverlay}>
-              <View style={styles.previewTopRow}>
-                <TouchableOpacity
-                  style={styles.overlayBtnTop}
-                  onPress={onOpenHome}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.overlayBtnText}>VOLTAR</Text>
-                </TouchableOpacity>
-              </View>
+              {showControls && (
+                <View style={styles.previewOverlay}>
+                  <View style={styles.previewTopRow}>
+                    <TouchableOpacity
+                      style={styles.overlayBtnTop}
+                      onPress={onOpenHome}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.overlayBtnText}>VOLTAR</Text>
+                    </TouchableOpacity>
+                  </View>
 
-              <View style={styles.previewBottomRow}>
-                <TouchableOpacity
-                  style={styles.overlayBtn}
-                  onPress={goToPreviousChannel}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.overlayBtnText}>◀</Text>
-                </TouchableOpacity>
+                  <View style={styles.previewBottomRow}>
+                    <TouchableOpacity
+                      style={styles.overlayBtn}
+                      onPress={goToPreviousChannel}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.overlayBtnText}>◀</Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.overlayBtn}
-                  onPress={togglePauseMain}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.overlayBtnText}>
-                    {isPaused ? "PLAY" : "PAUSE"}
-                  </Text>
-                </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.overlayBtn}
+                      onPress={togglePauseMain}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.overlayBtnText}>
+                        {isPaused ? "PLAY" : "PAUSE"}
+                      </Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.overlayBtn}
-                  onPress={goToNextChannel}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.overlayBtnText}>▶</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.overlayBtn}
+                      onPress={goToNextChannel}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.overlayBtnText}>▶</Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.overlayBtn}
-                  onPress={toggleFavorite}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.overlayBtnText}>
-                    {isFavorite ? "★" : "☆"}
-                  </Text>
-                </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.overlayBtn}
+                      onPress={toggleFavorite}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.overlayBtnText}>
+                        {isFavorite ? "★" : "☆"}
+                      </Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.overlayBtn}
-                  onPress={reloadPlayer}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.overlayBtnText}>↻</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.overlayBtn}
+                      onPress={reloadPlayer}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.overlayBtnText}>↻</Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.overlayBtn}
-                  onPress={openFullscreen}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.overlayBtnText}>⛶</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.overlayBtn}
+                      onPress={openFullscreen}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.overlayBtnText}>⛶</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
 
           <View style={styles.infoCard}>
             <Text style={styles.infoTitle}>LIVE TV</Text>
@@ -504,7 +638,7 @@ export default function LiveTVScreen({
             </Text>
 
             <Text style={styles.infoDesc}>
-              Botão voltar em cima e os demais controles embaixo, como você pediu.
+              Controles estilo TV Box: toque mostra/esconde, toque duplo pausa, deslizar troca canal.
             </Text>
           </View>
         </View>
@@ -517,68 +651,83 @@ export default function LiveTVScreen({
         onRequestClose={closeFullscreen}
       >
         <SafeAreaView style={styles.fullscreenContainer}>
-          {selectedChannel?.url ? (
-            <Video
-              key={`${selectedChannel.url}_${fullscreenKey}_fullscreen`}
-              ref={fullscreenVideoRef}
-              source={{ uri: selectedChannel.url }}
-              style={styles.fullscreenVideo}
-              resizeMode={ResizeMode.CONTAIN}
-              shouldPlay={!isFullscreenPaused}
-              isLooping
-              useNativeControls={false}
-            />
-          ) : (
-            <View style={styles.previewEmpty}>
-              <Text style={styles.previewEmptyText}>Sem sinal</Text>
-            </View>
-          )}
-
-          <View style={styles.fullscreenTopBar}>
+          <View style={styles.fullscreenTouchWrap} {...fullscreenPanResponder.panHandlers}>
             <TouchableOpacity
-              style={styles.fullscreenBackBtn}
-              onPress={closeFullscreen}
-              activeOpacity={0.8}
+              activeOpacity={1}
+              style={styles.touchLayer}
+              onPress={handleFullscreenTap}
             >
-              <Text style={styles.fullscreenBackText}>VOLTAR</Text>
-            </TouchableOpacity>
-          </View>
+              {selectedChannel?.url ? (
+                <Video
+                  key={`${selectedChannel.url}_${fullscreenKey}_fullscreen`}
+                  ref={fullscreenVideoRef}
+                  source={{ uri: selectedChannel.url }}
+                  style={styles.fullscreenVideo}
+                  resizeMode={ResizeMode.CONTAIN}
+                  shouldPlay={!isFullscreenPaused}
+                  isLooping
+                  useNativeControls={false}
+                  onReadyForDisplay={() => {
+                    resetFullscreenControlsTimer();
+                  }}
+                />
+              ) : (
+                <View style={styles.previewEmpty}>
+                  <Text style={styles.previewEmptyText}>Sem sinal</Text>
+                </View>
+              )}
 
-          <View style={styles.fullscreenBottomBar}>
-            <TouchableOpacity
-              style={styles.fullscreenBtn}
-              onPress={goToPreviousChannel}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.fullscreenBtnText}>◀</Text>
-            </TouchableOpacity>
+              {showFullscreenControls && (
+                <>
+                  <View style={styles.fullscreenTopBar}>
+                    <TouchableOpacity
+                      style={styles.fullscreenBackBtn}
+                      onPress={closeFullscreen}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.fullscreenBackText}>VOLTAR</Text>
+                    </TouchableOpacity>
+                  </View>
 
-            <TouchableOpacity
-              style={styles.fullscreenBtn}
-              onPress={togglePauseFullscreen}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.fullscreenBtnText}>
-                {isFullscreenPaused ? "PLAY" : "PAUSE"}
-              </Text>
-            </TouchableOpacity>
+                  <View style={styles.fullscreenBottomBar}>
+                    <TouchableOpacity
+                      style={styles.fullscreenBtn}
+                      onPress={goToPreviousChannel}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.fullscreenBtnText}>◀</Text>
+                    </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.fullscreenBtn}
-              onPress={goToNextChannel}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.fullscreenBtnText}>▶</Text>
-            </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.fullscreenBtn}
+                      onPress={togglePauseFullscreen}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.fullscreenBtnText}>
+                        {isFullscreenPaused ? "PLAY" : "PAUSE"}
+                      </Text>
+                    </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.fullscreenBtn}
-              onPress={toggleFavorite}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.fullscreenBtnText}>
-                {isFavorite ? "★" : "☆"}
-              </Text>
+                    <TouchableOpacity
+                      style={styles.fullscreenBtn}
+                      onPress={goToNextChannel}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.fullscreenBtnText}>▶</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.fullscreenBtn}
+                      onPress={toggleFavorite}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.fullscreenBtnText}>
+                        {isFavorite ? "★" : "☆"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -750,13 +899,17 @@ const styles = StyleSheet.create({
   },
 
   previewBox: {
-    width: isPhone ? 240 : 320,
-    height: isPhone ? 240 : 320,
+    width: isPhone ? 300 : 420,
+    height: isPhone ? 300 : 420,
     borderRadius: 12,
     overflow: "hidden",
     backgroundColor: "#000",
     marginBottom: 10,
     alignSelf: "center",
+  },
+
+  touchLayer: {
+    flex: 1,
   },
 
   previewVideo: {
@@ -859,6 +1012,10 @@ const styles = StyleSheet.create({
   fullscreenContainer: {
     flex: 1,
     backgroundColor: "#000",
+  },
+
+  fullscreenTouchWrap: {
+    flex: 1,
   },
 
   fullscreenVideo: {
