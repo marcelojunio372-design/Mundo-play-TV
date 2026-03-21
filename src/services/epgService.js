@@ -42,19 +42,32 @@ function normalizeText(value = "") {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .replace(/\b(fhd|hd|sd|uhd|4k|fullhd)\b/g, "")
+    .replace(/\b(hd|fhd|sd|uhd|4k|fullhd|h265|hevc)\b/g, "")
     .replace(/\b(tv|tvc|canal|channel)\b/g, "")
+    .replace(/\b(brasil|br|sudeste|sul|norte|nordeste|centrooeste|centrooeste|centro-oeste)\b/g, "")
+    .replace(/\b(local|interior|regional)\b/g, "")
     .replace(/[^a-z0-9]/g, "");
 }
 
 function cleanChannelName(name = "") {
-  return String(name || "")
+  return decodeXml(String(name || ""))
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .replace(/\b(fhd|hd|sd|uhd|4k|fullhd)\b/gi, "")
+    .replace(/\b(hd|fhd|sd|uhd|4k|fullhd|h265|hevc)\b/gi, "")
     .replace(/\b(tv|tvc|canal|channel)\b/gi, "")
+    .replace(/\b(brasil|br|sudeste|sul|norte|nordeste|centrooeste|centrooeste|centro-oeste)\b/gi, "")
+    .replace(/\b(local|interior|regional)\b/gi, "")
     .replace(/[|[\]()/\\\-_.:,]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function splitWords(text = "") {
+  return cleanChannelName(text)
+    .split(/\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function extractTag(block = "", tag = "") {
@@ -76,26 +89,23 @@ function extractTags(block = "", tag = "") {
   return values;
 }
 
-function splitWords(text = "") {
-  return cleanChannelName(text)
-    .split(/\s+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
+function unique(values = []) {
+  return Array.from(new Set(values.filter(Boolean)));
 }
 
 function buildAliases(name = "", tvgId = "", tvgName = "", displayNames = []) {
-  const raw = [
+  const raw = unique([
     safeText(name),
     safeText(tvgId),
     safeText(tvgName),
+    ...displayNames.map((item) => safeText(item)),
     cleanChannelName(name),
+    cleanChannelName(tvgId),
     cleanChannelName(tvgName),
-    ...displayNames.flatMap((item) => [safeText(item), cleanChannelName(item)]),
-  ].filter(Boolean);
+    ...displayNames.map((item) => cleanChannelName(item)),
+  ]);
 
-  return Array.from(
-    new Set(raw.map((item) => normalizeText(item)).filter(Boolean))
-  );
+  return unique(raw.map((item) => normalizeText(item)).filter(Boolean));
 }
 
 function extractChannelMap(xml = "") {
@@ -134,12 +144,15 @@ function extractProgrammes(xml = "", channelMap = {}) {
 
     const title = extractTag(body, "title");
     const desc = extractTag(body, "desc");
-    const channelInfo = channelMap[channelId] || null;
+    const channelInfo = channelMap[channelId] || { displayNames: [], aliases: [] };
 
     programmes.push({
       channel: channelId,
-      aliases: channelInfo?.aliases || buildAliases(channelId, channelId, channelId),
-      displayNames: channelInfo?.displayNames || [],
+      displayNames: channelInfo.displayNames || [],
+      aliases: unique([
+        ...channelInfo.aliases,
+        ...buildAliases(channelId, channelId, channelId, channelInfo.displayNames || []),
+      ]),
       start,
       stop,
       title,
@@ -148,40 +161,6 @@ function extractProgrammes(xml = "", channelMap = {}) {
   }
 
   return programmes;
-}
-
-function getWordOverlapScore(channelName = "", displayAliases = []) {
-  const baseWords = splitWords(channelName);
-  if (!baseWords.length) return 0;
-
-  let best = 0;
-
-  displayAliases.forEach((alias) => {
-    const aliasWords = splitWords(alias);
-    let score = 0;
-
-    baseWords.forEach((word) => {
-      if (aliasWords.includes(word)) score += 1;
-    });
-
-    if (score > best) best = score;
-  });
-
-  return best;
-}
-
-function matchesAlias(itemAliases = [], targetAliases = []) {
-  for (const target of targetAliases) {
-    for (const alias of itemAliases) {
-      if (!target || !alias) continue;
-
-      if (target === alias) return true;
-      if (target.includes(alias)) return true;
-      if (alias.includes(target)) return true;
-    }
-  }
-
-  return false;
 }
 
 function buildXmltvUrlFromSession(session) {
@@ -280,6 +259,46 @@ function itemTime(date) {
   return date instanceof Date ? date.getTime() : 0;
 }
 
+function aliasesMatchStrong(itemAliases = [], targetAliases = []) {
+  for (const target of targetAliases) {
+    for (const alias of itemAliases) {
+      if (!target || !alias) continue;
+      if (target === alias) return true;
+    }
+  }
+  return false;
+}
+
+function aliasesMatchLoose(itemAliases = [], targetAliases = []) {
+  for (const target of targetAliases) {
+    for (const alias of itemAliases) {
+      if (!target || !alias) continue;
+      if (target.includes(alias) || alias.includes(target)) return true;
+    }
+  }
+  return false;
+}
+
+function getWordOverlapScore(channelName = "", compareList = []) {
+  const baseWords = splitWords(channelName);
+  if (!baseWords.length) return 0;
+
+  let best = 0;
+
+  compareList.forEach((alias) => {
+    const aliasWords = splitWords(alias);
+    let score = 0;
+
+    baseWords.forEach((word) => {
+      if (aliasWords.includes(word)) score += 1;
+    });
+
+    if (score > best) best = score;
+  });
+
+  return best;
+}
+
 export function findNowAndNextForChannel(
   epgItems = [],
   channelName = "",
@@ -296,19 +315,22 @@ export function findNowAndNextForChannel(
   }
 
   let matched = epgItems.filter((item) =>
-    matchesAlias(item.aliases || [], aliases)
+    aliasesMatchStrong(item.aliases || [], aliases)
   );
 
   if (!matched.length) {
+    matched = epgItems.filter((item) =>
+      aliasesMatchLoose(item.aliases || [], aliases)
+    );
+  }
+
+  if (!matched.length) {
     matched = epgItems.filter((item) => {
-      const overlap = getWordOverlapScore(
-        safeText(channelName),
-        [
-          ...(item.displayNames || []),
-          ...(item.aliases || []).map((alias) => cleanChannelName(alias)),
-        ]
-      );
-      return overlap >= 1;
+      const score = getWordOverlapScore(channelName, [
+        ...(item.displayNames || []),
+        ...(item.aliases || []),
+      ]);
+      return score >= 1;
     });
   }
 
