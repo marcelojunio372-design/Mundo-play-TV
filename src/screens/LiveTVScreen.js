@@ -18,6 +18,7 @@ import {
   loadEPG,
   findNowAndNextForChannel,
   formatProgramTime,
+  EPG_DEBUG_STATE,
 } from "../services/epgService";
 
 const { width } = Dimensions.get("window");
@@ -234,6 +235,12 @@ export default function LiveTVScreen({
       foundNext: !!nextProgram,
       nowTitle: safeText(nowProgram?.title),
       nextTitle: safeText(nextProgram?.title),
+      xmltvUrl: safeText(EPG_DEBUG_STATE.xmltvUrl),
+      httpStatus: safeText(EPG_DEBUG_STATE.httpStatus),
+      startsWithTv: !!EPG_DEBUG_STATE.startsWithTv,
+      rawPreview: safeText(EPG_DEBUG_STATE.rawPreview),
+      itemsParsed: Number(EPG_DEBUG_STATE.itemsParsed || 0),
+      errorText: safeText(EPG_DEBUG_STATE.errorText),
     };
   }, [epgItems, selectedChannel, nowProgram, nextProgram]);
 
@@ -757,6 +764,24 @@ export default function LiveTVScreen({
                   </Text>
                   <Text style={styles.debugText}>
                     Título próximo: {epgDebug.nextTitle || "-"}
+                  </Text>
+                  <Text style={styles.debugText}>
+                    URL XMLTV: {epgDebug.xmltvUrl || "-"}
+                  </Text>
+                  <Text style={styles.debugText}>
+                    HTTP status: {epgDebug.httpStatus || "-"}
+                  </Text>
+                  <Text style={styles.debugText}>
+                    Começa com &lt;tv: {epgDebug.startsWithTv ? "SIM" : "NÃO"}
+                  </Text>
+                  <Text style={styles.debugText}>
+                    Programas extraídos: {epgDebug.itemsParsed}
+                  </Text>
+                  <Text style={styles.debugText}>
+                    Erro: {epgDebug.errorText || "-"}
+                  </Text>
+                  <Text style={styles.debugText}>
+                    Retorno bruto: {epgDebug.rawPreview || "-"}
                   </Text>
                 </View>
               </>
