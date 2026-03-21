@@ -26,6 +26,7 @@ const FAVORITES_KEY = "mundoplaytv_live_favorites";
 const RECENTS_KEY = "mundoplaytv_live_recents";
 const CATEGORY_ROW_HEIGHT = isPhone ? 34 : 46;
 const CHANNEL_ROW_HEIGHT = isPhone ? 38 : 48;
+const FULLSCREEN_HIDE_DELAY = 2500;
 
 function safeText(value) {
   if (value === null || value === undefined) return "";
@@ -91,12 +92,13 @@ export default function LiveTVScreen({
   const [isPaused, setIsPaused] = useState(false);
   const [isFullscreenPaused, setIsFullscreenPaused] = useState(false);
   const [showFullscreen, setShowFullscreen] = useState(false);
+  const [showFullscreenUi, setShowFullscreenUi] = useState(true);
   const [epgItems, setEpgItems] = useState([]);
   const [epgLoading, setEpgLoading] = useState(false);
-  const [showPlayerOverlay, setShowPlayerOverlay] = useState(true);
 
   const videoRef = useRef(null);
   const fullscreenVideoRef = useRef(null);
+  const fullscreenUiTimerRef = useRef(null);
 
   useEffect(() => {
     async function loadSavedData() {
@@ -106,12 +108,25 @@ export default function LiveTVScreen({
           AsyncStorage.getItem(RECENTS_KEY),
         ]);
 
-        if (savedFavorites) setFavoriteIds(JSON.parse(savedFavorites));
-        if (savedRecents) setRecentIds(JSON.parse(savedRecents));
+        if (savedFavorites) {
+          setFavoriteIds(JSON.parse(savedFavorites));
+        }
+
+        if (savedRecents) {
+          setRecentIds(JSON.parse(savedRecents));
+        }
       } catch (e) {}
     }
 
     loadSavedData();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (fullscreenUiTimerRef.current) {
+        clearTimeout(fullscreenUiTimerRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -121,13 +136,18 @@ export default function LiveTVScreen({
       try {
         setEpgLoading(true);
         const items = await loadEPG(session);
+
         if (active) {
           setEpgItems(Array.isArray(items) ? items : []);
         }
       } catch (e) {
-        if (active) setEpgItems([]);
+        if (active) {
+          setEpgItems([]);
+        }
       } finally {
-        if (active) setEpgLoading(false);
+        if (active) {
+          setEpgLoading(false);
+        }
       }
     }
 
@@ -185,7 +205,6 @@ export default function LiveTVScreen({
     setFullscreenKey((prev) => prev + 1);
     setIsPaused(false);
     setIsFullscreenPaused(false);
-    setShowPlayerOverlay(true);
   }, [selectedChannel?.url]);
 
   const { nowProgram, nextProgram } = useMemo(() => {
@@ -202,29 +221,10 @@ export default function LiveTVScreen({
     );
   }, [epgItems, selectedChannel]);
 
-  const progressPercent = useMemo(() => getProgressPercent(nowProgram), [nowProgram]);
-
-  const epgRows = useMemo(() => {
-    const rows = [];
-
-    if (nowProgram) {
-      rows.push({
-        key: "now",
-        time: formatProgramTime(nowProgram),
-        title: nowProgram.title || "Programação atual",
-      });
-    }
-
-    if (nextProgram) {
-      rows.push({
-        key: "next",
-        time: formatProgramTime(nextProgram),
-        title: nextProgram.title || "Próximo programa",
-      });
-    }
-
-    return rows;
-  }, [nowProgram, nextProgram]);
+  const progressPercent = useMemo(
+    () => getProgressPercent(nowProgram),
+    [nowProgram]
+  );
 
   const persistFavorites = async (ids) => {
     try {
@@ -260,6 +260,7 @@ export default function LiveTVScreen({
 
     setFavoriteIds(updated);
     await persistFavorites(updated);
+    showFullscreenControls();
   };
 
   const handleSelectCategory = (index) => {
@@ -271,7 +272,9 @@ export default function LiveTVScreen({
   const handleSelectChannel = async (index) => {
     setSelectedChannelIndex(index);
     const item = visibleChannels[index];
-    if (item) await addToRecent(item);
+    if (item) {
+      await addToRecent(item);
+    }
   };
 
   const togglePauseMain = async () => {
@@ -295,6 +298,7 @@ export default function LiveTVScreen({
         await fullscreenVideoRef.current?.pauseAsync?.();
         setIsFullscreenPaused(true);
       }
+      showFullscreenControls();
     } catch (e) {}
   };
 
@@ -303,6 +307,7 @@ export default function LiveTVScreen({
     const nextIndex =
       selectedChannelIndex <= 0 ? visibleChannels.length - 1 : selectedChannelIndex - 1;
     await handleSelectChannel(nextIndex);
+    showFullscreenControls();
   };
 
   const goToNextChannel = async () => {
@@ -310,6 +315,30 @@ export default function LiveTVScreen({
     const nextIndex =
       selectedChannelIndex >= visibleChannels.length - 1 ? 0 : selectedChannelIndex + 1;
     await handleSelectChannel(nextIndex);
+    showFullscreenControls();
+  };
+
+  const showFullscreenControls = () => {
+    setShowFullscreenUi(true);
+
+    if (fullscreenUiTimerRef.current) {
+      clearTimeout(fullscreenUiTimerRef.current);
+    }
+
+    fullscreenUiTimerRef.current = setTimeout(() => {
+      setShowFullscreenUi(false);
+    }, FULLSCREEN_HIDE_DELAY);
+  };
+
+  const toggleFullscreenControls = () => {
+    if (showFullscreenUi) {
+      setShowFullscreenUi(false);
+      if (fullscreenUiTimerRef.current) {
+        clearTimeout(fullscreenUiTimerRef.current);
+      }
+    } else {
+      showFullscreenControls();
+    }
   };
 
   const openFullscreen = async () => {
@@ -318,17 +347,19 @@ export default function LiveTVScreen({
     setFullscreenKey((prev) => prev + 1);
     setIsFullscreenPaused(false);
     setShowFullscreen(true);
+    showFullscreenControls();
   };
 
   const closeFullscreen = async () => {
     try {
       await fullscreenVideoRef.current?.stopAsync?.();
     } catch (e) {}
-    setShowFullscreen(false);
-  };
 
-  const togglePlayerOverlay = () => {
-    setShowPlayerOverlay((prev) => !prev);
+    if (fullscreenUiTimerRef.current) {
+      clearTimeout(fullscreenUiTimerRef.current);
+    }
+
+    setShowFullscreen(false);
   };
 
   const renderCategoryRow = ({ item, index }) => {
@@ -469,8 +500,8 @@ export default function LiveTVScreen({
         <View style={styles.rightPanel}>
           <TouchableOpacity
             style={styles.previewBox}
-            activeOpacity={1}
-            onPress={togglePlayerOverlay}
+            activeOpacity={0.95}
+            onPress={openFullscreen}
           >
             {selectedChannel?.url ? (
               <Video
@@ -486,64 +517,6 @@ export default function LiveTVScreen({
             ) : (
               <View style={styles.previewEmpty}>
                 <Text style={styles.previewEmptyText}>Sem sinal</Text>
-              </View>
-            )}
-
-            {showPlayerOverlay && (
-              <View style={styles.previewOverlay}>
-                <View style={styles.previewBottomControls}>
-                  <TouchableOpacity
-                    style={styles.overlayBtn}
-                    onPress={onOpenHome}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.overlayBtnText}>VOLTAR</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.overlayBtn}
-                    onPress={goToPreviousChannel}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.overlayBtnText}>◀</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.overlayBtn}
-                    onPress={togglePauseMain}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.overlayBtnText}>
-                      {isPaused ? "PLAY" : "PAUSE"}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.overlayBtn}
-                    onPress={goToNextChannel}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.overlayBtnText}>▶</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.overlayBtn}
-                    onPress={toggleFavorite}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.overlayBtnText}>
-                      {isFavorite ? "★" : "☆"}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.overlayBtnWide}
-                    onPress={openFullscreen}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.overlayBtnText}>TELA CHEIA</Text>
-                  </TouchableOpacity>
-                </View>
               </View>
             )}
           </TouchableOpacity>
@@ -571,20 +544,22 @@ export default function LiveTVScreen({
             </View>
 
             <View style={styles.scheduleBox}>
-              {epgRows.length > 0 ? (
-                epgRows.map((item) => (
-                  <View key={item.key} style={styles.scheduleRow}>
-                    <Text style={styles.scheduleTime}>{item.time}</Text>
-                    <Text style={styles.scheduleTitle} numberOfLines={1}>
-                      {item.title}
-                    </Text>
-                  </View>
-                ))
-              ) : (
+              <View style={styles.scheduleRow}>
+                <Text style={styles.scheduleTime}>
+                  {nowProgram ? formatProgramTime(nowProgram) : "--:--"}
+                </Text>
+                <Text style={styles.scheduleTitle} numberOfLines={1}>
+                  {nowProgram?.title || "Sem programação disponível"}
+                </Text>
+              </View>
+
+              {!!nextProgram && (
                 <View style={styles.scheduleRow}>
-                  <Text style={styles.scheduleTime}>--:--</Text>
+                  <Text style={styles.scheduleTime}>
+                    {formatProgramTime(nextProgram)}
+                  </Text>
                   <Text style={styles.scheduleTitle} numberOfLines={1}>
-                    Sem programação disponível
+                    {nextProgram.title || "Próximo programa"}
                   </Text>
                 </View>
               )}
@@ -600,112 +575,119 @@ export default function LiveTVScreen({
         onRequestClose={closeFullscreen}
       >
         <SafeAreaView style={styles.fullscreenContainer}>
-          {selectedChannel?.url ? (
-            <Video
-              key={`${selectedChannel.url}_${fullscreenKey}_fullscreen`}
-              ref={fullscreenVideoRef}
-              source={{ uri: selectedChannel.url }}
-              style={styles.fullscreenVideo}
-              resizeMode={ResizeMode.COVER}
-              shouldPlay={!isFullscreenPaused}
-              isLooping
-              useNativeControls={false}
-            />
-          ) : (
-            <View style={styles.previewEmpty}>
-              <Text style={styles.previewEmptyText}>Sem sinal</Text>
-            </View>
-          )}
+          <TouchableOpacity
+            activeOpacity={1}
+            style={styles.fullscreenTouchLayer}
+            onPress={toggleFullscreenControls}
+          >
+            {selectedChannel?.url ? (
+              <Video
+                key={`${selectedChannel.url}_${fullscreenKey}_fullscreen`}
+                ref={fullscreenVideoRef}
+                source={{ uri: selectedChannel.url }}
+                style={styles.fullscreenVideo}
+                resizeMode={ResizeMode.COVER}
+                shouldPlay={!isFullscreenPaused}
+                isLooping
+                useNativeControls={false}
+              />
+            ) : (
+              <View style={styles.previewEmpty}>
+                <Text style={styles.previewEmptyText}>Sem sinal</Text>
+              </View>
+            )}
 
-          <View style={styles.fullscreenOverlay}>
-            <View style={styles.fullscreenTopRow}>
-              <TouchableOpacity
-                style={styles.fullscreenIconBtn}
-                onPress={closeFullscreen}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.fullscreenIconText}>↩</Text>
-              </TouchableOpacity>
+            {showFullscreenUi && (
+              <View style={styles.fullscreenOverlay}>
+                <View style={styles.fullscreenTopRow}>
+                  <TouchableOpacity
+                    style={styles.fullscreenIconBtn}
+                    onPress={closeFullscreen}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.fullscreenIconText}>↩</Text>
+                  </TouchableOpacity>
 
-              <View style={styles.fullscreenTopIcons}>
-                <TouchableOpacity
-                  style={styles.fullscreenIconBtn}
-                  onPress={toggleFavorite}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.fullscreenIconText}>
-                    {isFavorite ? "♥" : "♡"}
+                  <View style={styles.fullscreenTopIcons}>
+                    <TouchableOpacity
+                      style={styles.fullscreenIconBtn}
+                      onPress={toggleFavorite}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.fullscreenIconText}>
+                        {isFavorite ? "♥" : "♡"}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.fullscreenIconBtn}
+                      onPress={togglePauseFullscreen}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.fullscreenIconText}>
+                        {isFullscreenPaused ? "▶" : "❚❚"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <View style={styles.fullscreenCenterControls}>
+                  <TouchableOpacity
+                    style={styles.fullscreenCenterBtn}
+                    onPress={goToPreviousChannel}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.fullscreenCenterText}>◀◀</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.fullscreenCenterBtnPlay}
+                    onPress={togglePauseFullscreen}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.fullscreenCenterText}>
+                      {isFullscreenPaused ? "▶" : "❚❚"}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.fullscreenCenterBtn}
+                    onPress={goToNextChannel}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.fullscreenCenterText}>▶▶</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.fullscreenBottomInfo}>
+                  <Text style={styles.fullscreenChannelText}>
+                    {selectedChannelIndex + 1} {safeText(selectedChannel?.name) || "Sem canal"}
                   </Text>
-                </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.fullscreenIconBtn}
-                  onPress={togglePauseFullscreen}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.fullscreenIconText}>
-                    {isFullscreenPaused ? "▶" : "❚❚"}
+                  <Text style={styles.fullscreenProgramText} numberOfLines={1}>
+                    {nowProgram?.title || "Programação atual não encontrada"}
                   </Text>
-                </TouchableOpacity>
+
+                  <Text style={styles.fullscreenTimesText} numberOfLines={1}>
+                    {nowProgram ? formatProgramTime(nowProgram) : "--:--"}
+                  </Text>
+
+                  <View style={styles.fullscreenProgressTrack}>
+                    <View
+                      style={[
+                        styles.fullscreenProgressFill,
+                        { width: `${progressPercent}%` },
+                      ]}
+                    />
+                  </View>
+
+                  <View style={styles.fullscreenLiveBadge}>
+                    <Text style={styles.fullscreenLiveBadgeText}>LIVE</Text>
+                  </View>
+                </View>
               </View>
-            </View>
-
-            <View style={styles.fullscreenCenterControls}>
-              <TouchableOpacity
-                style={styles.fullscreenCenterBtn}
-                onPress={goToPreviousChannel}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.fullscreenCenterText}>◀◀</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.fullscreenCenterBtnPlay}
-                onPress={togglePauseFullscreen}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.fullscreenCenterText}>
-                  {isFullscreenPaused ? "▶" : "❚❚"}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.fullscreenCenterBtn}
-                onPress={goToNextChannel}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.fullscreenCenterText}>▶▶</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.fullscreenBottomInfo}>
-              <Text style={styles.fullscreenChannelText}>
-                {selectedChannelIndex + 1} {safeText(selectedChannel?.name) || "Sem canal"}
-              </Text>
-
-              <Text style={styles.fullscreenProgramText} numberOfLines={1}>
-                {nowProgram?.title || "Programação atual não encontrada"}
-              </Text>
-
-              <Text style={styles.fullscreenTimesText} numberOfLines={1}>
-                {nowProgram ? formatProgramTime(nowProgram) : "--:--"}{" "}
-                {nextProgram?.title ? `• ${nextProgram.title}` : ""}
-              </Text>
-
-              <View style={styles.fullscreenProgressTrack}>
-                <View
-                  style={[
-                    styles.fullscreenProgressFill,
-                    { width: `${progressPercent}%` },
-                  ]}
-                />
-              </View>
-
-              <View style={styles.fullscreenLiveBadge}>
-                <Text style={styles.fullscreenLiveBadgeText}>LIVE</Text>
-              </View>
-            </View>
-          </View>
+            )}
+          </TouchableOpacity>
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -897,49 +879,6 @@ const styles = StyleSheet.create({
     fontSize: isPhone ? 9 : 12,
   },
 
-  previewOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "flex-end",
-    paddingHorizontal: 8,
-    paddingBottom: 8,
-  },
-
-  previewBottomControls: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "rgba(0,0,0,0.28)",
-    borderRadius: 12,
-    padding: 6,
-  },
-
-  overlayBtn: {
-    width: "13.2%",
-    minHeight: isPhone ? 34 : 42,
-    borderRadius: 8,
-    backgroundColor: "rgba(117,97,166,0.92)",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 4,
-  },
-
-  overlayBtnWide: {
-    width: "25%",
-    minHeight: isPhone ? 34 : 42,
-    borderRadius: 8,
-    backgroundColor: "rgba(117,97,166,0.92)",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 6,
-  },
-
-  overlayBtnText: {
-    color: "#fff",
-    fontSize: isPhone ? 7 : 10,
-    fontWeight: "900",
-    textAlign: "center",
-  },
-
   infoPanel: {
     flex: 1,
     backgroundColor: "#07112b",
@@ -1010,6 +949,10 @@ const styles = StyleSheet.create({
   fullscreenContainer: {
     flex: 1,
     backgroundColor: "#000",
+  },
+
+  fullscreenTouchLayer: {
+    flex: 1,
   },
 
   fullscreenVideo: {
