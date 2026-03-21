@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -11,6 +11,7 @@ import {
   StatusBar,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Video, ResizeMode } from "expo-av";
 
 const { width } = Dimensions.get("window");
 const isPhone = width < 900;
@@ -65,6 +66,8 @@ export default function LiveTVScreen({
   const [selectedCategory, setSelectedCategory] = useState(0);
   const [selectedChannelIndex, setSelectedChannelIndex] = useState(0);
   const [search, setSearch] = useState("");
+  const [playerKey, setPlayerKey] = useState(0);
+  const videoRef = useRef(null);
 
   useEffect(() => {
     async function loadSavedData() {
@@ -129,6 +132,10 @@ export default function LiveTVScreen({
     return favoriteIds.includes(selectedChannelId);
   }, [favoriteIds, selectedChannelId]);
 
+  useEffect(() => {
+    setPlayerKey((prev) => prev + 1);
+  }, [selectedChannel?.url]);
+
   const persistFavorites = async (ids) => {
     try {
       await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(ids));
@@ -177,6 +184,13 @@ export default function LiveTVScreen({
     if (item) {
       await addToRecent(item);
     }
+  };
+
+  const reloadPlayer = async () => {
+    try {
+      await videoRef.current?.stopAsync?.();
+    } catch (e) {}
+    setPlayerKey((prev) => prev + 1);
   };
 
   const renderCategoryRow = ({ item, index }) => {
@@ -317,8 +331,27 @@ export default function LiveTVScreen({
         </View>
 
         <View style={styles.rightPanel}>
+          <View style={styles.previewBox}>
+            {selectedChannel?.url ? (
+              <Video
+                key={`${selectedChannel.url}_${playerKey}`}
+                ref={videoRef}
+                source={{ uri: selectedChannel.url }}
+                style={styles.previewVideo}
+                resizeMode={ResizeMode.COVER}
+                shouldPlay
+                isLooping
+                useNativeControls={false}
+              />
+            ) : (
+              <View style={styles.previewEmpty}>
+                <Text style={styles.previewEmptyText}>Sem sinal</Text>
+              </View>
+            )}
+          </View>
+
           <View style={styles.infoCard}>
-            <Text style={styles.infoTitle}>TESTE LIVE TV</Text>
+            <Text style={styles.infoTitle}>LIVE TV</Text>
 
             <Text style={styles.infoText}>
               Total de canais: {channels.length}
@@ -350,8 +383,16 @@ export default function LiveTVScreen({
               </Text>
             </TouchableOpacity>
 
+            <TouchableOpacity
+              style={styles.reloadBtn}
+              onPress={reloadPlayer}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.reloadBtnText}>RECARREGAR PLAYER</Text>
+            </TouchableOpacity>
+
             <Text style={styles.infoDesc}>
-              Esta tela está sem player e sem EPG só para descobrir o que está derrubando a Live TV.
+              Player quadrado em modo leve só para testar a Live TV sem pesar o aplicativo.
             </Text>
           </View>
         </View>
@@ -522,6 +563,34 @@ const styles = StyleSheet.create({
     padding: isPhone ? 8 : 12,
   },
 
+  previewBox: {
+    width: isPhone ? 140 : 260,
+    height: isPhone ? 140 : 260,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: "#000",
+    marginBottom: 10,
+    alignSelf: "center",
+  },
+
+  previewVideo: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#000",
+  },
+
+  previewEmpty: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#000",
+  },
+
+  previewEmptyText: {
+    color: "#c8d4e2",
+    fontSize: isPhone ? 9 : 12,
+  },
+
   infoCard: {
     flex: 1,
     backgroundColor: "#10183f",
@@ -563,6 +632,24 @@ const styles = StyleSheet.create({
 
   favoriteBtnBigText: {
     color: "#38d7ff",
+    fontSize: isPhone ? 9 : 12,
+    fontWeight: "900",
+  },
+
+  reloadBtn: {
+    height: isPhone ? 38 : 44,
+    borderRadius: 8,
+    marginTop: 10,
+    backgroundColor: "rgba(255,224,79,0.10)",
+    borderWidth: 1,
+    borderColor: "#ffe24f",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+  },
+
+  reloadBtnText: {
+    color: "#ffe24f",
     fontSize: isPhone ? 9 : 12,
     fontWeight: "900",
   },
