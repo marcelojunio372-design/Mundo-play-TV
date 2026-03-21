@@ -155,7 +155,36 @@ function extractProgrammes(xml = "", channelMap = {}) {
   return programmes;
 }
 
-export async function loadEPG() {
+function buildXmltvUrl(session = {}) {
+  const server = safeText(session?.server);
+  const username = safeText(session?.username);
+  const password = safeText(session?.password);
+
+  if (server && username && password) {
+    return `${server.replace(/\/+$/, "")}/xmltv.php?username=${encodeURIComponent(
+      username
+    )}&password=${encodeURIComponent(password)}`;
+  }
+
+  const rawUrl = safeText(session?.url);
+  if (!rawUrl) return "";
+
+  try {
+    const parsed = new URL(rawUrl);
+    const urlUsername = safeText(parsed.searchParams.get("username"));
+    const urlPassword = safeText(parsed.searchParams.get("password"));
+
+    if (parsed.origin && urlUsername && urlPassword) {
+      return `${parsed.origin}/xmltv.php?username=${encodeURIComponent(
+        urlUsername
+      )}&password=${encodeURIComponent(urlPassword)}`;
+    }
+  } catch (e) {}
+
+  return "";
+}
+
+export async function loadEPG(session = {}) {
   const now = Date.now();
 
   if (
@@ -167,13 +196,20 @@ export async function loadEPG() {
   }
 
   try {
-    const url =
-      "http://epics.zip/xmltv.php?username=Marcelo123&password=128518957";
+    const url = buildXmltvUrl(session);
+    if (!url) return MEMORY_EPG_CACHE || [];
 
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/xml,text/xml,text/plain,*/*",
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+      },
+    });
+
     const xml = await response.text();
 
-    if (!response.ok || !xml) {
+    if (!response.ok || !xml || !xml.includes("<tv")) {
       return MEMORY_EPG_CACHE || [];
     }
 
@@ -296,5 +332,3 @@ export function formatProgramTime(program) {
 
   return `${start} - ${stop}`;
 }
-
-
