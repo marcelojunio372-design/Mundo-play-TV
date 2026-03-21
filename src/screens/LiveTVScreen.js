@@ -93,7 +93,7 @@ export default function LiveTVScreen({
   const [showFullscreen, setShowFullscreen] = useState(false);
   const [epgItems, setEpgItems] = useState([]);
   const [epgLoading, setEpgLoading] = useState(false);
-  const [showControls, setShowControls] = useState(true);
+  const [showPlayerOverlay, setShowPlayerOverlay] = useState(true);
 
   const videoRef = useRef(null);
   const fullscreenVideoRef = useRef(null);
@@ -185,7 +185,7 @@ export default function LiveTVScreen({
     setFullscreenKey((prev) => prev + 1);
     setIsPaused(false);
     setIsFullscreenPaused(false);
-    setShowControls(true);
+    setShowPlayerOverlay(true);
   }, [selectedChannel?.url]);
 
   const { nowProgram, nextProgram } = useMemo(() => {
@@ -327,8 +327,8 @@ export default function LiveTVScreen({
     setShowFullscreen(false);
   };
 
-  const toggleControls = () => {
-    setShowControls((prev) => !prev);
+  const togglePlayerOverlay = () => {
+    setShowPlayerOverlay((prev) => !prev);
   };
 
   const renderCategoryRow = ({ item, index }) => {
@@ -470,7 +470,7 @@ export default function LiveTVScreen({
           <TouchableOpacity
             style={styles.previewBox}
             activeOpacity={1}
-            onPress={toggleControls}
+            onPress={togglePlayerOverlay}
           >
             {selectedChannel?.url ? (
               <Video
@@ -488,108 +488,108 @@ export default function LiveTVScreen({
                 <Text style={styles.previewEmptyText}>Sem sinal</Text>
               </View>
             )}
+
+            {showPlayerOverlay && (
+              <View style={styles.previewOverlay}>
+                <View style={styles.previewBottomControls}>
+                  <TouchableOpacity
+                    style={styles.overlayBtn}
+                    onPress={onOpenHome}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.overlayBtnText}>VOLTAR</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.overlayBtn}
+                    onPress={goToPreviousChannel}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.overlayBtnText}>◀</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.overlayBtn}
+                    onPress={togglePauseMain}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.overlayBtnText}>
+                      {isPaused ? "PLAY" : "PAUSE"}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.overlayBtn}
+                    onPress={goToNextChannel}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.overlayBtnText}>▶</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.overlayBtn}
+                    onPress={toggleFavorite}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.overlayBtnText}>
+                      {isFavorite ? "★" : "☆"}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.overlayBtnWide}
+                    onPress={openFullscreen}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.overlayBtnText}>TELA CHEIA</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
           </TouchableOpacity>
 
-          {showControls && (
-            <>
-              <View style={styles.controlsRow}>
-                <TouchableOpacity
-                  style={styles.controlBtn}
-                  onPress={onOpenHome}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.controlBtnText}>VOLTAR</Text>
-                </TouchableOpacity>
+          <View style={styles.infoPanel}>
+            <Text style={styles.channelTitle}>
+              {safeText(selectedChannel?.name) || "Sem canal"}
+            </Text>
 
-                <TouchableOpacity
-                  style={styles.controlBtn}
-                  onPress={goToPreviousChannel}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.controlBtnText}>◀</Text>
-                </TouchableOpacity>
+            <Text style={styles.epgTimeMain}>
+              {nowProgram ? formatProgramTime(nowProgram) : "Sem horário atual"}
+            </Text>
 
-                <TouchableOpacity
-                  style={styles.controlBtn}
-                  onPress={togglePauseMain}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.controlBtnText}>
-                    {isPaused ? "PLAY" : "PAUSE"}
+            <Text style={styles.epgCurrentMain} numberOfLines={2}>
+              {nowProgram?.title ||
+                (epgLoading
+                  ? "Carregando EPG..."
+                  : "Programação atual não encontrada")}
+            </Text>
+
+            <View style={styles.progressTrack}>
+              <View
+                style={[styles.progressFill, { width: `${progressPercent}%` }]}
+              />
+            </View>
+
+            <View style={styles.scheduleBox}>
+              {epgRows.length > 0 ? (
+                epgRows.map((item) => (
+                  <View key={item.key} style={styles.scheduleRow}>
+                    <Text style={styles.scheduleTime}>{item.time}</Text>
+                    <Text style={styles.scheduleTitle} numberOfLines={1}>
+                      {item.title}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.scheduleRow}>
+                  <Text style={styles.scheduleTime}>--:--</Text>
+                  <Text style={styles.scheduleTitle} numberOfLines={1}>
+                    Sem programação disponível
                   </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.controlBtn}
-                  onPress={goToNextChannel}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.controlBtnText}>▶</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.controlBtn}
-                  onPress={toggleFavorite}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.controlBtnText}>
-                    {isFavorite ? "★" : "☆"}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.controlBtnWide}
-                  onPress={openFullscreen}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.controlBtnText}>TELA CHEIA</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.infoPanel}>
-                <Text style={styles.channelTitle}>
-                  {safeText(selectedChannel?.name) || "Sem canal"}
-                </Text>
-
-                <Text style={styles.epgTimeMain}>
-                  {nowProgram ? formatProgramTime(nowProgram) : "Sem horário atual"}
-                </Text>
-
-                <Text style={styles.epgCurrentMain} numberOfLines={2}>
-                  {nowProgram?.title ||
-                    (epgLoading
-                      ? "Carregando EPG..."
-                      : "Programação atual não encontrada")}
-                </Text>
-
-                <View style={styles.progressTrack}>
-                  <View
-                    style={[styles.progressFill, { width: `${progressPercent}%` }]}
-                  />
                 </View>
-
-                <View style={styles.scheduleBox}>
-                  {epgRows.length > 0 ? (
-                    epgRows.map((item) => (
-                      <View key={item.key} style={styles.scheduleRow}>
-                        <Text style={styles.scheduleTime}>{item.time}</Text>
-                        <Text style={styles.scheduleTitle} numberOfLines={1}>
-                          {item.title}
-                        </Text>
-                      </View>
-                    ))
-                  ) : (
-                    <View style={styles.scheduleRow}>
-                      <Text style={styles.scheduleTime}>--:--</Text>
-                      <Text style={styles.scheduleTitle} numberOfLines={1}>
-                        Sem programação disponível
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            </>
-          )}
+              )}
+            </View>
+          </View>
         </View>
       </View>
 
@@ -897,34 +897,43 @@ const styles = StyleSheet.create({
     fontSize: isPhone ? 9 : 12,
   },
 
-  controlsRow: {
+  previewOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "flex-end",
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+  },
+
+  previewBottomControls: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 10,
+    backgroundColor: "rgba(0,0,0,0.28)",
+    borderRadius: 12,
+    padding: 6,
   },
 
-  controlBtn: {
+  overlayBtn: {
     width: "13.2%",
     minHeight: isPhone ? 34 : 42,
     borderRadius: 8,
-    backgroundColor: "#7561a6",
+    backgroundColor: "rgba(117,97,166,0.92)",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 4,
   },
 
-  controlBtnWide: {
+  overlayBtnWide: {
     width: "25%",
     minHeight: isPhone ? 34 : 42,
     borderRadius: 8,
-    backgroundColor: "#7561a6",
+    backgroundColor: "rgba(117,97,166,0.92)",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 6,
   },
 
-  controlBtnText: {
+  overlayBtnText: {
     color: "#fff",
     fontSize: isPhone ? 7 : 10,
     fontWeight: "900",
