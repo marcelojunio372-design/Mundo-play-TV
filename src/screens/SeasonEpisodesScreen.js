@@ -12,48 +12,122 @@ import {
 } from "react-native";
 import { Video, ResizeMode } from "expo-av";
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 const isPhone = width < 900;
 
+function safeText(value) {
+  if (value === null || value === undefined) return "";
+  return String(value).trim();
+}
+
+function buildSeasonPlaylist(series, currentSeason) {
+  const seasonsFromSeries = Array.isArray(series?.seasons) ? series.seasons : [];
+
+  if (seasonsFromSeries.length > 0) {
+    const flat = [];
+
+    seasonsFromSeries.forEach((seasonItem, seasonIndex) => {
+      const seasonEpisodes = Array.isArray(seasonItem?.episodes)
+        ? seasonItem.episodes
+        : [];
+
+      seasonEpisodes.forEach((episode, episodeIndex) => {
+        flat.push({
+          ...episode,
+          __seasonName:
+            safeText(seasonItem?.name) || `Temporada ${seasonIndex + 1}`,
+          __seasonIndex: seasonIndex,
+          __episodeIndex: episodeIndex,
+        });
+      });
+    });
+
+    return flat;
+  }
+
+  const fallbackEpisodes = Array.isArray(currentSeason?.episodes)
+    ? currentSeason.episodes
+    : [];
+
+  return fallbackEpisodes.map((episode, episodeIndex) => ({
+    ...episode,
+    __seasonName: safeText(currentSeason?.name) || "Temporada 1",
+    __seasonIndex: 0,
+    __episodeIndex: episodeIndex,
+  }));
+}
+
+function findStartIndex(playlist, episode) {
+  if (!playlist.length || !episode) return -1;
+
+  const targetId = safeText(episode.id);
+  const targetUrl = safeText(episode.url);
+  const targetTitle = safeText(episode.title);
+
+  const byId = playlist.findIndex((item) => safeText(item.id) === targetId);
+  if (byId >= 0 && targetId) return byId;
+
+  const byUrl = playlist.findIndex((item) => safeText(item.url) === targetUrl);
+  if (byUrl >= 0 && targetUrl) return byUrl;
+
+  const byTitle = playlist.findIndex(
+    (item) => safeText(item.title) === targetTitle
+  );
+  if (byTitle >= 0 && targetTitle) return byTitle;
+
+  return -1;
+}
+
 export default function SeasonEpisodesScreen({ series, season, onBack }) {
-  const episodes = useMemo(() => {
-    return Array.isArray(season?.episodes) ? season.episodes : [];
-  }, [season]);
+  const seasonEpisodes = Array.isArray(season?.episodes) ? season.episodes : [];
+
+  const playlist = useMemo(() => {
+    return buildSeasonPlaylist(series, season);
+  }, [series, season]);
 
   const videoRef = useRef(null);
-  const [selectedEpisodeIndex, setSelectedEpisodeIndex] = useState(-1);
+
+  const [selectedEpisode, setSelectedEpisode] = useState(null);
+  const [selectedPlaylistIndex, setSelectedPlaylistIndex] = useState(-1);
   const [statusText, setStatusText] = useState("");
 
-  const selectedEpisode =
-    selectedEpisodeIndex >= 0 ? episodes[selectedEpisodeIndex] || null : null;
-
-  const openEpisode = (item, index) => {
+  const openEpisode = (item) => {
     if (!item?.url) return;
+
+    const startIndex = findStartIndex(playlist, item);
+
+    setSelectedEpisode(item);
+    setSelectedPlaylistIndex(startIndex);
     setStatusText("");
-    setSelectedEpisodeIndex(index);
   };
 
   const closePlayer = async () => {
     try {
       await videoRef.current?.stopAsync?.();
     } catch (e) {}
-    setSelectedEpisodeIndex(-1);
+
+    setSelectedEpisode(null);
+    setSelectedPlaylistIndex(-1);
     setStatusText("");
   };
 
-  const playNextEpisodeAutomatically = async () => {
-    const nextIndex = selectedEpisodeIndex + 1;
+  const playNextAutomatically = async () => {
+    const nextIndex = selectedPlaylistIndex + 1;
 
-    if (nextIndex >= episodes.length) {
+    if (nextIndex < 0 || nextIndex >= playlist.length) {
       return;
     }
+
+    const nextEpisode = playlist[nextIndex];
+    if (!nextEpisode?.url) return;
 
     try {
       await videoRef.current?.stopAsync?.();
     } catch (e) {}
 
     setStatusText("");
-    setSelectedEpisodeIndex(nextIndex);
+    setSelectedPlaylistIndex(nextIndex);
+    setSelectedEpisode(nextEpisode);
   };
 
   const handlePlaybackStatusUpdate = (status) => {
@@ -61,7 +135,7 @@ export default function SeasonEpisodesScreen({ series, season, onBack }) {
     if (!status.isLoaded) return;
 
     if (status.didJustFinish) {
-      playNextEpisodeAutomatically();
+      playNextAutomatically();
       return;
     }
 
@@ -85,7 +159,7 @@ export default function SeasonEpisodesScreen({ series, season, onBack }) {
         </Text>
 
         <Text style={styles.seasonCount}>
-          Episódios: {episodes.length}
+          Episódios: {seasonEpisodes.length}
         </Text>
       </View>
 
@@ -93,12 +167,12 @@ export default function SeasonEpisodesScreen({ series, season, onBack }) {
         <Text style={styles.mainTitle}>{series?.name || "Série"}</Text>
 
         <FlatList
-          data={episodes}
+          data={seasonEpisodes}
           keyExtractor={(item, index) => item.id || `ep_${index}`}
           renderItem={({ item, index }) => (
             <TouchableOpacity
               style={styles.epRow}
-              onPress={() => openEpisode(item, index)}
+              onPress={() => openEpisode(item)}
             >
               <Image
                 source={item.logo ? { uri: item.logo } : undefined}
@@ -317,8 +391,7 @@ const styles = StyleSheet.create({
   },
 
   playerBox: {
-    width: "100%",
-    height: height * 0.42,
+    flex: 1,
     backgroundColor: "#000",
   },
 
@@ -332,7 +405,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: "rgba(0,0,0,0.35)",
     paddingHorizontal: 20,
   },
 

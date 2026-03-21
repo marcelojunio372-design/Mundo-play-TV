@@ -1,3 +1,8 @@
+let MEMORY_EPG_CACHE = [];
+let MEMORY_EPG_CACHE_TIME = 0;
+
+const EPG_CACHE_MS = 10 * 60 * 1000;
+
 function safeText(value) {
   if (value === null || value === undefined) return "";
   return String(value).trim();
@@ -71,21 +76,23 @@ function extractTags(block = "", tag = "") {
   return values;
 }
 
-function buildAliases(name = "", group = "", tvgId = "", tvgName = "") {
+function splitWords(text = "") {
+  return cleanChannelName(text)
+    .split(/\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function buildAliases(name = "", tvgId = "", tvgName = "") {
   const raw = [
     safeText(name),
-    safeText(group),
     safeText(tvgId),
     safeText(tvgName),
     cleanChannelName(name),
     cleanChannelName(tvgName),
   ].filter(Boolean);
 
-  return Array.from(
-    new Set(
-      raw.map((item) => normalizeText(item)).filter(Boolean)
-    )
-  );
+  return Array.from(new Set(raw.map((item) => normalizeText(item)).filter(Boolean)));
 }
 
 function extractChannelMap(xml = "") {
@@ -99,16 +106,19 @@ function extractChannelMap(xml = "") {
     const body = match[2] || "";
     const displayNames = extractTags(body, "display-name");
 
+    const aliases = Array.from(
+      new Set(
+        [channelId, ...displayNames]
+          .flatMap((item) => [safeText(item), cleanChannelName(item)])
+          .map((item) => normalizeText(item))
+          .filter(Boolean)
+      )
+    );
+
     channelMap[channelId] = {
       id: channelId,
       displayNames,
-      aliases: Array.from(
-        new Set(
-          [channelId, ...displayNames]
-            .map((item) => normalizeText(item))
-            .filter(Boolean)
-        )
-      ),
+      aliases,
     };
   }
 
@@ -146,6 +156,16 @@ function extractProgrammes(xml = "", channelMap = {}) {
 }
 
 export async function loadEPG() {
+  const now = Date.now();
+
+  if (
+    Array.isArray(MEMORY_EPG_CACHE) &&
+    MEMORY_EPG_CACHE.length > 0 &&
+    now - MEMORY_EPG_CACHE_TIME < EPG_CACHE_MS
+  ) {
+    return MEMORY_EPG_CACHE;
+  }
+
   try {
     const url =
       "http://epics.zip/xmltv.php?username=Marcelo123&password=128518957";
@@ -154,13 +174,18 @@ export async function loadEPG() {
     const xml = await response.text();
 
     if (!response.ok || !xml) {
-      return [];
+      return MEMORY_EPG_CACHE || [];
     }
 
     const channelMap = extractChannelMap(xml);
-    return extractProgrammes(xml, channelMap);
+    const programmes = extractProgrammes(xml, channelMap);
+
+    MEMORY_EPG_CACHE = programmes;
+    MEMORY_EPG_CACHE_TIME = now;
+
+    return programmes;
   } catch (e) {
-    return [];
+    return MEMORY_EPG_CACHE || [];
   }
 }
 
@@ -168,14 +193,34 @@ function itemTime(date) {
   return date instanceof Date ? date.getTime() : 0;
 }
 
-function matchesChannel(itemAliases = [], aliases = []) {
-  for (const a of aliases) {
-    for (const b of itemAliases) {
-      if (!a || !b) continue;
+function getWordOverlapScore(channelName = "", displayAliases = []) {
+  const baseWords = splitWords(channelName);
+  if (!baseWords.length) return 0;
 
-      if (a === b) return true;
-      if (a.includes(b)) return true;
-      if (b.includes(a)) return true;
+  let best = 0;
+
+  displayAliases.forEach((alias) => {
+    const aliasWords = splitWords(alias);
+    let score = 0;
+
+    baseWords.forEach((word) => {
+      if (aliasWords.includes(word)) score += 1;
+    });
+
+    if (score > best) best = score;
+  });
+
+  return best;
+}
+
+function matchesAlias(itemAliases = [], targetAliases = []) {
+  for (const target of targetAliases) {
+    for (const alias of itemAliases) {
+      if (!target || !alias) continue;
+
+      if (target === alias) return true;
+      if (target.includes(alias)) return true;
+      if (alias.includes(target)) return true;
     }
   }
 
@@ -191,15 +236,27 @@ export function findNowAndNextForChannel(
 ) {
   const now = new Date();
 
-  const aliases = buildAliases(channelName, group, tvgId, tvgName);
+  const aliases = buildAliases(channelName, tvgId, tvgName);
 
   if (!aliases.length || !Array.isArray(epgItems) || !epgItems.length) {
     return { nowProgram: null, nextProgram: null };
   }
 
-  const matched = epgItems
-    .filter((item) => matchesChannel(item.aliases || [], aliases))
-    .sort((a, b) => itemTime(a.start) - itemTime(b.start));
+  let matched = epgItems.filter((item) =>
+    matchesAlias(item.aliases || [], aliases)
+  );
+
+  if (!matched.length) {
+    matched = epgItems.filter((item) => {
+      const overlap = getWordOverlapScore(
+        safeText(channelName),
+        (item.aliases || []).map((alias) => cleanChannelName(alias))
+      );
+      return overlap >= 2;
+    });
+  }
+
+  matched = matched.sort((a, b) => itemTime(a.start) - itemTime(b.start));
 
   if (!matched.length) {
     return { nowProgram: null, nextProgram: null };
@@ -239,6 +296,5 @@ export function formatProgramTime(program) {
 
   return `${start} - ${stop}`;
 }
-
 
 
