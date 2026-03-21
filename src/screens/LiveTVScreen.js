@@ -9,6 +9,7 @@ import {
   Dimensions,
   TextInput,
   StatusBar,
+  Modal,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Video, ResizeMode } from "expo-av";
@@ -67,7 +68,13 @@ export default function LiveTVScreen({
   const [selectedChannelIndex, setSelectedChannelIndex] = useState(0);
   const [search, setSearch] = useState("");
   const [playerKey, setPlayerKey] = useState(0);
+  const [fullscreenKey, setFullscreenKey] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const [isFullscreenPaused, setIsFullscreenPaused] = useState(false);
+  const [showFullscreen, setShowFullscreen] = useState(false);
+
   const videoRef = useRef(null);
+  const fullscreenVideoRef = useRef(null);
 
   useEffect(() => {
     async function loadSavedData() {
@@ -134,6 +141,9 @@ export default function LiveTVScreen({
 
   useEffect(() => {
     setPlayerKey((prev) => prev + 1);
+    setFullscreenKey((prev) => prev + 1);
+    setIsPaused(false);
+    setIsFullscreenPaused(false);
   }, [selectedChannel?.url]);
 
   const persistFavorites = async (ids) => {
@@ -191,6 +201,60 @@ export default function LiveTVScreen({
       await videoRef.current?.stopAsync?.();
     } catch (e) {}
     setPlayerKey((prev) => prev + 1);
+    setIsPaused(false);
+  };
+
+  const togglePauseMain = async () => {
+    try {
+      if (isPaused) {
+        await videoRef.current?.playAsync?.();
+        setIsPaused(false);
+      } else {
+        await videoRef.current?.pauseAsync?.();
+        setIsPaused(true);
+      }
+    } catch (e) {}
+  };
+
+  const togglePauseFullscreen = async () => {
+    try {
+      if (isFullscreenPaused) {
+        await fullscreenVideoRef.current?.playAsync?.();
+        setIsFullscreenPaused(false);
+      } else {
+        await fullscreenVideoRef.current?.pauseAsync?.();
+        setIsFullscreenPaused(true);
+      }
+    } catch (e) {}
+  };
+
+  const goToPreviousChannel = async () => {
+    if (!visibleChannels.length) return;
+    const nextIndex =
+      selectedChannelIndex <= 0 ? visibleChannels.length - 1 : selectedChannelIndex - 1;
+    await handleSelectChannel(nextIndex);
+  };
+
+  const goToNextChannel = async () => {
+    if (!visibleChannels.length) return;
+    const nextIndex =
+      selectedChannelIndex >= visibleChannels.length - 1 ? 0 : selectedChannelIndex + 1;
+    await handleSelectChannel(nextIndex);
+  };
+
+  const openFullscreen = async () => {
+    if (!selectedChannel?.url) return;
+    await addToRecent(selectedChannel);
+    setFullscreenKey((prev) => prev + 1);
+    setIsFullscreenPaused(false);
+    setShowFullscreen(true);
+  };
+
+  const closeFullscreen = async () => {
+    try {
+      await fullscreenVideoRef.current?.stopAsync?.();
+    } catch (e) {}
+    setShowFullscreen(false);
   };
 
   const renderCategoryRow = ({ item, index }) => {
@@ -331,7 +395,11 @@ export default function LiveTVScreen({
         </View>
 
         <View style={styles.rightPanel}>
-          <View style={styles.previewBox}>
+          <TouchableOpacity
+            style={styles.previewBox}
+            activeOpacity={0.92}
+            onPress={openFullscreen}
+          >
             {selectedChannel?.url ? (
               <Video
                 key={`${selectedChannel.url}_${playerKey}`}
@@ -339,7 +407,7 @@ export default function LiveTVScreen({
                 source={{ uri: selectedChannel.url }}
                 style={styles.previewVideo}
                 resizeMode={ResizeMode.COVER}
-                shouldPlay
+                shouldPlay={!isPaused}
                 isLooping
                 useNativeControls={false}
               />
@@ -348,7 +416,73 @@ export default function LiveTVScreen({
                 <Text style={styles.previewEmptyText}>Sem sinal</Text>
               </View>
             )}
-          </View>
+
+            <View style={styles.previewOverlay}>
+              <View style={styles.previewTopRow}>
+                <TouchableOpacity
+                  style={styles.overlayBtnTop}
+                  onPress={onOpenHome}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.overlayBtnText}>VOLTAR</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.previewBottomRow}>
+                <TouchableOpacity
+                  style={styles.overlayBtn}
+                  onPress={goToPreviousChannel}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.overlayBtnText}>◀</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.overlayBtn}
+                  onPress={togglePauseMain}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.overlayBtnText}>
+                    {isPaused ? "PLAY" : "PAUSE"}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.overlayBtn}
+                  onPress={goToNextChannel}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.overlayBtnText}>▶</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.overlayBtn}
+                  onPress={toggleFavorite}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.overlayBtnText}>
+                    {isFavorite ? "★" : "☆"}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.overlayBtn}
+                  onPress={reloadPlayer}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.overlayBtnText}>↻</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.overlayBtn}
+                  onPress={openFullscreen}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.overlayBtnText}>⛶</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
 
           <View style={styles.infoCard}>
             <Text style={styles.infoTitle}>LIVE TV</Text>
@@ -369,34 +503,86 @@ export default function LiveTVScreen({
               Grupo: {safeText(selectedChannel?.group) || "-"}
             </Text>
 
-            <Text style={styles.infoText}>
-              URL: {safeText(selectedChannel?.url) || "-"}
-            </Text>
-
-            <TouchableOpacity
-              style={styles.favoriteBtnBig}
-              onPress={toggleFavorite}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.favoriteBtnBigText}>
-                {isFavorite ? "REMOVER FAVORITO" : "MARCAR FAVORITO"}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.reloadBtn}
-              onPress={reloadPlayer}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.reloadBtnText}>RECARREGAR PLAYER</Text>
-            </TouchableOpacity>
-
             <Text style={styles.infoDesc}>
-              Player quadrado em modo leve só para testar a Live TV sem pesar o aplicativo.
+              Botão voltar em cima e os demais controles embaixo, como você pediu.
             </Text>
           </View>
         </View>
       </View>
+
+      <Modal
+        visible={showFullscreen}
+        animationType="fade"
+        transparent={false}
+        onRequestClose={closeFullscreen}
+      >
+        <SafeAreaView style={styles.fullscreenContainer}>
+          {selectedChannel?.url ? (
+            <Video
+              key={`${selectedChannel.url}_${fullscreenKey}_fullscreen`}
+              ref={fullscreenVideoRef}
+              source={{ uri: selectedChannel.url }}
+              style={styles.fullscreenVideo}
+              resizeMode={ResizeMode.CONTAIN}
+              shouldPlay={!isFullscreenPaused}
+              isLooping
+              useNativeControls={false}
+            />
+          ) : (
+            <View style={styles.previewEmpty}>
+              <Text style={styles.previewEmptyText}>Sem sinal</Text>
+            </View>
+          )}
+
+          <View style={styles.fullscreenTopBar}>
+            <TouchableOpacity
+              style={styles.fullscreenBackBtn}
+              onPress={closeFullscreen}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.fullscreenBackText}>VOLTAR</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.fullscreenBottomBar}>
+            <TouchableOpacity
+              style={styles.fullscreenBtn}
+              onPress={goToPreviousChannel}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.fullscreenBtnText}>◀</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.fullscreenBtn}
+              onPress={togglePauseFullscreen}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.fullscreenBtnText}>
+                {isFullscreenPaused ? "PLAY" : "PAUSE"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.fullscreenBtn}
+              onPress={goToNextChannel}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.fullscreenBtnText}>▶</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.fullscreenBtn}
+              onPress={toggleFavorite}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.fullscreenBtnText}>
+                {isFavorite ? "★" : "☆"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -564,9 +750,9 @@ const styles = StyleSheet.create({
   },
 
   previewBox: {
-    width: isPhone ? 140 : 260,
-    height: isPhone ? 140 : 260,
-    borderRadius: 8,
+    width: isPhone ? 240 : 320,
+    height: isPhone ? 240 : 320,
+    borderRadius: 12,
     overflow: "hidden",
     backgroundColor: "#000",
     marginBottom: 10,
@@ -589,6 +775,58 @@ const styles = StyleSheet.create({
   previewEmptyText: {
     color: "#c8d4e2",
     fontSize: isPhone ? 9 : 12,
+  },
+
+  previewOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "space-between",
+    padding: 8,
+  },
+
+  previewTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-start",
+  },
+
+  previewBottomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "rgba(0,0,0,0.35)",
+    borderRadius: 10,
+    padding: 6,
+  },
+
+  overlayBtnTop: {
+    minWidth: isPhone ? 70 : 86,
+    height: isPhone ? 32 : 36,
+    borderRadius: 8,
+    backgroundColor: "rgba(16,24,63,0.88)",
+    borderWidth: 1,
+    borderColor: "#38d7ff",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+  },
+
+  overlayBtn: {
+    minWidth: isPhone ? 38 : 46,
+    height: isPhone ? 32 : 36,
+    borderRadius: 8,
+    backgroundColor: "rgba(16,24,63,0.88)",
+    borderWidth: 1,
+    borderColor: "#38d7ff",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+    marginHorizontal: 2,
+  },
+
+  overlayBtnText: {
+    color: "#38d7ff",
+    fontSize: isPhone ? 8 : 10,
+    fontWeight: "900",
   },
 
   infoCard: {
@@ -618,39 +856,71 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
 
-  favoriteBtnBig: {
-    height: isPhone ? 38 : 44,
+  fullscreenContainer: {
+    flex: 1,
+    backgroundColor: "#000",
+  },
+
+  fullscreenVideo: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#000",
+  },
+
+  fullscreenTopBar: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingTop: isPhone ? 18 : 24,
+    paddingHorizontal: 10,
+    paddingBottom: 8,
+    backgroundColor: "rgba(0,0,0,0.20)",
+  },
+
+  fullscreenBackBtn: {
+    alignSelf: "flex-start",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     borderRadius: 8,
-    marginTop: 10,
-    backgroundColor: "rgba(56,215,255,0.10)",
+    backgroundColor: "rgba(16,32,51,0.88)",
+  },
+
+  fullscreenBackText: {
+    color: "#38d7ff",
+    fontWeight: "900",
+    fontSize: 12,
+  },
+
+  fullscreenBottomBar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 14,
+    backgroundColor: "rgba(0,0,0,0.30)",
+  },
+
+  fullscreenBtn: {
+    minWidth: isPhone ? 58 : 74,
+    height: isPhone ? 34 : 38,
+    borderRadius: 8,
+    backgroundColor: "rgba(7,20,35,0.90)",
     borderWidth: 1,
     borderColor: "#38d7ff",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 10,
+    marginHorizontal: 4,
   },
 
-  favoriteBtnBigText: {
+  fullscreenBtnText: {
     color: "#38d7ff",
-    fontSize: isPhone ? 9 : 12,
-    fontWeight: "900",
-  },
-
-  reloadBtn: {
-    height: isPhone ? 38 : 44,
-    borderRadius: 8,
-    marginTop: 10,
-    backgroundColor: "rgba(255,224,79,0.10)",
-    borderWidth: 1,
-    borderColor: "#ffe24f",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 10,
-  },
-
-  reloadBtnText: {
-    color: "#ffe24f",
-    fontSize: isPhone ? 9 : 12,
+    fontSize: isPhone ? 8 : 10,
     fontWeight: "900",
   },
 });
