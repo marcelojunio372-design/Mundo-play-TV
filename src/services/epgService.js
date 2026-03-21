@@ -170,39 +170,10 @@ function extractProgrammes(xml = "", channelMap = {}) {
   return programmes;
 }
 
-function buildXmltvUrl(session = null) {
-  const server = safeText(session?.server);
-  const username = safeText(session?.username);
-  const password = safeText(session?.password);
-
-  if (server && username && password) {
-    return `${server.replace(/\/+$/, "")}/xmltv.php?username=${encodeURIComponent(
-      username
-    )}&password=${encodeURIComponent(password)}`;
-  }
-
-  const rawUrl = safeText(session?.url);
-  if (!rawUrl) return "";
-
+export async function loadEPG() {
   try {
-    const parsed = new URL(rawUrl);
-    const urlUsername = safeText(parsed.searchParams.get("username"));
-    const urlPassword = safeText(parsed.searchParams.get("password"));
-
-    if (urlUsername && urlPassword) {
-      return `${parsed.origin}/xmltv.php?username=${encodeURIComponent(
-        urlUsername
-      )}&password=${encodeURIComponent(urlPassword)}`;
-    }
-  } catch (e) {}
-
-  return "";
-}
-
-export async function loadEPG(session = null) {
-  try {
-    const url = buildXmltvUrl(session);
-    if (!url) return [];
+    const url =
+      "http://epics.zip/xmltv.php?username=Marcelo123&password=128518957";
 
     const response = await fetch(url);
     const xml = await response.text();
@@ -222,6 +193,26 @@ function itemTime(date) {
   return date instanceof Date ? date.getTime() : 0;
 }
 
+function aliasWords(text = "") {
+  const cleaned = cleanChannelName(text);
+  if (!cleaned) return [];
+  return cleaned.split(/\s+/).filter(Boolean);
+}
+
+function countWordOverlap(a = "", b = "") {
+  const aw = aliasWords(a);
+  const bw = aliasWords(b);
+
+  if (!aw.length || !bw.length) return 0;
+
+  let count = 0;
+  aw.forEach((word) => {
+    if (bw.includes(word)) count += 1;
+  });
+
+  return count;
+}
+
 function scoreProgrammeMatch(item, aliases = [], tvgId = "", tvgName = "") {
   const itemAliases = Array.isArray(item?.aliases)
     ? item.aliases
@@ -238,7 +229,7 @@ function scoreProgrammeMatch(item, aliases = [], tvgId = "", tvgName = "") {
       item.cleanChannelKey === normalizedTvgId ||
       itemAliases.includes(normalizedTvgId)
     ) {
-      score = Math.max(score, 1000);
+      score = Math.max(score, 1200);
     }
   }
 
@@ -248,7 +239,7 @@ function scoreProgrammeMatch(item, aliases = [], tvgId = "", tvgName = "") {
       item.channelKey === normalizedTvgName ||
       item.cleanChannelKey === normalizedTvgName
     ) {
-      score = Math.max(score, 920);
+      score = Math.max(score, 1100);
     }
   }
 
@@ -257,7 +248,7 @@ function scoreProgrammeMatch(item, aliases = [], tvgId = "", tvgName = "") {
       if (!channelAlias || !programAlias) continue;
 
       if (channelAlias === programAlias) {
-        score = Math.max(score, 820);
+        score = Math.max(score, 1000);
         continue;
       }
 
@@ -265,7 +256,7 @@ function scoreProgrammeMatch(item, aliases = [], tvgId = "", tvgName = "") {
         channelAlias.startsWith(programAlias) ||
         programAlias.startsWith(channelAlias)
       ) {
-        score = Math.max(score, 650);
+        score = Math.max(score, 800);
         continue;
       }
 
@@ -273,20 +264,18 @@ function scoreProgrammeMatch(item, aliases = [], tvgId = "", tvgName = "") {
         channelAlias.includes(programAlias) ||
         programAlias.includes(channelAlias)
       ) {
-        score = Math.max(score, 500);
+        score = Math.max(score, 650);
         continue;
       }
 
-      const channelShort = channelAlias.replace(/tv$/, "");
-      const programShort = programAlias.replace(/tv$/, "");
+      const overlap = countWordOverlap(channelAlias, programAlias);
 
-      if (
-        channelShort &&
-        programShort &&
-        (channelShort === programShort ||
-          channelShort.includes(programShort) ||
-          programShort.includes(channelShort))
-      ) {
+      if (overlap >= 2) {
+        score = Math.max(score, 520);
+        continue;
+      }
+
+      if (overlap >= 1) {
         score = Math.max(score, 380);
       }
     }
@@ -308,7 +297,9 @@ export function findNowAndNextForChannel(
     safeText(channelName),
     safeText(group),
     safeText(tvgId),
-    safeText(tvgName)
+    safeText(tvgName),
+    cleanChannelName(channelName),
+    cleanChannelName(tvgName)
   );
 
   if (!aliases.length || !epgItems?.length) {
@@ -320,7 +311,7 @@ export function findNowAndNextForChannel(
       ...item,
       _score: scoreProgrammeMatch(item, aliases, tvgId, tvgName),
     }))
-    .filter((item) => item._score >= 380)
+    .filter((item) => item._score >= 350)
     .sort((a, b) => {
       if (b._score !== a._score) return b._score - a._score;
       return itemTime(a.start) - itemTime(b.start);
@@ -333,18 +324,27 @@ export function findNowAndNextForChannel(
   const bestScore = scoredMatches[0]._score;
 
   const candidateMatches = scoredMatches.filter(
-    (item) => item._score >= Math.max(380, bestScore - 220)
+    (item) => item._score >= Math.max(350, bestScore - 300)
   );
 
   const orderedMatches = [...candidateMatches].sort(
     (a, b) => itemTime(a.start) - itemTime(b.start)
   );
 
-  const current =
+  let current =
     orderedMatches.find((item) => {
       if (!item.start || !item.stop) return false;
       return now >= item.start && now < item.stop;
     }) || null;
+
+  if (!current) {
+    current =
+      orderedMatches.find((item) => {
+        if (!item.start || !item.stop) return false;
+        const diff = Math.abs(now.getTime() - item.start.getTime());
+        return diff <= 60 * 60 * 1000;
+      }) || null;
+  }
 
   let nextProgram = null;
 
