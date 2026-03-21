@@ -46,7 +46,7 @@ export default function HomeScreen({
       {
         id: "fallback_home",
         name: "MUNDO PLAY TV",
-        description: "Conteúdo carregado com sucesso. Abra Live TV, Filmes ou Séries.",
+        description: "Abra Filmes ou Séries para atualizar o conteúdo desta lista.",
         logo: "",
         cover: "",
         backdrop: "",
@@ -89,8 +89,8 @@ export default function HomeScreen({
 
   const heroUri =
     item?.backdrop ||
-    item?.cover ||
     item?.fanart ||
+    item?.cover ||
     item?.poster ||
     item?.logo ||
     "";
@@ -161,7 +161,7 @@ export default function HomeScreen({
 
                 <View style={styles.button}>
                   <Text style={styles.buttonText}>
-                    {item?.id === "fallback_home" ? "CONTEÚDO PRONTO" : "TOQUE PARA ABRIR"}
+                    {item?.id === "fallback_home" ? "AGUARDANDO CONTEÚDO" : "TOQUE PARA ABRIR"}
                   </Text>
                 </View>
               </View>
@@ -245,13 +245,13 @@ const styles = StyleSheet.create({
   },
 
   heroImage: {
-    resizeMode: "cover",
-    opacity: 0.72,
+    resizeMode: "contain",
+    opacity: 0.78,
   },
 
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.48)",
+    backgroundColor: "rgba(0,0,0,0.50)",
   },
 
   heroContent: {

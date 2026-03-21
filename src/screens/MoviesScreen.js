@@ -119,10 +119,7 @@ export default function MoviesScreen({
 
     return baseMovies.filter((item) => {
       const name = safeText(item.name).toLowerCase();
-      const group = safeText(item.group).toLowerCase();
-      const year = safeText(item.year).toLowerCase();
-
-      return name.includes(term) || group.includes(term) || year.includes(term);
+      return name.includes(term);
     });
   }, [baseMovies, search]);
 

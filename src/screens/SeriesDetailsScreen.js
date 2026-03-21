@@ -9,6 +9,7 @@ import {
   Image,
   Dimensions,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -183,7 +184,7 @@ export default function SeriesDetailsScreen({ series, onBack, onOpenSeason }) {
           <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
 
-        <View style={styles.overlay}>
+        <ScrollView contentContainerStyle={styles.overlay}>
           <Image
             source={series.logo ? { uri: series.logo } : undefined}
             style={styles.poster}
@@ -221,15 +222,13 @@ export default function SeriesDetailsScreen({ series, onBack, onOpenSeason }) {
               </View>
             ) : null}
 
-            <Text style={styles.desc} numberOfLines={7}>
-              {description}
-            </Text>
+            <Text style={styles.desc}>{description}</Text>
 
             <Text style={styles.episodesInfo}>
               Temporadas: {seasons.length || 0} • Episódios: {totalEpisodes || 0}
             </Text>
           </View>
-        </View>
+        </ScrollView>
       </ImageBackground>
     </SafeAreaView>
   );
@@ -263,11 +262,12 @@ const styles = StyleSheet.create({
   },
 
   overlay: {
-    flex: 1,
+    flexGrow: 1,
     flexDirection: isPhone ? "column" : "row",
     alignItems: isPhone ? "flex-start" : "center",
     paddingHorizontal: isPhone ? 20 : 70,
-    paddingTop: isPhone ? 70 : 0,
+    paddingTop: isPhone ? 70 : 30,
+    paddingBottom: 30,
     backgroundColor: "rgba(10,8,16,0.58)",
   },
 

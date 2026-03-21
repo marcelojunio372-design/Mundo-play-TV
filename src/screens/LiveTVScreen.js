@@ -187,8 +187,7 @@ export default function LiveTVScreen({
 
     return baseChannels.filter((item) => {
       const name = safeText(item.name).toLowerCase();
-      const group = safeText(item.group).toLowerCase();
-      return name.includes(term) || group.includes(term);
+      return name.includes(term);
     });
   }, [baseChannels, search]);
 
@@ -1255,4 +1254,3 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
 });
-
