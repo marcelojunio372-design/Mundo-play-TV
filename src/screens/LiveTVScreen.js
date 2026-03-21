@@ -19,7 +19,7 @@ import {
   formatProgramTime,
 } from "../services/epgService";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 const isPhone = width < 900;
 
 const FAVORITES_KEY = "mundoplaytv_live_favorites";
@@ -56,6 +56,20 @@ function buildCategories(channels = [], favorites = [], recents = []) {
         items: groups[group],
       })),
   ];
+}
+
+function getProgressPercent(program) {
+  if (!program?.start || !program?.stop) return 0;
+
+  const now = Date.now();
+  const start = program.start.getTime();
+  const stop = program.stop.getTime();
+
+  if (stop <= start) return 0;
+  if (now <= start) return 0;
+  if (now >= stop) return 100;
+
+  return Math.max(0, Math.min(100, ((now - start) / (stop - start)) * 100));
 }
 
 export default function LiveTVScreen({
@@ -194,6 +208,8 @@ export default function LiveTVScreen({
       safeText(selectedChannel.tvgName || selectedChannel.name)
     );
   }, [epgItems, selectedChannel]);
+
+  const progressPercent = useMemo(() => getProgressPercent(nowProgram), [nowProgram]);
 
   const persistFavorites = async (ids) => {
     try {
@@ -352,9 +368,31 @@ export default function LiveTVScreen({
     );
   };
 
+  const epgRows = useMemo(() => {
+    const rows = [];
+
+    if (nowProgram) {
+      rows.push({
+        key: "now",
+        time: formatProgramTime(nowProgram),
+        title: nowProgram.title || "Programação atual",
+      });
+    }
+
+    if (nextProgram) {
+      rows.push({
+        key: "next",
+        time: formatProgramTime(nextProgram),
+        title: nextProgram.title || "Próximo programa",
+      });
+    }
+
+    return rows;
+  }, [nowProgram, nextProgram]);
+
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#090c18" />
+      <StatusBar barStyle="light-content" backgroundColor="#050814" />
 
       <View style={styles.topnav}>
         <TouchableOpacity onPress={onOpenHome}>
@@ -462,26 +500,42 @@ export default function LiveTVScreen({
               {safeText(selectedChannel?.name) || "Sem canal"}
             </Text>
 
-            <Text style={styles.epgTime}>
+            <Text style={styles.epgTimeMain}>
               {nowProgram ? formatProgramTime(nowProgram) : "Sem horário atual"}
             </Text>
 
-            <Text style={styles.epgCurrent} numberOfLines={2}>
+            <Text style={styles.epgCurrentMain} numberOfLines={2}>
               {nowProgram?.title ||
                 (epgLoading
                   ? "Carregando EPG..."
                   : "Programação atual não encontrada")}
             </Text>
 
-            <Text style={styles.epgNextLabel}>Próximo</Text>
+            <View style={styles.progressTrack}>
+              <View
+                style={[styles.progressFill, { width: `${progressPercent}%` }]}
+              />
+            </View>
 
-            <Text style={styles.epgNext} numberOfLines={2}>
-              {nextProgram?.title || "Sem próximo programa"}
-            </Text>
-
-            <Text style={styles.epgNextTime}>
-              {nextProgram ? formatProgramTime(nextProgram) : ""}
-            </Text>
+            <View style={styles.scheduleBox}>
+              {epgRows.length > 0 ? (
+                epgRows.map((item) => (
+                  <View key={item.key} style={styles.scheduleRow}>
+                    <Text style={styles.scheduleTime}>{item.time}</Text>
+                    <Text style={styles.scheduleTitle} numberOfLines={1}>
+                      {item.title}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.scheduleRow}>
+                  <Text style={styles.scheduleTime}>--:--</Text>
+                  <Text style={styles.scheduleTitle} numberOfLines={1}>
+                    Sem programação disponível
+                  </Text>
+                </View>
+              )}
+            </View>
 
             <View style={styles.buttonRow}>
               <TouchableOpacity
@@ -489,16 +543,16 @@ export default function LiveTVScreen({
                 onPress={openFullscreen}
                 activeOpacity={0.8}
               >
-                <Text style={styles.actionBtnText}>ABRIR</Text>
+                <Text style={styles.actionBtnText}>alcançar</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.actionBtn}
+                style={styles.actionBtnWide}
                 onPress={toggleFavorite}
                 activeOpacity={0.8}
               >
                 <Text style={styles.actionBtnText}>
-                  {isFavorite ? "FAVORITO ✓" : "FAVORITO"}
+                  {isFavorite ? "Adicionar aos favoritos ✓" : "Adicionar aos favoritos"}
                 </Text>
               </TouchableOpacity>
 
@@ -507,9 +561,7 @@ export default function LiveTVScreen({
                 onPress={togglePauseMain}
                 activeOpacity={0.8}
               >
-                <Text style={styles.actionBtnText}>
-                  {isPaused ? "PLAY" : "PAUSE"}
-                </Text>
+                <Text style={styles.actionBtnText}>procurar</Text>
               </TouchableOpacity>
             </View>
 
@@ -535,7 +587,7 @@ export default function LiveTVScreen({
                 onPress={onOpenHome}
                 activeOpacity={0.8}
               >
-                <Text style={styles.smallActionBtnText}>VOLTAR</Text>
+                <Text style={styles.smallActionBtnText}>voltar</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -555,7 +607,7 @@ export default function LiveTVScreen({
               ref={fullscreenVideoRef}
               source={{ uri: selectedChannel.url }}
               style={styles.fullscreenVideo}
-              resizeMode={ResizeMode.CONTAIN}
+              resizeMode={ResizeMode.COVER}
               shouldPlay={!isFullscreenPaused}
               isLooping
               useNativeControls={false}
@@ -566,52 +618,94 @@ export default function LiveTVScreen({
             </View>
           )}
 
-          <View style={styles.fullscreenTopBar}>
-            <TouchableOpacity
-              style={styles.fullscreenBackBtn}
-              onPress={closeFullscreen}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.fullscreenBackText}>VOLTAR</Text>
-            </TouchableOpacity>
-          </View>
+          <View style={styles.fullscreenOverlay}>
+            <View style={styles.fullscreenTopRow}>
+              <TouchableOpacity
+                style={styles.fullscreenIconBtn}
+                onPress={closeFullscreen}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.fullscreenIconText}>↩</Text>
+              </TouchableOpacity>
 
-          <View style={styles.fullscreenBottomBar}>
-            <TouchableOpacity
-              style={styles.fullscreenBtn}
-              onPress={goToPreviousChannel}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.fullscreenBtnText}>◀</Text>
-            </TouchableOpacity>
+              <View style={styles.fullscreenTopIcons}>
+                <TouchableOpacity
+                  style={styles.fullscreenIconBtn}
+                  onPress={toggleFavorite}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.fullscreenIconText}>
+                    {isFavorite ? "♥" : "♡"}
+                  </Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.fullscreenBtn}
-              onPress={togglePauseFullscreen}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.fullscreenBtnText}>
-                {isFullscreenPaused ? "PLAY" : "PAUSE"}
+                <TouchableOpacity
+                  style={styles.fullscreenIconBtn}
+                  onPress={togglePauseFullscreen}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.fullscreenIconText}>
+                    {isFullscreenPaused ? "▶" : "❚❚"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.fullscreenCenterControls}>
+              <TouchableOpacity
+                style={styles.fullscreenCenterBtn}
+                onPress={goToPreviousChannel}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.fullscreenCenterText}>◀◀</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.fullscreenCenterBtnPlay}
+                onPress={togglePauseFullscreen}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.fullscreenCenterText}>
+                  {isFullscreenPaused ? "▶" : "❚❚"}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.fullscreenCenterBtn}
+                onPress={goToNextChannel}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.fullscreenCenterText}>▶▶</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.fullscreenBottomInfo}>
+              <Text style={styles.fullscreenChannelText}>
+                {selectedChannelIndex + 1} {safeText(selectedChannel?.name) || "Sem canal"}
               </Text>
-            </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.fullscreenBtn}
-              onPress={goToNextChannel}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.fullscreenBtnText}>▶</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.fullscreenBtn}
-              onPress={toggleFavorite}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.fullscreenBtnText}>
-                {isFavorite ? "★" : "☆"}
+              <Text style={styles.fullscreenProgramText} numberOfLines={1}>
+                {nowProgram?.title || "Programação atual não encontrada"}
               </Text>
-            </TouchableOpacity>
+
+              <Text style={styles.fullscreenTimesText} numberOfLines={1}>
+                {nowProgram ? formatProgramTime(nowProgram) : "--:--"}{" "}
+                {nextProgram?.title ? `• ${nextProgram.title}` : ""}
+              </Text>
+
+              <View style={styles.fullscreenProgressTrack}>
+                <View
+                  style={[
+                    styles.fullscreenProgressFill,
+                    { width: `${progressPercent}%` },
+                  ]}
+                />
+              </View>
+
+              <View style={styles.fullscreenLiveBadge}>
+                <Text style={styles.fullscreenLiveBadgeText}>LIVE</Text>
+              </View>
+            </View>
           </View>
         </SafeAreaView>
       </Modal>
@@ -779,7 +873,7 @@ const styles = StyleSheet.create({
 
   previewBox: {
     width: "100%",
-    height: isPhone ? 145 : 250,
+    height: isPhone ? 160 : 255,
     borderRadius: 8,
     overflow: "hidden",
     backgroundColor: "#000",
@@ -807,7 +901,6 @@ const styles = StyleSheet.create({
   infoPanel: {
     flex: 1,
     backgroundColor: "#07112b",
-    paddingHorizontal: 2,
   },
 
   channelTitle: {
@@ -817,64 +910,100 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
-  epgTime: {
+  epgTimeMain: {
     color: "#f3df58",
     fontSize: isPhone ? 10 : 13,
     fontWeight: "800",
     marginBottom: 8,
   },
 
-  epgCurrent: {
+  epgCurrentMain: {
     color: "#ffffff",
     fontSize: isPhone ? 11 : 16,
+    marginBottom: 10,
+  },
+
+  progressTrack: {
+    width: "100%",
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    overflow: "hidden",
+    marginBottom: 12,
+  },
+
+  progressFill: {
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: "#29a3ff",
+  },
+
+  scheduleBox: {
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderRadius: 8,
+    paddingVertical: 6,
     marginBottom: 14,
   },
 
-  epgNextLabel: {
+  scheduleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+
+  scheduleTime: {
+    width: isPhone ? 82 : 120,
     color: "#f3df58",
-    fontSize: isPhone ? 10 : 13,
-    fontWeight: "900",
-    marginBottom: 4,
-  },
-
-  epgNext: {
-    color: "#ffffff",
-    fontSize: isPhone ? 10 : 14,
-    marginBottom: 4,
-  },
-
-  epgNextTime: {
-    color: "#cfd7e2",
     fontSize: isPhone ? 9 : 12,
-    marginBottom: 16,
+    fontWeight: "800",
+  },
+
+  scheduleTitle: {
+    flex: 1,
+    color: "#ffffff",
+    fontSize: isPhone ? 9 : 12,
   },
 
   buttonRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 8,
+    alignItems: "center",
+    marginTop: 2,
   },
 
   actionBtn: {
-    flex: 1,
-    minHeight: isPhone ? 34 : 42,
+    width: "24%",
+    minHeight: isPhone ? 36 : 46,
     borderRadius: 8,
-    backgroundColor: "#6f5aa3",
+    backgroundColor: "#7561a6",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 8,
+    paddingHorizontal: 6,
+  },
+
+  actionBtnWide: {
+    width: "48%",
+    minHeight: isPhone ? 36 : 46,
+    borderRadius: 8,
+    backgroundColor: "#7561a6",
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 8,
+    marginHorizontal: "2%",
   },
 
   actionBtnText: {
     color: "#fff",
-    fontSize: isPhone ? 9 : 12,
+    fontSize: isPhone ? 8.5 : 12,
     fontWeight: "900",
+    textAlign: "center",
   },
 
   smallButtonRow: {
     flexDirection: "row",
     marginTop: 10,
+    alignItems: "center",
   },
 
   smallActionBtn: {
@@ -903,59 +1032,125 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
   },
 
-  fullscreenTopBar: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
+  fullscreenOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "space-between",
     paddingTop: isPhone ? 18 : 24,
-    paddingHorizontal: 10,
-    paddingBottom: 8,
-    backgroundColor: "rgba(0,0,0,0.18)",
+    paddingBottom: isPhone ? 16 : 24,
+    paddingHorizontal: isPhone ? 10 : 16,
   },
 
-  fullscreenBackBtn: {
-    alignSelf: "flex-start",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: "rgba(20,26,45,0.90)",
+  fullscreenTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
 
-  fullscreenBackText: {
+  fullscreenTopIcons: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  fullscreenIconBtn: {
+    width: isPhone ? 40 : 48,
+    height: isPhone ? 40 : 48,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.28)",
+    marginLeft: 8,
+  },
+
+  fullscreenIconText: {
     color: "#fff",
+    fontSize: isPhone ? 18 : 22,
     fontWeight: "900",
-    fontSize: 12,
   },
 
-  fullscreenBottomBar: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
+  fullscreenCenterControls: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 10,
-    paddingTop: 10,
-    paddingBottom: 14,
-    backgroundColor: "rgba(0,0,0,0.30)",
+    marginTop: "auto",
+    marginBottom: 40,
   },
 
-  fullscreenBtn: {
-    minWidth: isPhone ? 58 : 74,
-    height: isPhone ? 34 : 38,
-    borderRadius: 8,
-    backgroundColor: "rgba(30,30,45,0.88)",
+  fullscreenCenterBtn: {
+    width: isPhone ? 56 : 70,
+    height: isPhone ? 56 : 70,
+    borderRadius: 28,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 10,
-    marginHorizontal: 4,
+    backgroundColor: "rgba(0,0,0,0.18)",
+    marginHorizontal: 18,
   },
 
-  fullscreenBtnText: {
+  fullscreenCenterBtnPlay: {
+    width: isPhone ? 72 : 88,
+    height: isPhone ? 72 : 88,
+    borderRadius: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.22)",
+    marginHorizontal: 18,
+  },
+
+  fullscreenCenterText: {
     color: "#fff",
-    fontSize: isPhone ? 8 : 10,
+    fontSize: isPhone ? 22 : 30,
+    fontWeight: "900",
+  },
+
+  fullscreenBottomInfo: {
+    width: "100%",
+    marginTop: "auto",
+  },
+
+  fullscreenChannelText: {
+    color: "#fff",
+    fontSize: isPhone ? 18 : 28,
+    fontWeight: "300",
+    marginBottom: 4,
+  },
+
+  fullscreenProgramText: {
+    color: "#f1f1f1",
+    fontSize: isPhone ? 10 : 14,
+    marginBottom: 4,
+  },
+
+  fullscreenTimesText: {
+    color: "#d7d7d7",
+    fontSize: isPhone ? 10 : 13,
+    marginBottom: 10,
+  },
+
+  fullscreenProgressTrack: {
+    width: "100%",
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    overflow: "hidden",
+    marginBottom: 10,
+  },
+
+  fullscreenProgressFill: {
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: "#1ea0ff",
+  },
+
+  fullscreenLiveBadge: {
+    alignSelf: "flex-end",
+    backgroundColor: "rgba(30,30,30,0.72)",
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+
+  fullscreenLiveBadgeText: {
+    color: "#ff4a4a",
+    fontSize: isPhone ? 10 : 13,
     fontWeight: "900",
   },
 });
