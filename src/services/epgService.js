@@ -3,19 +3,6 @@ let MEMORY_EPG_CACHE_TIME = 0;
 
 const EPG_CACHE_MS = 10 * 60 * 1000;
 
-export const EPG_DEBUG_STATE = {
-  xmltvUrl: "",
-  httpStatus: "",
-  startsWithTv: false,
-  rawPreview: "",
-  itemsParsed: 0,
-  errorText: "",
-};
-
-function setDebugState(patch = {}) {
-  Object.assign(EPG_DEBUG_STATE, patch);
-}
-
 function safeText(value) {
   if (value === null || value === undefined) return "";
   return String(value).trim();
@@ -213,31 +200,12 @@ export async function loadEPG(session = {}) {
     MEMORY_EPG_CACHE.length > 0 &&
     now - MEMORY_EPG_CACHE_TIME < EPG_CACHE_MS
   ) {
-    setDebugState({
-      errorText: "",
-      itemsParsed: MEMORY_EPG_CACHE.length,
-    });
     return MEMORY_EPG_CACHE;
   }
 
   try {
     const url = buildXmltvUrl(session);
-
-    setDebugState({
-      xmltvUrl: url || "",
-      httpStatus: "",
-      startsWithTv: false,
-      rawPreview: "",
-      itemsParsed: 0,
-      errorText: "",
-    });
-
-    if (!url) {
-      setDebugState({
-        errorText: "URL do XMLTV não pôde ser montada.",
-      });
-      return MEMORY_EPG_CACHE || [];
-    }
+    if (!url) return MEMORY_EPG_CACHE || [];
 
     const response = await fetch(url, {
       headers: {
@@ -248,46 +216,20 @@ export async function loadEPG(session = {}) {
     });
 
     const xml = await response.text();
-    const rawPreview = String(xml || "")
-      .slice(0, 600)
-      .replace(/\s+/g, " ")
-      .trim();
-
     const startsWithTv = String(xml || "").includes("<tv");
 
-    setDebugState({
-      httpStatus: `${response.status}`,
-      startsWithTv,
-      rawPreview,
-    });
-
     if (!response.ok || !xml || !startsWithTv) {
-      setDebugState({
-        errorText: "Resposta do XMLTV inválida ou não é XMLTV.",
-        itemsParsed: 0,
-      });
       return MEMORY_EPG_CACHE || [];
     }
 
     const channelMap = extractChannelMap(xml);
     const programmes = extractProgrammes(xml, channelMap);
 
-    MEMORY_EPG_CACHE = programmes;
+    MEMORY_EPG_CACHE = Array.isArray(programmes) ? programmes : [];
     MEMORY_EPG_CACHE_TIME = now;
 
-    setDebugState({
-      itemsParsed: programmes.length,
-      errorText: programmes.length
-        ? ""
-        : "XMLTV recebido, mas nenhum programme foi extraído.",
-    });
-
-    return programmes;
+    return MEMORY_EPG_CACHE;
   } catch (e) {
-    setDebugState({
-      errorText: safeText(e?.message) || "Erro ao buscar XMLTV.",
-      itemsParsed: 0,
-    });
     return MEMORY_EPG_CACHE || [];
   }
 }
