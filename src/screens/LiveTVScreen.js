@@ -19,7 +19,7 @@ import {
   formatProgramTime,
 } from "../services/epgService";
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 const isPhone = width < 900;
 
 const FAVORITES_KEY = "mundoplaytv_live_favorites";
@@ -93,6 +93,7 @@ export default function LiveTVScreen({
   const [showFullscreen, setShowFullscreen] = useState(false);
   const [epgItems, setEpgItems] = useState([]);
   const [epgLoading, setEpgLoading] = useState(false);
+  const [showPlayerUi, setShowPlayerUi] = useState(true);
 
   const videoRef = useRef(null);
   const fullscreenVideoRef = useRef(null);
@@ -193,6 +194,7 @@ export default function LiveTVScreen({
     setFullscreenKey((prev) => prev + 1);
     setIsPaused(false);
     setIsFullscreenPaused(false);
+    setShowPlayerUi(true);
   }, [selectedChannel?.url]);
 
   const { nowProgram, nextProgram } = useMemo(() => {
@@ -312,6 +314,10 @@ export default function LiveTVScreen({
       await fullscreenVideoRef.current?.stopAsync?.();
     } catch (e) {}
     setShowFullscreen(false);
+  };
+
+  const togglePlayerUi = () => {
+    setShowPlayerUi((prev) => !prev);
   };
 
   const renderCategoryRow = ({ item, index }) => {
@@ -474,8 +480,8 @@ export default function LiveTVScreen({
         <View style={styles.rightPanel}>
           <TouchableOpacity
             style={styles.previewBox}
-            activeOpacity={0.92}
-            onPress={openFullscreen}
+            activeOpacity={1}
+            onPress={togglePlayerUi}
           >
             {selectedChannel?.url ? (
               <Video
@@ -495,102 +501,106 @@ export default function LiveTVScreen({
             )}
           </TouchableOpacity>
 
-          <View style={styles.infoPanel}>
-            <Text style={styles.channelTitle}>
-              {safeText(selectedChannel?.name) || "Sem canal"}
-            </Text>
+          {showPlayerUi && (
+            <View style={styles.infoPanel}>
+              <Text style={styles.channelTitle}>
+                {safeText(selectedChannel?.name) || "Sem canal"}
+              </Text>
 
-            <Text style={styles.epgTimeMain}>
-              {nowProgram ? formatProgramTime(nowProgram) : "Sem horário atual"}
-            </Text>
+              <Text style={styles.epgTimeMain}>
+                {nowProgram ? formatProgramTime(nowProgram) : "Sem horário atual"}
+              </Text>
 
-            <Text style={styles.epgCurrentMain} numberOfLines={2}>
-              {nowProgram?.title ||
-                (epgLoading
-                  ? "Carregando EPG..."
-                  : "Programação atual não encontrada")}
-            </Text>
+              <Text style={styles.epgCurrentMain} numberOfLines={2}>
+                {nowProgram?.title ||
+                  (epgLoading
+                    ? "Carregando EPG..."
+                    : "Programação atual não encontrada")}
+              </Text>
 
-            <View style={styles.progressTrack}>
-              <View
-                style={[styles.progressFill, { width: `${progressPercent}%` }]}
-              />
-            </View>
+              <View style={styles.progressTrack}>
+                <View
+                  style={[styles.progressFill, { width: `${progressPercent}%` }]}
+                />
+              </View>
 
-            <View style={styles.scheduleBox}>
-              {epgRows.length > 0 ? (
-                epgRows.map((item) => (
-                  <View key={item.key} style={styles.scheduleRow}>
-                    <Text style={styles.scheduleTime}>{item.time}</Text>
+              <View style={styles.scheduleBox}>
+                {epgRows.length > 0 ? (
+                  epgRows.map((item) => (
+                    <View key={item.key} style={styles.scheduleRow}>
+                      <Text style={styles.scheduleTime}>{item.time}</Text>
+                      <Text style={styles.scheduleTitle} numberOfLines={1}>
+                        {item.title}
+                      </Text>
+                    </View>
+                  ))
+                ) : (
+                  <View style={styles.scheduleRow}>
+                    <Text style={styles.scheduleTime}>--:--</Text>
                     <Text style={styles.scheduleTitle} numberOfLines={1}>
-                      {item.title}
+                      Sem programação disponível
                     </Text>
                   </View>
-                ))
-              ) : (
-                <View style={styles.scheduleRow}>
-                  <Text style={styles.scheduleTime}>--:--</Text>
-                  <Text style={styles.scheduleTitle} numberOfLines={1}>
-                    Sem programação disponível
+                )}
+              </View>
+
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={goToPreviousChannel}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.actionBtnText}>◀</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={togglePauseMain}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.actionBtnText}>
+                    {isPaused ? "PLAY" : "PAUSE"}
                   </Text>
-                </View>
-              )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={goToNextChannel}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.actionBtnText}>▶</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={toggleFavorite}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.actionBtnText}>
+                    {isFavorite ? "★" : "☆"}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={openFullscreen}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.actionBtnText}>ABRIR</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.smallButtonRow}>
+                <TouchableOpacity
+                  style={styles.smallActionBtn}
+                  onPress={onOpenHome}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.smallActionBtnText}>voltar</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-
-            <View style={styles.buttonRow}>
-              <TouchableOpacity
-                style={styles.actionBtn}
-                onPress={openFullscreen}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.actionBtnText}>alcançar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.actionBtnWide}
-                onPress={toggleFavorite}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.actionBtnText}>
-                  {isFavorite ? "Adicionar aos favoritos ✓" : "Adicionar aos favoritos"}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.actionBtn}
-                onPress={togglePauseMain}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.actionBtnText}>procurar</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.smallButtonRow}>
-              <TouchableOpacity
-                style={styles.smallActionBtn}
-                onPress={goToPreviousChannel}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.smallActionBtnText}>◀</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.smallActionBtn}
-                onPress={goToNextChannel}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.smallActionBtnText}>▶</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.smallActionBtn}
-                onPress={onOpenHome}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.smallActionBtnText}>voltar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          )}
         </View>
       </View>
 
@@ -973,29 +983,18 @@ const styles = StyleSheet.create({
   },
 
   actionBtn: {
-    width: "24%",
+    width: "18.8%",
     minHeight: isPhone ? 36 : 46,
     borderRadius: 8,
     backgroundColor: "#7561a6",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 6,
-  },
-
-  actionBtnWide: {
-    width: "48%",
-    minHeight: isPhone ? 36 : 46,
-    borderRadius: 8,
-    backgroundColor: "#7561a6",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 8,
-    marginHorizontal: "2%",
+    paddingHorizontal: 4,
   },
 
   actionBtnText: {
     color: "#fff",
-    fontSize: isPhone ? 8.5 : 12,
+    fontSize: isPhone ? 8 : 11,
     fontWeight: "900",
     textAlign: "center",
   },
