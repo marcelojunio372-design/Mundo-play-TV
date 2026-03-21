@@ -93,7 +93,7 @@ export default function LiveTVScreen({
   const [showFullscreen, setShowFullscreen] = useState(false);
   const [epgItems, setEpgItems] = useState([]);
   const [epgLoading, setEpgLoading] = useState(false);
-  const [showBottomUi, setShowBottomUi] = useState(true);
+  const [showControls, setShowControls] = useState(true);
 
   const videoRef = useRef(null);
   const fullscreenVideoRef = useRef(null);
@@ -106,13 +106,8 @@ export default function LiveTVScreen({
           AsyncStorage.getItem(RECENTS_KEY),
         ]);
 
-        if (savedFavorites) {
-          setFavoriteIds(JSON.parse(savedFavorites));
-        }
-
-        if (savedRecents) {
-          setRecentIds(JSON.parse(savedRecents));
-        }
+        if (savedFavorites) setFavoriteIds(JSON.parse(savedFavorites));
+        if (savedRecents) setRecentIds(JSON.parse(savedRecents));
       } catch (e) {}
     }
 
@@ -130,13 +125,9 @@ export default function LiveTVScreen({
           setEpgItems(Array.isArray(items) ? items : []);
         }
       } catch (e) {
-        if (active) {
-          setEpgItems([]);
-        }
+        if (active) setEpgItems([]);
       } finally {
-        if (active) {
-          setEpgLoading(false);
-        }
+        if (active) setEpgLoading(false);
       }
     }
 
@@ -194,6 +185,7 @@ export default function LiveTVScreen({
     setFullscreenKey((prev) => prev + 1);
     setIsPaused(false);
     setIsFullscreenPaused(false);
+    setShowControls(true);
   }, [selectedChannel?.url]);
 
   const { nowProgram, nextProgram } = useMemo(() => {
@@ -211,6 +203,28 @@ export default function LiveTVScreen({
   }, [epgItems, selectedChannel]);
 
   const progressPercent = useMemo(() => getProgressPercent(nowProgram), [nowProgram]);
+
+  const epgRows = useMemo(() => {
+    const rows = [];
+
+    if (nowProgram) {
+      rows.push({
+        key: "now",
+        time: formatProgramTime(nowProgram),
+        title: nowProgram.title || "Programação atual",
+      });
+    }
+
+    if (nextProgram) {
+      rows.push({
+        key: "next",
+        time: formatProgramTime(nextProgram),
+        title: nextProgram.title || "Próximo programa",
+      });
+    }
+
+    return rows;
+  }, [nowProgram, nextProgram]);
 
   const persistFavorites = async (ids) => {
     try {
@@ -257,9 +271,7 @@ export default function LiveTVScreen({
   const handleSelectChannel = async (index) => {
     setSelectedChannelIndex(index);
     const item = visibleChannels[index];
-    if (item) {
-      await addToRecent(item);
-    }
+    if (item) await addToRecent(item);
   };
 
   const togglePauseMain = async () => {
@@ -315,8 +327,8 @@ export default function LiveTVScreen({
     setShowFullscreen(false);
   };
 
-  const toggleBottomUi = () => {
-    setShowBottomUi((prev) => !prev);
+  const toggleControls = () => {
+    setShowControls((prev) => !prev);
   };
 
   const renderCategoryRow = ({ item, index }) => {
@@ -372,28 +384,6 @@ export default function LiveTVScreen({
       </TouchableOpacity>
     );
   };
-
-  const epgRows = useMemo(() => {
-    const rows = [];
-
-    if (nowProgram) {
-      rows.push({
-        key: "now",
-        time: formatProgramTime(nowProgram),
-        title: nowProgram.title || "Programação atual",
-      });
-    }
-
-    if (nextProgram) {
-      rows.push({
-        key: "next",
-        time: formatProgramTime(nextProgram),
-        title: nextProgram.title || "Próximo programa",
-      });
-    }
-
-    return rows;
-  }, [nowProgram, nextProgram]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -480,7 +470,7 @@ export default function LiveTVScreen({
           <TouchableOpacity
             style={styles.previewBox}
             activeOpacity={1}
-            onPress={toggleBottomUi}
+            onPress={toggleControls}
           >
             {selectedChannel?.url ? (
               <Video
@@ -500,49 +490,8 @@ export default function LiveTVScreen({
             )}
           </TouchableOpacity>
 
-          {showBottomUi && (
-            <View style={styles.infoPanel}>
-              <Text style={styles.channelTitle}>
-                {safeText(selectedChannel?.name) || "Sem canal"}
-              </Text>
-
-              <Text style={styles.epgTimeMain}>
-                {nowProgram ? formatProgramTime(nowProgram) : "Sem horário atual"}
-              </Text>
-
-              <Text style={styles.epgCurrentMain} numberOfLines={2}>
-                {nowProgram?.title ||
-                  (epgLoading
-                    ? "Carregando EPG..."
-                    : "Programação atual não encontrada")}
-              </Text>
-
-              <View style={styles.progressTrack}>
-                <View
-                  style={[styles.progressFill, { width: `${progressPercent}%` }]}
-                />
-              </View>
-
-              <View style={styles.scheduleBox}>
-                {epgRows.length > 0 ? (
-                  epgRows.map((item) => (
-                    <View key={item.key} style={styles.scheduleRow}>
-                      <Text style={styles.scheduleTime}>{item.time}</Text>
-                      <Text style={styles.scheduleTitle} numberOfLines={1}>
-                        {item.title}
-                      </Text>
-                    </View>
-                  ))
-                ) : (
-                  <View style={styles.scheduleRow}>
-                    <Text style={styles.scheduleTime}>--:--</Text>
-                    <Text style={styles.scheduleTitle} numberOfLines={1}>
-                      Sem programação disponível
-                    </Text>
-                  </View>
-                )}
-              </View>
-
+          {showControls && (
+            <>
               <View style={styles.controlsRow}>
                 <TouchableOpacity
                   style={styles.controlBtn}
@@ -589,14 +538,57 @@ export default function LiveTVScreen({
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={styles.controlBtn}
+                  style={styles.controlBtnWide}
                   onPress={openFullscreen}
                   activeOpacity={0.8}
                 >
                   <Text style={styles.controlBtnText}>TELA CHEIA</Text>
                 </TouchableOpacity>
               </View>
-            </View>
+
+              <View style={styles.infoPanel}>
+                <Text style={styles.channelTitle}>
+                  {safeText(selectedChannel?.name) || "Sem canal"}
+                </Text>
+
+                <Text style={styles.epgTimeMain}>
+                  {nowProgram ? formatProgramTime(nowProgram) : "Sem horário atual"}
+                </Text>
+
+                <Text style={styles.epgCurrentMain} numberOfLines={2}>
+                  {nowProgram?.title ||
+                    (epgLoading
+                      ? "Carregando EPG..."
+                      : "Programação atual não encontrada")}
+                </Text>
+
+                <View style={styles.progressTrack}>
+                  <View
+                    style={[styles.progressFill, { width: `${progressPercent}%` }]}
+                  />
+                </View>
+
+                <View style={styles.scheduleBox}>
+                  {epgRows.length > 0 ? (
+                    epgRows.map((item) => (
+                      <View key={item.key} style={styles.scheduleRow}>
+                        <Text style={styles.scheduleTime}>{item.time}</Text>
+                        <Text style={styles.scheduleTitle} numberOfLines={1}>
+                          {item.title}
+                        </Text>
+                      </View>
+                    ))
+                  ) : (
+                    <View style={styles.scheduleRow}>
+                      <Text style={styles.scheduleTime}>--:--</Text>
+                      <Text style={styles.scheduleTitle} numberOfLines={1}>
+                        Sem programação disponível
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            </>
           )}
         </View>
       </View>
@@ -905,6 +897,40 @@ const styles = StyleSheet.create({
     fontSize: isPhone ? 9 : 12,
   },
 
+  controlsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+
+  controlBtn: {
+    width: "13.2%",
+    minHeight: isPhone ? 34 : 42,
+    borderRadius: 8,
+    backgroundColor: "#7561a6",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+
+  controlBtnWide: {
+    width: "25%",
+    minHeight: isPhone ? 34 : 42,
+    borderRadius: 8,
+    backgroundColor: "#7561a6",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+  },
+
+  controlBtnText: {
+    color: "#fff",
+    fontSize: isPhone ? 7 : 10,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+
   infoPanel: {
     flex: 1,
     backgroundColor: "#07112b",
@@ -970,32 +996,6 @@ const styles = StyleSheet.create({
     flex: 1,
     color: "#ffffff",
     fontSize: isPhone ? 9 : 12,
-  },
-
-  controlsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    flexWrap: "wrap",
-    marginTop: 2,
-  },
-
-  controlBtn: {
-    width: "15.8%",
-    minHeight: isPhone ? 36 : 46,
-    borderRadius: 8,
-    backgroundColor: "#7561a6",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 4,
-    marginBottom: 8,
-  },
-
-  controlBtnText: {
-    color: "#fff",
-    fontSize: isPhone ? 7.5 : 10,
-    fontWeight: "900",
-    textAlign: "center",
   },
 
   fullscreenContainer: {
