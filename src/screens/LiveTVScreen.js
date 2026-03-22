@@ -95,11 +95,12 @@ export default function LiveTVScreen({
   const [showFullscreenUi, setShowFullscreenUi] = useState(true);
   const [epgItems, setEpgItems] = useState([]);
   const [epgLoading, setEpgLoading] = useState(false);
-  const [epgReady, setEpgReady] = useState(false);
+  const [epgLoaded, setEpgLoaded] = useState(false);
 
   const videoRef = useRef(null);
   const fullscreenVideoRef = useRef(null);
   const fullscreenUiTimerRef = useRef(null);
+  const epgStartedRef = useRef(false);
 
   useEffect(() => {
     async function loadSavedData() {
@@ -109,13 +110,8 @@ export default function LiveTVScreen({
           AsyncStorage.getItem(RECENTS_KEY),
         ]);
 
-        if (savedFavorites) {
-          setFavoriteIds(JSON.parse(savedFavorites));
-        }
-
-        if (savedRecents) {
-          setRecentIds(JSON.parse(savedRecents));
-        }
+        if (savedFavorites) setFavoriteIds(JSON.parse(savedFavorites));
+        if (savedRecents) setRecentIds(JSON.parse(savedRecents));
       } catch (e) {}
     }
 
@@ -134,30 +130,29 @@ export default function LiveTVScreen({
     let active = true;
 
     async function fetchEpgData() {
+      if (epgStartedRef.current) return;
+      epgStartedRef.current = true;
+
       try {
         setEpgLoading(true);
-        setEpgReady(false);
-
         const items = await loadEPG(session);
 
         if (!active) return;
-
         setEpgItems(Array.isArray(items) ? items : []);
-        setEpgReady(true);
       } catch (e) {
         if (!active) return;
         setEpgItems([]);
-        setEpgReady(true);
       } finally {
         if (active) {
           setEpgLoading(false);
+          setEpgLoaded(true);
         }
       }
     }
 
     const timer = setTimeout(() => {
       fetchEpgData();
-    }, 400);
+    }, 1500);
 
     return () => {
       active = false;
@@ -215,7 +210,7 @@ export default function LiveTVScreen({
   }, [selectedChannel?.url]);
 
   const { nowProgram, nextProgram } = useMemo(() => {
-    if (!selectedChannel || !epgReady || !epgItems.length) {
+    if (!selectedChannel || !epgItems.length) {
       return { nowProgram: null, nextProgram: null };
     }
 
@@ -226,12 +221,9 @@ export default function LiveTVScreen({
       safeText(selectedChannel.tvgId),
       safeText(selectedChannel.tvgName || selectedChannel.name)
     );
-  }, [epgItems, epgReady, selectedChannel]);
+  }, [epgItems, selectedChannel]);
 
-  const progressPercent = useMemo(
-    () => getProgressPercent(nowProgram),
-    [nowProgram]
-  );
+  const progressPercent = useMemo(() => getProgressPercent(nowProgram), [nowProgram]);
 
   const persistFavorites = async (ids) => {
     try {
@@ -279,9 +271,7 @@ export default function LiveTVScreen({
   const handleSelectChannel = (index) => {
     setSelectedChannelIndex(index);
     const item = visibleChannels[index];
-    if (item) {
-      addToRecent(item);
-    }
+    if (item) addToRecent(item);
   };
 
   const togglePauseFullscreen = async () => {
@@ -373,9 +363,7 @@ export default function LiveTVScreen({
           {item.name}
         </Text>
 
-        <Text
-          style={[styles.categoryCount, active && styles.categoryTextActive]}
-        >
+        <Text style={[styles.categoryCount, active && styles.categoryTextActive]}>
           {item.items.length}
         </Text>
       </TouchableOpacity>
@@ -411,8 +399,8 @@ export default function LiveTVScreen({
     );
   };
 
-  const epgMainText = epgLoading
-    ? "Carregando EPG..."
+  const epgStatusText = epgLoading
+    ? "Carregando guia..."
     : nowProgram?.title || "Programação atual não encontrada";
 
   return (
@@ -530,7 +518,7 @@ export default function LiveTVScreen({
             </Text>
 
             <Text style={styles.epgCurrentMain} numberOfLines={2}>
-              {epgMainText}
+              {epgStatusText}
             </Text>
 
             <View style={styles.progressTrack}>
@@ -556,6 +544,15 @@ export default function LiveTVScreen({
                   </Text>
                   <Text style={styles.scheduleTitle} numberOfLines={1}>
                     {nextProgram.title || "Próximo programa"}
+                  </Text>
+                </View>
+              )}
+
+              {!nextProgram && epgLoaded && (
+                <View style={styles.scheduleRow}>
+                  <Text style={styles.scheduleTime}>--:--</Text>
+                  <Text style={styles.scheduleTitle} numberOfLines={1}>
+                    Sem programação seguinte
                   </Text>
                 </View>
               )}
