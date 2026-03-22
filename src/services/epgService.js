@@ -23,7 +23,7 @@ function parseXmltvDate(value = "") {
   if (!raw) return null;
 
   const match = raw.match(
-    /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\s*([+\-]\d{4})?$/
+    /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(?:\s*([+\-]\d{4}))?$/
   );
 
   if (!match) return null;
@@ -44,7 +44,7 @@ function normalizeText(value = "") {
     .toLowerCase()
     .replace(/\b(hd|fhd|sd|uhd|4k|fullhd|h265|hevc)\b/g, "")
     .replace(/\b(tv|tvc|canal|channel)\b/g, "")
-    .replace(/\b(brasil|br|sudeste|sul|norte|nordeste|centrooeste|centrooeste|centro-oeste)\b/g, "")
+    .replace(/\b(brasil|br|sudeste|sul|norte|nordeste|centrooeste|centro-oeste)\b/g, "")
     .replace(/\b(local|interior|regional)\b/g, "")
     .replace(/[^a-z0-9]/g, "");
 }
@@ -54,10 +54,10 @@ function cleanChannelName(name = "") {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .replace(/\b(hd|fhd|sd|uhd|4k|fullhd|h265|hevc)\b/gi, "")
-    .replace(/\b(tv|tvc|canal|channel)\b/gi, "")
-    .replace(/\b(brasil|br|sudeste|sul|norte|nordeste|centrooeste|centrooeste|centro-oeste)\b/gi, "")
-    .replace(/\b(local|interior|regional)\b/gi, "")
+    .replace(/\b(hd|fhd|sd|uhd|4k|fullhd|h265|hevc)\b/g, "")
+    .replace(/\b(tv|tvc|canal|channel)\b/g, "")
+    .replace(/\b(brasil|br|sudeste|sul|norte|nordeste|centrooeste|centro-oeste)\b/g, "")
+    .replace(/\b(local|interior|regional)\b/g, "")
     .replace(/[|[\]()/\\\-_.:,]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -108,16 +108,35 @@ function buildAliases(name = "", tvgId = "", tvgName = "", displayNames = []) {
   return unique(raw.map((item) => normalizeText(item)).filter(Boolean));
 }
 
+function getAttrValue(attrs = "", attrName = "") {
+  if (!attrs || !attrName) return "";
+
+  const doubleQuoted = attrs.match(
+    new RegExp(`${attrName}\\s*=\\s*"([^"]*)"`, "i")
+  );
+  if (doubleQuoted?.[1]) return decodeXml(doubleQuoted[1]).trim();
+
+  const singleQuoted = attrs.match(
+    new RegExp(`${attrName}\\s*=\\s*'([^']*)'`, "i")
+  );
+  if (singleQuoted?.[1]) return decodeXml(singleQuoted[1]).trim();
+
+  return "";
+}
+
 function extractChannelMap(xml = "") {
   const channelMap = {};
-  const regex = /<channel\s+id="([^"]+)"[^>]*>([\s\S]*?)<\/channel>/gi;
+  const regex = /<channel\b([^>]*)>([\s\S]*?)<\/channel>/gi;
 
   let match;
 
   while ((match = regex.exec(xml))) {
-    const channelId = decodeXml(match[1] || "").trim();
+    const attrs = match[1] || "";
     const body = match[2] || "";
+    const channelId = getAttrValue(attrs, "id");
     const displayNames = extractTags(body, "display-name");
+
+    if (!channelId) continue;
 
     channelMap[channelId] = {
       id: channelId,
@@ -131,16 +150,19 @@ function extractChannelMap(xml = "") {
 
 function extractProgrammes(xml = "", channelMap = {}) {
   const programmes = [];
-  const regex =
-    /<programme\s+start="([^"]+)"\s+stop="([^"]+)"\s+channel="([^"]+)"[^>]*>([\s\S]*?)<\/programme>/gi;
+  const regex = /<programme\b([^>]*)>([\s\S]*?)<\/programme>/gi;
 
   let match;
 
   while ((match = regex.exec(xml))) {
-    const start = parseXmltvDate(match[1]);
-    const stop = parseXmltvDate(match[2]);
-    const channelId = decodeXml(match[3] || "").trim();
-    const body = match[4] || "";
+    const attrs = match[1] || "";
+    const body = match[2] || "";
+
+    const start = parseXmltvDate(getAttrValue(attrs, "start"));
+    const stop = parseXmltvDate(getAttrValue(attrs, "stop"));
+    const channelId = getAttrValue(attrs, "channel");
+
+    if (!channelId) continue;
 
     const title = extractTag(body, "title");
     const desc = extractTag(body, "desc");
@@ -196,7 +218,11 @@ function buildXmltvUrlFromSession(session) {
     )}&password=${encodeURIComponent(password)}`;
   }
 
-  const sessionUrl = safeText(session?.url);
+  const sessionUrl =
+    safeText(session?.url) ||
+    safeText(session?.playlistUrl) ||
+    safeText(session?.data?.url) ||
+    safeText(session?.data?.playlistUrl);
 
   if (sessionUrl) {
     try {
@@ -212,7 +238,7 @@ function buildXmltvUrlFromSession(session) {
     } catch (e) {}
   }
 
-  return "http://epics.zip/xmltv.php?username=Marcelo123&password=128518957";
+  return "";
 }
 
 export async function loadEPG(session) {
@@ -228,6 +254,7 @@ export async function loadEPG(session) {
 
   try {
     const url = buildXmltvUrlFromSession(session);
+    if (!url) return [];
 
     const response = await fetch(url, {
       method: "GET",
