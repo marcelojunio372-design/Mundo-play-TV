@@ -17,6 +17,7 @@ import {
   loadEPG,
   findNowAndNextForChannel,
   formatProgramTime,
+  getEPGDebugInfo,
 } from "../services/epgService";
 
 const { width } = Dimensions.get("window");
@@ -96,6 +97,14 @@ export default function LiveTVScreen({
   const [epgItems, setEpgItems] = useState([]);
   const [epgLoading, setEpgLoading] = useState(false);
   const [epgLoaded, setEpgLoaded] = useState(false);
+  const [epgDebug, setEpgDebug] = useState({
+    url: "",
+    loaded: false,
+    error: "",
+    xmlOk: false,
+    channelCount: 0,
+    programmeCount: 0,
+  });
 
   const videoRef = useRef(null);
   const fullscreenVideoRef = useRef(null);
@@ -138,14 +147,18 @@ export default function LiveTVScreen({
         const items = await loadEPG(session);
 
         if (!active) return;
+
         setEpgItems(Array.isArray(items) ? items : []);
+        setEpgDebug(getEPGDebugInfo());
       } catch (e) {
         if (!active) return;
         setEpgItems([]);
+        setEpgDebug(getEPGDebugInfo());
       } finally {
         if (active) {
           setEpgLoading(false);
           setEpgLoaded(true);
+          setEpgDebug(getEPGDebugInfo());
         }
       }
     }
@@ -557,6 +570,50 @@ export default function LiveTVScreen({
                 </View>
               )}
             </View>
+
+            <View style={styles.debugBox}>
+              <Text style={styles.debugTitle}>DIAGNÓSTICO EPG</Text>
+
+              <Text style={styles.debugText} numberOfLines={2}>
+                URL: {safeText(epgDebug.url) || "vazia"}
+              </Text>
+
+              <Text style={styles.debugText}>
+                Carregado: {epgDebug.loaded ? "SIM" : "NÃO"}
+              </Text>
+
+              <Text style={styles.debugText}>
+                XML válido: {epgDebug.xmlOk ? "SIM" : "NÃO"}
+              </Text>
+
+              <Text style={styles.debugText}>
+                Canais XML: {epgDebug.channelCount || 0}
+              </Text>
+
+              <Text style={styles.debugText}>
+                Programas XML: {epgDebug.programmeCount || 0}
+              </Text>
+
+              <Text style={styles.debugText}>
+                Itens no app: {Array.isArray(epgItems) ? epgItems.length : 0}
+              </Text>
+
+              <Text style={styles.debugText}>
+                Canal atual: {safeText(selectedChannel?.name) || "-"}
+              </Text>
+
+              <Text style={styles.debugText}>
+                tvgId: {safeText(selectedChannel?.tvgId) || "-"}
+              </Text>
+
+              <Text style={styles.debugText}>
+                tvgName: {safeText(selectedChannel?.tvgName) || "-"}
+              </Text>
+
+              <Text style={styles.debugText} numberOfLines={2}>
+                Erro: {safeText(epgDebug.error) || "nenhum"}
+              </Text>
+            </View>
           </View>
         </View>
       </View>
@@ -937,6 +994,28 @@ const styles = StyleSheet.create({
     flex: 1,
     color: "#ffffff",
     fontSize: isPhone ? 9 : 12,
+  },
+
+  debugBox: {
+    marginTop: 8,
+    backgroundColor: "rgba(0,0,0,0.22)",
+    borderWidth: 1,
+    borderColor: "rgba(243,223,88,0.20)",
+    borderRadius: 8,
+    padding: 8,
+  },
+
+  debugTitle: {
+    color: "#f3df58",
+    fontSize: isPhone ? 9 : 12,
+    fontWeight: "900",
+    marginBottom: 6,
+  },
+
+  debugText: {
+    color: "#dce6f2",
+    fontSize: isPhone ? 7 : 10,
+    marginBottom: 4,
   },
 
   fullscreenContainer: {
