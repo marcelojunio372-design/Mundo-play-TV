@@ -33,15 +33,6 @@ function safeText(value) {
   return String(value).trim();
 }
 
-function normalizeSimple(value = "") {
-  return String(value || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/\b(hd|fhd|sd|uhd|4k|fullhd|tv|tvc|canal|channel|brasil|br)\b/g, "")
-    .replace(/[^a-z0-9]/g, "");
-}
-
 function buildCategories(channels = [], favorites = [], recents = []) {
   const groups = {};
 
@@ -104,6 +95,7 @@ export default function LiveTVScreen({
   const [showFullscreenUi, setShowFullscreenUi] = useState(true);
   const [epgItems, setEpgItems] = useState([]);
   const [epgLoading, setEpgLoading] = useState(false);
+  const [epgReady, setEpgReady] = useState(false);
 
   const videoRef = useRef(null);
   const fullscreenVideoRef = useRef(null);
@@ -144,15 +136,18 @@ export default function LiveTVScreen({
     async function fetchEpgData() {
       try {
         setEpgLoading(true);
+        setEpgReady(false);
+
         const items = await loadEPG(session);
 
-        if (active) {
-          setEpgItems(Array.isArray(items) ? items : []);
-        }
+        if (!active) return;
+
+        setEpgItems(Array.isArray(items) ? items : []);
+        setEpgReady(true);
       } catch (e) {
-        if (active) {
-          setEpgItems([]);
-        }
+        if (!active) return;
+        setEpgItems([]);
+        setEpgReady(true);
       } finally {
         if (active) {
           setEpgLoading(false);
@@ -160,10 +155,13 @@ export default function LiveTVScreen({
       }
     }
 
-    fetchEpgData();
+    const timer = setTimeout(() => {
+      fetchEpgData();
+    }, 400);
 
     return () => {
       active = false;
+      clearTimeout(timer);
     };
   }, [session]);
 
@@ -217,7 +215,7 @@ export default function LiveTVScreen({
   }, [selectedChannel?.url]);
 
   const { nowProgram, nextProgram } = useMemo(() => {
-    if (!selectedChannel) {
+    if (!selectedChannel || !epgReady || !epgItems.length) {
       return { nowProgram: null, nextProgram: null };
     }
 
@@ -228,51 +226,12 @@ export default function LiveTVScreen({
       safeText(selectedChannel.tvgId),
       safeText(selectedChannel.tvgName || selectedChannel.name)
     );
-  }, [epgItems, selectedChannel]);
+  }, [epgItems, epgReady, selectedChannel]);
 
   const progressPercent = useMemo(
     () => getProgressPercent(nowProgram),
     [nowProgram]
   );
-
-  const diagnosticMatches = useMemo(() => {
-    const selectedName = safeText(selectedChannel?.name);
-    const selectedTvgId = safeText(selectedChannel?.tvgId);
-    const selectedTvgName = safeText(selectedChannel?.tvgName);
-
-    const selectedAliases = [
-      normalizeSimple(selectedName),
-      normalizeSimple(selectedTvgId),
-      normalizeSimple(selectedTvgName),
-    ].filter(Boolean);
-
-    if (!selectedAliases.length || !Array.isArray(epgItems) || !epgItems.length) {
-      return [];
-    }
-
-    return epgItems.filter((item) => {
-      const aliases = Array.isArray(item.aliases) ? item.aliases : [];
-      return aliases.some((alias) =>
-        selectedAliases.some(
-          (target) => alias === target || alias.includes(target) || target.includes(alias)
-        )
-      );
-    });
-  }, [epgItems, selectedChannel]);
-
-  const diagnosticSample = useMemo(() => {
-    return diagnosticMatches
-      .slice(0, 3)
-      .map((item) => {
-        const name =
-          safeText(item?.displayNames?.[0]) ||
-          safeText(item?.channel) ||
-          "sem nome";
-        const title = safeText(item?.title) || "sem título";
-        return `${name} | ${title}`;
-      })
-      .join(" || ");
-  }, [diagnosticMatches]);
 
   const persistFavorites = async (ids) => {
     try {
@@ -317,11 +276,11 @@ export default function LiveTVScreen({
     setSearch("");
   };
 
-  const handleSelectChannel = async (index) => {
+  const handleSelectChannel = (index) => {
     setSelectedChannelIndex(index);
     const item = visibleChannels[index];
     if (item) {
-      await addToRecent(item);
+      addToRecent(item);
     }
   };
 
@@ -338,19 +297,19 @@ export default function LiveTVScreen({
     } catch (e) {}
   };
 
-  const goToPreviousChannel = async () => {
+  const goToPreviousChannel = () => {
     if (!visibleChannels.length) return;
     const nextIndex =
       selectedChannelIndex <= 0 ? visibleChannels.length - 1 : selectedChannelIndex - 1;
-    await handleSelectChannel(nextIndex);
+    handleSelectChannel(nextIndex);
     showFullscreenControls();
   };
 
-  const goToNextChannel = async () => {
+  const goToNextChannel = () => {
     if (!visibleChannels.length) return;
     const nextIndex =
       selectedChannelIndex >= visibleChannels.length - 1 ? 0 : selectedChannelIndex + 1;
-    await handleSelectChannel(nextIndex);
+    handleSelectChannel(nextIndex);
     showFullscreenControls();
   };
 
@@ -379,7 +338,7 @@ export default function LiveTVScreen({
 
   const openFullscreen = async () => {
     if (!selectedChannel?.url) return;
-    await addToRecent(selectedChannel);
+    addToRecent(selectedChannel);
     setFullscreenKey((prev) => prev + 1);
     setIsFullscreenPaused(false);
     setShowFullscreen(true);
@@ -451,6 +410,10 @@ export default function LiveTVScreen({
       </TouchableOpacity>
     );
   };
+
+  const epgMainText = epgLoading
+    ? "Carregando EPG..."
+    : nowProgram?.title || "Programação atual não encontrada";
 
   return (
     <SafeAreaView style={styles.container}>
@@ -567,10 +530,7 @@ export default function LiveTVScreen({
             </Text>
 
             <Text style={styles.epgCurrentMain} numberOfLines={2}>
-              {nowProgram?.title ||
-                (epgLoading
-                  ? "Carregando EPG..."
-                  : "Programação atual não encontrada")}
+              {epgMainText}
             </Text>
 
             <View style={styles.progressTrack}>
@@ -599,40 +559,6 @@ export default function LiveTVScreen({
                   </Text>
                 </View>
               )}
-            </View>
-
-            <View style={styles.debugBox}>
-              <Text style={styles.debugTitle}>TESTE VISÍVEL EPG</Text>
-              <Text style={styles.debugText}>
-                EPG carregado: {epgLoading ? "carregando" : "sim"}
-              </Text>
-              <Text style={styles.debugText}>
-                Quantidade de itens EPG: {Array.isArray(epgItems) ? epgItems.length : 0}
-              </Text>
-              <Text style={styles.debugText}>
-                Canal: {safeText(selectedChannel?.name) || "-"}
-              </Text>
-              <Text style={styles.debugText}>
-                Grupo: {safeText(selectedChannel?.group) || "-"}
-              </Text>
-              <Text style={styles.debugText}>
-                tvgId: {safeText(selectedChannel?.tvgId) || "-"}
-              </Text>
-              <Text style={styles.debugText}>
-                tvgName: {safeText(selectedChannel?.tvgName) || "-"}
-              </Text>
-              <Text style={styles.debugText}>
-                Achou agora: {nowProgram ? "SIM" : "NÃO"}
-              </Text>
-              <Text style={styles.debugText}>
-                Achou próximo: {nextProgram ? "SIM" : "NÃO"}
-              </Text>
-              <Text style={styles.debugText}>
-                Itens parecidos encontrados: {diagnosticMatches.length}
-              </Text>
-              <Text style={styles.debugText} numberOfLines={3}>
-                Amostra XML: {diagnosticSample || "-"}
-              </Text>
             </View>
           </View>
         </View>
@@ -1014,27 +940,6 @@ const styles = StyleSheet.create({
     flex: 1,
     color: "#ffffff",
     fontSize: isPhone ? 9 : 12,
-  },
-
-  debugBox: {
-    backgroundColor: "rgba(0,0,0,0.22)",
-    borderWidth: 1,
-    borderColor: "rgba(41,163,255,0.35)",
-    borderRadius: 8,
-    padding: 8,
-  },
-
-  debugTitle: {
-    color: "#38d7ff",
-    fontSize: isPhone ? 10 : 12,
-    fontWeight: "900",
-    marginBottom: 6,
-  },
-
-  debugText: {
-    color: "#dbe7f3",
-    fontSize: isPhone ? 8 : 10,
-    marginBottom: 3,
   },
 
   fullscreenContainer: {

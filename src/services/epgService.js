@@ -1,7 +1,11 @@
 let MEMORY_EPG_CACHE = [];
 let MEMORY_EPG_CACHE_TIME = 0;
+let MEMORY_EPG_INDEX = new Map();
 
 const EPG_CACHE_MS = 10 * 60 * 1000;
+const EPG_PAST_WINDOW_MS = 6 * 60 * 60 * 1000;
+const EPG_FUTURE_WINDOW_MS = 36 * 60 * 60 * 1000;
+const FETCH_TIMEOUT_MS = 20000;
 
 function safeText(value) {
   if (value === null || value === undefined) return "";
@@ -148,6 +152,18 @@ function extractChannelMap(xml = "") {
   return channelMap;
 }
 
+function shouldKeepProgramme(start, stop) {
+  const now = Date.now();
+  const startTime = start instanceof Date ? start.getTime() : 0;
+  const stopTime = stop instanceof Date ? stop.getTime() : 0;
+
+  if (!startTime || !stopTime) return false;
+  if (stopTime < now - EPG_PAST_WINDOW_MS) return false;
+  if (startTime > now + EPG_FUTURE_WINDOW_MS) return false;
+
+  return true;
+}
+
 function extractProgrammes(xml = "", channelMap = {}) {
   const programmes = [];
   const regex = /<programme\b([^>]*)>([\s\S]*?)<\/programme>/gi;
@@ -163,6 +179,7 @@ function extractProgrammes(xml = "", channelMap = {}) {
     const channelId = getAttrValue(attrs, "channel");
 
     if (!channelId) continue;
+    if (!shouldKeepProgramme(start, stop)) continue;
 
     const title = extractTag(body, "title");
     const desc = extractTag(body, "desc");
@@ -241,6 +258,63 @@ function buildXmltvUrlFromSession(session) {
   return "";
 }
 
+async function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function buildIndex(programmes = []) {
+  const index = new Map();
+
+  programmes.forEach((item) => {
+    const aliases = Array.isArray(item.aliases) ? item.aliases : [];
+    aliases.forEach((alias) => {
+      if (!alias) return;
+      if (!index.has(alias)) index.set(alias, []);
+      index.get(alias).push(item);
+    });
+  });
+
+  for (const [key, list] of index.entries()) {
+    list.sort((a, b) => itemTime(a.start) - itemTime(b.start));
+    index.set(key, uniqueProgrammes(list));
+  }
+
+  return index;
+}
+
+function uniqueProgrammes(items = []) {
+  const seen = new Set();
+  const out = [];
+
+  items.forEach((item) => {
+    const key = [
+      safeText(item.channel),
+      item.start instanceof Date ? item.start.getTime() : 0,
+      item.stop instanceof Date ? item.stop.getTime() : 0,
+      safeText(item.title),
+    ].join("|");
+
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(item);
+  });
+
+  return out;
+}
+
 export async function loadEPG(session) {
   const now = Date.now();
 
@@ -256,13 +330,17 @@ export async function loadEPG(session) {
     const url = buildXmltvUrlFromSession(session);
     if (!url) return [];
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Accept: "application/xml,text/xml,*/*",
-        "Cache-Control": "no-cache",
+    const response = await fetchWithTimeout(
+      url,
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/xml,text/xml,*/*",
+          "Cache-Control": "no-cache",
+        },
       },
-    });
+      FETCH_TIMEOUT_MS
+    );
 
     const xml = await response.text();
 
@@ -275,6 +353,7 @@ export async function loadEPG(session) {
 
     MEMORY_EPG_CACHE = Array.isArray(programmes) ? programmes : [];
     MEMORY_EPG_CACHE_TIME = now;
+    MEMORY_EPG_INDEX = buildIndex(MEMORY_EPG_CACHE);
 
     return MEMORY_EPG_CACHE;
   } catch (e) {
@@ -326,6 +405,19 @@ function getWordOverlapScore(channelName = "", compareList = []) {
   return best;
 }
 
+function collectIndexedCandidates(targetAliases = []) {
+  const collected = [];
+
+  targetAliases.forEach((alias) => {
+    const list = MEMORY_EPG_INDEX.get(alias);
+    if (Array.isArray(list) && list.length) {
+      collected.push(...list);
+    }
+  });
+
+  return uniqueProgrammes(collected);
+}
+
 export function findNowAndNextForChannel(
   epgItems = [],
   channelName = "",
@@ -334,16 +426,19 @@ export function findNowAndNextForChannel(
   tvgName = ""
 ) {
   const now = new Date();
-
   const aliases = buildAliases(channelName, tvgId, tvgName);
 
   if (!aliases.length || !Array.isArray(epgItems) || !epgItems.length) {
     return { nowProgram: null, nextProgram: null };
   }
 
-  let matched = epgItems.filter((item) =>
-    aliasesMatchStrong(item.aliases || [], aliases)
-  );
+  let matched = collectIndexedCandidates(aliases);
+
+  if (!matched.length) {
+    matched = epgItems.filter((item) =>
+      aliasesMatchStrong(item.aliases || [], aliases)
+    );
+  }
 
   if (!matched.length) {
     matched = epgItems.filter((item) =>
