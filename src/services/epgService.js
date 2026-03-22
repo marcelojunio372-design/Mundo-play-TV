@@ -1,18 +1,11 @@
 let MEMORY_EPG_CACHE = [];
 let MEMORY_EPG_CACHE_TIME = 0;
 let MEMORY_EPG_INDEX = new Map();
-let MEMORY_EPG_DEBUG = {
-  url: "",
-  loaded: false,
-  error: "",
-  xmlOk: false,
-  channelCount: 0,
-  programmeCount: 0,
-};
+let MEMORY_EPG_LOADING_PROMISE = null;
 
 const EPG_CACHE_MS = 10 * 60 * 1000;
-const FETCH_TIMEOUT_MS = 8000;
-const MAX_PROGRAMMES_PER_ALIAS = 12;
+const FETCH_TIMEOUT_MS = 6000;
+const MAX_PROGRAMMES_PER_ALIAS = 20;
 
 function safeText(value) {
   if (value === null || value === undefined) return "";
@@ -166,8 +159,8 @@ function shouldKeepProgramme(start, stop) {
 
   if (!startTime || !stopTime) return false;
 
-  const minStart = now - 4 * 60 * 60 * 1000;
-  const maxStart = now + 18 * 60 * 60 * 1000;
+  const minStart = now - 3 * 60 * 60 * 1000;
+  const maxStart = now + 12 * 60 * 60 * 1000;
 
   return stopTime >= minStart && startTime <= maxStart;
 }
@@ -316,6 +309,7 @@ function buildIndex(programmes = []) {
 
       if (!index.has(alias)) index.set(alias, []);
       const list = index.get(alias);
+
       if (list.length < MAX_PROGRAMMES_PER_ALIAS) {
         list.push(item);
       }
@@ -332,7 +326,7 @@ function buildIndex(programmes = []) {
   return index;
 }
 
-export async function loadEPG(session) {
+async function doLoadEPG(session) {
   const now = Date.now();
 
   if (
@@ -340,22 +334,13 @@ export async function loadEPG(session) {
     MEMORY_EPG_CACHE.length > 0 &&
     now - MEMORY_EPG_CACHE_TIME < EPG_CACHE_MS
   ) {
-    MEMORY_EPG_DEBUG.loaded = true;
-    MEMORY_EPG_DEBUG.error = "";
     return MEMORY_EPG_CACHE;
   }
 
+  const url = buildXmltvUrlFromSession(session);
+  if (!url) return MEMORY_EPG_CACHE || [];
+
   try {
-    const url = buildXmltvUrlFromSession(session);
-    MEMORY_EPG_DEBUG.url = url || "";
-
-    if (!url) {
-      MEMORY_EPG_DEBUG.loaded = false;
-      MEMORY_EPG_DEBUG.error = "Sem URL XMLTV";
-      MEMORY_EPG_DEBUG.xmlOk = false;
-      return [];
-    }
-
     const response = await fetchWithTimeout(url, {
       method: "GET",
       headers: {
@@ -365,11 +350,8 @@ export async function loadEPG(session) {
     });
 
     const xml = await response.text();
-    MEMORY_EPG_DEBUG.xmlOk = !!xml && xml.includes("<tv");
 
     if (!response.ok || !xml || !xml.includes("<tv")) {
-      MEMORY_EPG_DEBUG.loaded = false;
-      MEMORY_EPG_DEBUG.error = "XML inválido ou resposta ruim";
       return MEMORY_EPG_CACHE || [];
     }
 
@@ -380,18 +362,26 @@ export async function loadEPG(session) {
     MEMORY_EPG_CACHE_TIME = now;
     MEMORY_EPG_INDEX = buildIndex(MEMORY_EPG_CACHE);
 
-    MEMORY_EPG_DEBUG.loaded = true;
-    MEMORY_EPG_DEBUG.error = "";
-    MEMORY_EPG_DEBUG.channelCount = Object.keys(channelMap).length;
-    MEMORY_EPG_DEBUG.programmeCount = MEMORY_EPG_CACHE.length;
-
     return MEMORY_EPG_CACHE;
   } catch (e) {
-    MEMORY_EPG_DEBUG.loaded = false;
-    MEMORY_EPG_DEBUG.error = safeText(e?.message) || "Erro ao carregar EPG";
-    MEMORY_EPG_DEBUG.xmlOk = false;
     return MEMORY_EPG_CACHE || [];
   }
+}
+
+export async function warmupEPG(session) {
+  if (MEMORY_EPG_LOADING_PROMISE) return MEMORY_EPG_LOADING_PROMISE;
+
+  MEMORY_EPG_LOADING_PROMISE = doLoadEPG(session)
+    .catch(() => MEMORY_EPG_CACHE || [])
+    .finally(() => {
+      MEMORY_EPG_LOADING_PROMISE = null;
+    });
+
+  return MEMORY_EPG_LOADING_PROMISE;
+}
+
+export async function loadEPG(session) {
+  return warmupEPG(session);
 }
 
 function aliasesMatchStrong(itemAliases = [], targetAliases = []) {
@@ -526,10 +516,4 @@ export function formatProgramTime(program) {
   });
 
   return `${start} - ${stop}`;
-}
-
-export function getEPGDebugInfo() {
-  return {
-    ...MEMORY_EPG_DEBUG,
-  };
 }

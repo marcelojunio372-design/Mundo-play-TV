@@ -10,14 +10,14 @@ import {
   TextInput,
   StatusBar,
   Modal,
+  InteractionManager,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Video, ResizeMode } from "expo-av";
 import {
-  loadEPG,
+  warmupEPG,
   findNowAndNextForChannel,
   formatProgramTime,
-  getEPGDebugInfo,
 } from "../services/epgService";
 
 const { width } = Dimensions.get("window");
@@ -95,21 +95,12 @@ export default function LiveTVScreen({
   const [showFullscreen, setShowFullscreen] = useState(false);
   const [showFullscreenUi, setShowFullscreenUi] = useState(true);
   const [epgItems, setEpgItems] = useState([]);
-  const [epgLoading, setEpgLoading] = useState(false);
-  const [epgLoaded, setEpgLoaded] = useState(false);
-  const [epgDebug, setEpgDebug] = useState({
-    url: "",
-    loaded: false,
-    error: "",
-    xmlOk: false,
-    channelCount: 0,
-    programmeCount: 0,
-  });
+  const [epgReady, setEpgReady] = useState(false);
 
   const videoRef = useRef(null);
   const fullscreenVideoRef = useRef(null);
   const fullscreenUiTimerRef = useRef(null);
-  const epgStartedRef = useRef(false);
+  const epgWarmupStartedRef = useRef(false);
 
   useEffect(() => {
     async function loadSavedData() {
@@ -137,39 +128,34 @@ export default function LiveTVScreen({
 
   useEffect(() => {
     let active = true;
+    let interactionTask = null;
 
-    async function fetchEpgData() {
-      if (epgStartedRef.current) return;
-      epgStartedRef.current = true;
+    async function startWarmup() {
+      if (epgWarmupStartedRef.current) return;
+      epgWarmupStartedRef.current = true;
 
       try {
-        setEpgLoading(true);
-        const items = await loadEPG(session);
-
+        const items = await warmupEPG(session);
         if (!active) return;
 
         setEpgItems(Array.isArray(items) ? items : []);
-        setEpgDebug(getEPGDebugInfo());
+        setEpgReady(true);
       } catch (e) {
         if (!active) return;
         setEpgItems([]);
-        setEpgDebug(getEPGDebugInfo());
-      } finally {
-        if (active) {
-          setEpgLoading(false);
-          setEpgLoaded(true);
-          setEpgDebug(getEPGDebugInfo());
-        }
+        setEpgReady(true);
       }
     }
 
-    const timer = setTimeout(() => {
-      fetchEpgData();
-    }, 1500);
+    interactionTask = InteractionManager.runAfterInteractions(() => {
+      setTimeout(() => {
+        startWarmup();
+      }, 2500);
+    });
 
     return () => {
       active = false;
-      clearTimeout(timer);
+      if (interactionTask?.cancel) interactionTask.cancel();
     };
   }, [session]);
 
@@ -223,7 +209,7 @@ export default function LiveTVScreen({
   }, [selectedChannel?.url]);
 
   const { nowProgram, nextProgram } = useMemo(() => {
-    if (!selectedChannel || !epgItems.length) {
+    if (!selectedChannel || !epgReady || !epgItems.length) {
       return { nowProgram: null, nextProgram: null };
     }
 
@@ -234,7 +220,7 @@ export default function LiveTVScreen({
       safeText(selectedChannel.tvgId),
       safeText(selectedChannel.tvgName || selectedChannel.name)
     );
-  }, [epgItems, selectedChannel]);
+  }, [epgItems, epgReady, selectedChannel]);
 
   const progressPercent = useMemo(() => getProgressPercent(nowProgram), [nowProgram]);
 
@@ -412,9 +398,7 @@ export default function LiveTVScreen({
     );
   };
 
-  const epgStatusText = epgLoading
-    ? "Carregando guia..."
-    : nowProgram?.title || "Programação atual não encontrada";
+  const epgStatusText = nowProgram?.title || "Programação atual não encontrada";
 
   return (
     <SafeAreaView style={styles.container}>
@@ -561,7 +545,7 @@ export default function LiveTVScreen({
                 </View>
               )}
 
-              {!nextProgram && epgLoaded && (
+              {!nextProgram && epgReady && (
                 <View style={styles.scheduleRow}>
                   <Text style={styles.scheduleTime}>--:--</Text>
                   <Text style={styles.scheduleTitle} numberOfLines={1}>
@@ -569,50 +553,6 @@ export default function LiveTVScreen({
                   </Text>
                 </View>
               )}
-            </View>
-
-            <View style={styles.debugBox}>
-              <Text style={styles.debugTitle}>DIAGNÓSTICO EPG</Text>
-
-              <Text style={styles.debugText} numberOfLines={2}>
-                URL: {safeText(epgDebug.url) || "vazia"}
-              </Text>
-
-              <Text style={styles.debugText}>
-                Carregado: {epgDebug.loaded ? "SIM" : "NÃO"}
-              </Text>
-
-              <Text style={styles.debugText}>
-                XML válido: {epgDebug.xmlOk ? "SIM" : "NÃO"}
-              </Text>
-
-              <Text style={styles.debugText}>
-                Canais XML: {epgDebug.channelCount || 0}
-              </Text>
-
-              <Text style={styles.debugText}>
-                Programas XML: {epgDebug.programmeCount || 0}
-              </Text>
-
-              <Text style={styles.debugText}>
-                Itens no app: {Array.isArray(epgItems) ? epgItems.length : 0}
-              </Text>
-
-              <Text style={styles.debugText}>
-                Canal atual: {safeText(selectedChannel?.name) || "-"}
-              </Text>
-
-              <Text style={styles.debugText}>
-                tvgId: {safeText(selectedChannel?.tvgId) || "-"}
-              </Text>
-
-              <Text style={styles.debugText}>
-                tvgName: {safeText(selectedChannel?.tvgName) || "-"}
-              </Text>
-
-              <Text style={styles.debugText} numberOfLines={2}>
-                Erro: {safeText(epgDebug.error) || "nenhum"}
-              </Text>
             </View>
           </View>
         </View>
@@ -994,28 +934,6 @@ const styles = StyleSheet.create({
     flex: 1,
     color: "#ffffff",
     fontSize: isPhone ? 9 : 12,
-  },
-
-  debugBox: {
-    marginTop: 8,
-    backgroundColor: "rgba(0,0,0,0.22)",
-    borderWidth: 1,
-    borderColor: "rgba(243,223,88,0.20)",
-    borderRadius: 8,
-    padding: 8,
-  },
-
-  debugTitle: {
-    color: "#f3df58",
-    fontSize: isPhone ? 9 : 12,
-    fontWeight: "900",
-    marginBottom: 6,
-  },
-
-  debugText: {
-    color: "#dce6f2",
-    fontSize: isPhone ? 7 : 10,
-    marginBottom: 4,
   },
 
   fullscreenContainer: {
