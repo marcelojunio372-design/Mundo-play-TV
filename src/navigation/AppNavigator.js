@@ -155,10 +155,8 @@ export default function AppNavigator() {
     }
 
     if (session && screen === "home" && !isEpgLoading && !isEpgReady) {
-      timer = setTimeout(() => {
-        startEpgWarmup();
-      }, 1200);
-    }
+  startEpgWarmup();
+}
 
     return () => {
       active = false;
