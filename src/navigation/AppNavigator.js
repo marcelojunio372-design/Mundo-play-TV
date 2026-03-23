@@ -81,7 +81,7 @@ export default function AppNavigator() {
     if (loginType === "m3u") {
       setIsEpgLoading(false);
       setIsEpgReady(false);
-      setEpgMessage("");
+      setEpgMessage("Carregando lista M3U...");
     } else {
       setIsEpgLoading(false);
       setIsEpgReady(false);
@@ -126,7 +126,7 @@ export default function AppNavigator() {
       if (loginType === "m3u") {
         setIsEpgLoading(false);
         setIsEpgReady(false);
-        setEpgMessage("");
+        setEpgMessage("Lista M3U carregada.");
       } else {
         setIsEpgReady(false);
         setEpgMessage("Lista atualizada. Preparando guia...");
@@ -143,21 +143,55 @@ export default function AppNavigator() {
   useEffect(() => {
     let active = true;
 
-    async function startEpgWarmup() {
+    async function startBackgroundLoads() {
       if (!session) return;
       if (screen !== "home") return;
-      if (isEpgLoading || isEpgReady) return;
+      if (isRefreshingData) return;
 
       const loginType = String(session?.type || "").toLowerCase();
+      const hasData =
+        Array.isArray(session?.data?.live) &&
+        session.data.live.length > 0;
 
-      if (loginType === "m3u") {
-        if (active) {
-          setIsEpgLoading(false);
-          setIsEpgReady(false);
-          setEpgMessage("");
+      if (loginType === "m3u" && !hasData) {
+        try {
+          setIsRefreshingData(true);
+          setEpgMessage("Carregando lista M3U...");
+
+          const data = await loadM3U(session.url, { only: "all" });
+          if (!active) return;
+
+          const safeData = mergeData(data);
+
+          setSession((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              data: safeData,
+            };
+          });
+
+          await writeCache(session.url, safeData);
+
+          if (!active) return;
+          setEpgMessage("Lista M3U carregada.");
+        } catch (e) {
+          if (!active) return;
+          setEpgMessage("Falha ao carregar lista M3U.");
+        } finally {
+          if (active) {
+            setIsRefreshingData(false);
+          }
         }
+
         return;
       }
+
+      if (loginType === "m3u") {
+        return;
+      }
+
+      if (isEpgLoading || isEpgReady) return;
 
       try {
         setIsEpgLoading(true);
@@ -180,14 +214,14 @@ export default function AppNavigator() {
       }
     }
 
-    if (session && screen === "home" && !isEpgLoading && !isEpgReady) {
-      startEpgWarmup();
+    if (session && screen === "home") {
+      startBackgroundLoads();
     }
 
     return () => {
       active = false;
     };
-  }, [session, screen, isEpgLoading, isEpgReady]);
+  }, [session, screen, isRefreshingData, isEpgLoading, isEpgReady]);
 
   if (!session) {
     return <LoginScreen onLogin={handleLogin} />;

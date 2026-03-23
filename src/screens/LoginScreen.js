@@ -10,7 +10,6 @@ import {
   ScrollView,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { loadM3U } from "../services/m3uService";
 import { loadXtream } from "../services/xtreamService";
 
 const LOGIN_STORAGE_KEY = "mundoplaytv_login_data_v1";
@@ -98,16 +97,22 @@ export default function LoginScreen({ onLogin }) {
         password: "",
       });
 
-      const data = await loadM3U(finalUrl, { only: "all" });
-
       onLogin({
         type: "m3u",
         url: finalUrl,
         mac,
-        data,
+        data: {
+          live: [],
+          movies: [],
+          series: [],
+          liveCategories: [],
+          movieCategories: [],
+          seriesCategories: [],
+          loadedAt: null,
+        },
       });
     } catch (e) {
-      Alert.alert("Erro", "Falha ao carregar a lista M3U");
+      Alert.alert("Erro", "Falha ao iniciar login M3U");
     } finally {
       setLoading(false);
     }
@@ -247,7 +252,7 @@ export default function LoginScreen({ onLogin }) {
               {loading
                 ? mode === "xtream"
                   ? "CARREGANDO XTREAM..."
-                  : "CARREGANDO M3U..."
+                  : "ENTRANDO M3U..."
                 : "CONECTAR"}
             </Text>
           </TouchableOpacity>
