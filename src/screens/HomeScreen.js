@@ -8,6 +8,7 @@ import {
   Dimensions,
   ImageBackground,
   Image,
+  ActivityIndicator,
 } from "react-native";
 
 const { width } = Dimensions.get("window");
@@ -23,6 +24,10 @@ export default function HomeScreen({
   onLogout,
   onSelectMovie,
   onSelectSeries,
+  isRefreshingData,
+  isEpgLoading,
+  isEpgReady,
+  epgMessage,
 }) {
   const movies = session?.data?.movies || [];
   const series = session?.data?.series || [];
@@ -101,6 +106,14 @@ export default function HomeScreen({
     item?.cover ||
     "";
 
+  const homeStatusText = isRefreshingData
+    ? "Atualizando lista..."
+    : isEpgLoading
+    ? (epgMessage || "Carregando guia de programação...")
+    : isEpgReady
+    ? "Guia pronto para TV ao vivo"
+    : (epgMessage || "Aguardando preparação do guia...");
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topbar}>
@@ -110,13 +123,36 @@ export default function HomeScreen({
         </Text>
       </View>
 
+      <View style={styles.statusBarWrap}>
+        <View style={styles.statusLeft}>
+          {(isRefreshingData || isEpgLoading) ? (
+            <ActivityIndicator size="small" color="#38d7ff" />
+          ) : (
+            <View
+              style={[
+                styles.statusDot,
+                isEpgReady ? styles.statusDotOk : styles.statusDotIdle,
+              ]}
+            />
+          )}
+
+          <Text style={styles.statusText}>{homeStatusText}</Text>
+        </View>
+
+        {isEpgReady ? (
+          <Text style={styles.statusReady}>EPG pronto</Text>
+        ) : (
+          <Text style={styles.statusLoading}>Preparando...</Text>
+        )}
+      </View>
+
       <View style={styles.content}>
         <View style={styles.sidebar}>
           <Btn text="LIVE TV" onPress={onOpenLive} />
           <Btn text="FILMES" onPress={onOpenMovies} />
           <Btn text="SÉRIES" onPress={onOpenSeries} />
           <Btn text="CONFIG." onPress={onOpenSettings} />
-          <Btn text="RECARREGAR" onPress={onReload} />
+          <Btn text={isRefreshingData ? "ATUALIZANDO..." : "RECARREGAR"} onPress={onReload} />
           <Btn text="SAIR" onPress={onLogout} />
         </View>
 
@@ -203,6 +239,57 @@ const styles = StyleSheet.create({
   datetime: {
     color: "#9eb3c7",
     fontSize: isPhone ? 10 : 12,
+  },
+
+  statusBarWrap: {
+    minHeight: isPhone ? 42 : 50,
+    backgroundColor: "#081827",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.08)",
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  statusLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    paddingRight: 10,
+  },
+
+  statusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 999,
+    marginRight: 10,
+  },
+
+  statusDotOk: {
+    backgroundColor: "#44d17a",
+  },
+
+  statusDotIdle: {
+    backgroundColor: "#7b8ca0",
+  },
+
+  statusText: {
+    color: "#d6e3ef",
+    fontSize: isPhone ? 10 : 13,
+    flex: 1,
+  },
+
+  statusReady: {
+    color: "#44d17a",
+    fontSize: isPhone ? 10 : 12,
+    fontWeight: "800",
+  },
+
+  statusLoading: {
+    color: "#38d7ff",
+    fontSize: isPhone ? 10 : 12,
+    fontWeight: "800",
   },
 
   content: {

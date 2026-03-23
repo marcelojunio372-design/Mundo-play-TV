@@ -10,12 +10,11 @@ import {
   TextInput,
   StatusBar,
   Modal,
-  InteractionManager,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Video, ResizeMode } from "expo-av";
 import {
-  warmupEPG,
+  loadEPG,
   findNowAndNextForChannel,
   formatProgramTime,
 } from "../services/epgService";
@@ -80,6 +79,7 @@ export default function LiveTVScreen({
   onOpenLive,
   onOpenMovies,
   onOpenSeries,
+  isEpgReady,
 }) {
   const channels = Array.isArray(session?.data?.live) ? session.data.live : [];
 
@@ -90,17 +90,16 @@ export default function LiveTVScreen({
   const [search, setSearch] = useState("");
   const [playerKey, setPlayerKey] = useState(0);
   const [fullscreenKey, setFullscreenKey] = useState(0);
+
   const [isPaused, setIsPaused] = useState(false);
   const [isFullscreenPaused, setIsFullscreenPaused] = useState(false);
   const [showFullscreen, setShowFullscreen] = useState(false);
   const [showFullscreenUi, setShowFullscreenUi] = useState(true);
   const [epgItems, setEpgItems] = useState([]);
-  const [epgReady, setEpgReady] = useState(false);
 
   const videoRef = useRef(null);
   const fullscreenVideoRef = useRef(null);
   const fullscreenUiTimerRef = useRef(null);
-  const epgStartedRef = useRef(false);
 
   useEffect(() => {
     async function loadSavedData() {
@@ -128,35 +127,29 @@ export default function LiveTVScreen({
 
   useEffect(() => {
     let active = true;
-    let interactionTask = null;
 
-    async function startWarmup() {
-      if (epgStartedRef.current) return;
-      epgStartedRef.current = true;
+    async function readReadyCache() {
+      if (!isEpgReady) {
+        if (active) setEpgItems([]);
+        return;
+      }
 
       try {
-        const items = await warmupEPG(session);
+        const items = await loadEPG(session);
         if (!active) return;
         setEpgItems(Array.isArray(items) ? items : []);
       } catch (e) {
         if (!active) return;
         setEpgItems([]);
-      } finally {
-        if (active) setEpgReady(true);
       }
     }
 
-    interactionTask = InteractionManager.runAfterInteractions(() => {
-      setTimeout(() => {
-        startWarmup();
-      }, 3000);
-    });
+    readReadyCache();
 
     return () => {
       active = false;
-      if (interactionTask?.cancel) interactionTask.cancel();
     };
-  }, [session]);
+  }, [session, isEpgReady]);
 
   const favoriteChannels = useMemo(() => {
     const favoriteSet = new Set(favoriteIds);
@@ -201,14 +194,32 @@ export default function LiveTVScreen({
   }, [favoriteIds, selectedChannelId]);
 
   useEffect(() => {
-    setPlayerKey((prev) => prev + 1);
-    setFullscreenKey((prev) => prev + 1);
-    setIsPaused(false);
-    setIsFullscreenPaused(false);
+    async function resetPlayers() {
+      try {
+        await videoRef.current?.stopAsync?.();
+      } catch (e) {}
+
+      try {
+        await fullscreenVideoRef.current?.stopAsync?.();
+      } catch (e) {}
+
+      setPlayerKey((prev) => prev + 1);
+      setFullscreenKey((prev) => prev + 1);
+
+      if (showFullscreen) {
+        setIsPaused(true);
+        setIsFullscreenPaused(false);
+      } else {
+        setIsPaused(false);
+        setIsFullscreenPaused(false);
+      }
+    }
+
+    resetPlayers();
   }, [selectedChannel?.url]);
 
   const { nowProgram, nextProgram } = useMemo(() => {
-    if (!selectedChannel || !epgReady || !epgItems.length) {
+    if (!selectedChannel || !epgItems.length) {
       return { nowProgram: null, nextProgram: null };
     }
 
@@ -219,7 +230,7 @@ export default function LiveTVScreen({
       safeText(selectedChannel.tvgId),
       safeText(selectedChannel.tvgName || selectedChannel.name)
     );
-  }, [epgItems, epgReady, selectedChannel]);
+  }, [epgItems, selectedChannel]);
 
   const progressPercent = useMemo(() => getProgressPercent(nowProgram), [nowProgram]);
 
@@ -260,16 +271,44 @@ export default function LiveTVScreen({
     showFullscreenControls();
   };
 
-  const handleSelectCategory = (index) => {
+  const handleSelectCategory = async (index) => {
+    try {
+      await videoRef.current?.stopAsync?.();
+    } catch (e) {}
+
+    try {
+      await fullscreenVideoRef.current?.stopAsync?.();
+    } catch (e) {}
+
     setSelectedCategory(index);
     setSelectedChannelIndex(0);
     setSearch("");
   };
 
-  const handleSelectChannel = (index) => {
+  const handleSelectChannel = async (index) => {
+    try {
+      await videoRef.current?.stopAsync?.();
+    } catch (e) {}
+
+    try {
+      await fullscreenVideoRef.current?.stopAsync?.();
+    } catch (e) {}
+
     setSelectedChannelIndex(index);
+
     const item = visibleChannels[index];
-    if (item) addToRecent(item);
+    if (item) await addToRecent(item);
+
+    setPlayerKey((prev) => prev + 1);
+    setFullscreenKey((prev) => prev + 1);
+
+    if (showFullscreen) {
+      setIsPaused(true);
+      setIsFullscreenPaused(false);
+    } else {
+      setIsPaused(false);
+      setIsFullscreenPaused(false);
+    }
   };
 
   const togglePauseFullscreen = async () => {
@@ -285,19 +324,19 @@ export default function LiveTVScreen({
     } catch (e) {}
   };
 
-  const goToPreviousChannel = () => {
+  const goToPreviousChannel = async () => {
     if (!visibleChannels.length) return;
     const nextIndex =
       selectedChannelIndex <= 0 ? visibleChannels.length - 1 : selectedChannelIndex - 1;
-    handleSelectChannel(nextIndex);
+    await handleSelectChannel(nextIndex);
     showFullscreenControls();
   };
 
-  const goToNextChannel = () => {
+  const goToNextChannel = async () => {
     if (!visibleChannels.length) return;
     const nextIndex =
       selectedChannelIndex >= visibleChannels.length - 1 ? 0 : selectedChannelIndex + 1;
-    handleSelectChannel(nextIndex);
+    await handleSelectChannel(nextIndex);
     showFullscreenControls();
   };
 
@@ -326,7 +365,14 @@ export default function LiveTVScreen({
 
   const openFullscreen = async () => {
     if (!selectedChannel?.url) return;
-    addToRecent(selectedChannel);
+
+    await addToRecent(selectedChannel);
+
+    try {
+      await videoRef.current?.pauseAsync?.();
+    } catch (e) {}
+
+    setIsPaused(true);
     setFullscreenKey((prev) => prev + 1);
     setIsFullscreenPaused(false);
     setShowFullscreen(true);
@@ -343,6 +389,14 @@ export default function LiveTVScreen({
     }
 
     setShowFullscreen(false);
+    setIsFullscreenPaused(false);
+
+    setTimeout(async () => {
+      try {
+        setIsPaused(false);
+        await videoRef.current?.playAsync?.();
+      } catch (e) {}
+    }, 150);
   };
 
   const renderCategoryRow = ({ item, index }) => {
@@ -491,8 +545,9 @@ export default function LiveTVScreen({
                 source={{ uri: selectedChannel.url }}
                 style={styles.previewVideo}
                 resizeMode={ResizeMode.COVER}
-                shouldPlay={!isPaused}
+                shouldPlay={!isPaused && !showFullscreen}
                 isLooping
+                isMuted={false}
                 useNativeControls={false}
               />
             ) : (
@@ -512,7 +567,9 @@ export default function LiveTVScreen({
             </Text>
 
             <Text style={styles.epgCurrentMain} numberOfLines={2}>
-              {nowProgram?.title || "Programação atual não encontrada"}
+              {!isEpgReady
+                ? "Guia ainda está sendo preparado no início."
+                : nowProgram?.title || "Programação atual não encontrada"}
             </Text>
 
             <View style={styles.progressTrack}>
@@ -527,7 +584,9 @@ export default function LiveTVScreen({
                   {nowProgram ? formatProgramTime(nowProgram) : "--:--"}
                 </Text>
                 <Text style={styles.scheduleTitle} numberOfLines={1}>
-                  {nowProgram?.title || "Sem programação disponível"}
+                  {!isEpgReady
+                    ? "Aguardando guia ficar pronto"
+                    : nowProgram?.title || "Sem programação disponível"}
                 </Text>
               </View>
 
@@ -574,8 +633,9 @@ export default function LiveTVScreen({
                 source={{ uri: selectedChannel.url }}
                 style={styles.fullscreenVideo}
                 resizeMode={ResizeMode.COVER}
-                shouldPlay={!isFullscreenPaused}
+                shouldPlay={!isFullscreenPaused && showFullscreen}
                 isLooping
+                isMuted={false}
                 useNativeControls={false}
               />
             ) : (
@@ -652,7 +712,9 @@ export default function LiveTVScreen({
                   </Text>
 
                   <Text style={styles.fullscreenProgramText} numberOfLines={1}>
-                    {nowProgram?.title || "Programação atual não encontrada"}
+                    {!isEpgReady
+                      ? "Guia ainda está sendo preparado"
+                      : nowProgram?.title || "Programação atual não encontrada"}
                   </Text>
 
                   <Text style={styles.fullscreenTimesText} numberOfLines={1}>
