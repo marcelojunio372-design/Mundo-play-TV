@@ -56,8 +56,8 @@ export default function AppNavigator() {
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [selectedSeries, setSelectedSeries] = useState(null);
   const [selectedSeason, setSelectedSeason] = useState(null);
-  const [isRefreshingData, setIsRefreshingData] = useState(false);
 
+  const [isRefreshingData, setIsRefreshingData] = useState(false);
   const [isEpgLoading, setIsEpgLoading] = useState(false);
   const [isEpgReady, setIsEpgReady] = useState(false);
   const [epgMessage, setEpgMessage] = useState("");
@@ -79,10 +79,12 @@ export default function AppNavigator() {
     const loginType = String(payload?.type || "").toLowerCase();
 
     if (loginType === "m3u") {
+      setIsRefreshingData(false);
       setIsEpgLoading(false);
       setIsEpgReady(false);
-      setEpgMessage("Carregando lista M3U...");
+      setEpgMessage("Carregando Live TV...");
     } else {
+      setIsRefreshingData(false);
       setIsEpgLoading(false);
       setIsEpgReady(false);
       setEpgMessage("Preparando guia...");
@@ -105,8 +107,75 @@ export default function AppNavigator() {
     if (!session?.url) return false;
     if (isRefreshingData) return false;
 
+    const loginType = String(session?.type || "").toLowerCase();
+
     try {
       setIsRefreshingData(true);
+
+      if (loginType === "m3u") {
+        setEpgMessage("Atualizando Live TV...");
+
+        const liveData = await loadM3U(session.url, { only: "live" });
+        const safeLiveData = mergeData({
+          ...session?.data,
+          live: liveData.live,
+          liveCategories: liveData.liveCategories,
+        });
+
+        setSession((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            data: safeLiveData,
+          };
+        });
+
+        await writeCache(session.url, safeLiveData);
+
+        setEpgMessage("Atualizando filmes...");
+
+        const movieData = await loadM3U(session.url, { only: "movie" });
+        const safeMovieData = mergeData({
+          ...safeLiveData,
+          movies: movieData.movies,
+          movieCategories: movieData.movieCategories,
+        });
+
+        setSession((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            data: safeMovieData,
+          };
+        });
+
+        await writeCache(session.url, safeMovieData);
+
+        setEpgMessage("Atualizando séries...");
+
+        const seriesData = await loadM3U(session.url, { only: "series" });
+        const safeSeriesData = mergeData({
+          ...safeMovieData,
+          series: seriesData.series,
+          seriesCategories: seriesData.seriesCategories,
+          loadedAt: new Date().toISOString(),
+        });
+
+        setSession((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            data: safeSeriesData,
+          };
+        });
+
+        await writeCache(session.url, safeSeriesData);
+
+        setIsEpgLoading(false);
+        setIsEpgReady(false);
+        setEpgMessage("Lista M3U carregada.");
+        return true;
+      }
 
       const data = await loadM3U(session.url, { only: "all" });
       const safeData = mergeData(data);
@@ -121,19 +190,13 @@ export default function AppNavigator() {
 
       await writeCache(session.url, safeData);
 
-      const loginType = String(session?.type || "").toLowerCase();
-
-      if (loginType === "m3u") {
-        setIsEpgLoading(false);
-        setIsEpgReady(false);
-        setEpgMessage("Lista M3U carregada.");
-      } else {
-        setIsEpgReady(false);
-        setEpgMessage("Lista atualizada. Preparando guia...");
-      }
-
+      setIsEpgReady(false);
+      setEpgMessage("Lista atualizada. Preparando guia...");
       return true;
     } catch (e) {
+      if (loginType === "m3u") {
+        setEpgMessage("Falha ao atualizar lista M3U.");
+      }
       return false;
     } finally {
       setIsRefreshingData(false);
@@ -149,32 +212,91 @@ export default function AppNavigator() {
       if (isRefreshingData) return;
 
       const loginType = String(session?.type || "").toLowerCase();
-      const hasData =
-        Array.isArray(session?.data?.live) &&
-        session.data.live.length > 0;
+      const hasLive = Array.isArray(session?.data?.live) && session.data.live.length > 0;
+      const hasMovies = Array.isArray(session?.data?.movies) && session.data.movies.length > 0;
+      const hasSeries = Array.isArray(session?.data?.series) && session.data.series.length > 0;
 
-      if (loginType === "m3u" && !hasData) {
+      if (loginType === "m3u") {
         try {
-          setIsRefreshingData(true);
-          setEpgMessage("Carregando lista M3U...");
+          if (!hasLive) {
+            setIsRefreshingData(true);
+            setEpgMessage("Carregando Live TV...");
 
-          const data = await loadM3U(session.url, { only: "all" });
-          if (!active) return;
+            const liveData = await loadM3U(session.url, { only: "live" });
+            if (!active) return;
 
-          const safeData = mergeData(data);
+            const safeLiveData = mergeData({
+              ...session?.data,
+              live: liveData.live,
+              liveCategories: liveData.liveCategories,
+            });
 
-          setSession((prev) => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              data: safeData,
-            };
-          });
+            setSession((prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                data: safeLiveData,
+              };
+            });
 
-          await writeCache(session.url, safeData);
+            await writeCache(session.url, safeLiveData);
 
-          if (!active) return;
-          setEpgMessage("Lista M3U carregada.");
+            if (!active) return;
+            setEpgMessage("Live TV carregada.");
+          }
+
+          if (!hasMovies) {
+            setEpgMessage("Carregando filmes...");
+
+            const movieData = await loadM3U(session.url, { only: "movie" });
+            if (!active) return;
+
+            setSession((prev) => {
+              if (!prev) return prev;
+
+              const nextData = mergeData({
+                ...prev.data,
+                movies: movieData.movies,
+                movieCategories: movieData.movieCategories,
+              });
+
+              writeCache(prev.url, nextData);
+              return {
+                ...prev,
+                data: nextData,
+              };
+            });
+
+            if (!active) return;
+            setEpgMessage("Filmes carregados.");
+          }
+
+          if (!hasSeries) {
+            setEpgMessage("Carregando séries...");
+
+            const seriesData = await loadM3U(session.url, { only: "series" });
+            if (!active) return;
+
+            setSession((prev) => {
+              if (!prev) return prev;
+
+              const nextData = mergeData({
+                ...prev.data,
+                series: seriesData.series,
+                seriesCategories: seriesData.seriesCategories,
+                loadedAt: new Date().toISOString(),
+              });
+
+              writeCache(prev.url, nextData);
+              return {
+                ...prev,
+                data: nextData,
+              };
+            });
+
+            if (!active) return;
+            setEpgMessage("Lista M3U carregada.");
+          }
         } catch (e) {
           if (!active) return;
           setEpgMessage("Falha ao carregar lista M3U.");
@@ -184,10 +306,6 @@ export default function AppNavigator() {
           }
         }
 
-        return;
-      }
-
-      if (loginType === "m3u") {
         return;
       }
 
