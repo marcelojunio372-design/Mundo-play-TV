@@ -6,6 +6,8 @@ const EPG_CACHE_MS = 10 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 12000;
 const RETRY_DELAY_MS = 1200;
 const MAX_ITEMS_PER_CHANNEL = 4;
+const XTREAM_PREFETCH_LIMIT = 120;
+const XTREAM_CONCURRENCY = 8;
 
 function safeText(value) {
   if (value === null || value === undefined) return "";
@@ -24,6 +26,20 @@ function decodeXml(text = "") {
     .replace(/&apos;/g, "'")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">");
+}
+
+function decodeMaybeBase64(value = "") {
+  const raw = safeText(value);
+  if (!raw) return "";
+
+  try {
+    if (typeof globalThis?.atob === "function") {
+      const decoded = globalThis.atob(raw);
+      if (decoded) return decodeXml(decoded);
+    }
+  } catch (e) {}
+
+  return decodeXml(raw);
 }
 
 function normalizeId(value = "") {
@@ -272,7 +288,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS)
   }
 }
 
-async function fetchXmltvOnce(url = "") {
+async function fetchTextOnce(url = "") {
   const response = await fetchWithTimeout(
     url,
     {
@@ -290,12 +306,35 @@ async function fetchXmltvOnce(url = "") {
   };
 }
 
+async function fetchJsonOnce(url = "") {
+  const response = await fetchWithTimeout(
+    url,
+    {
+      method: "GET",
+      headers: buildHeaders(url),
+    },
+    FETCH_TIMEOUT_MS
+  );
+
+  const text = await response.text();
+
+  if (!response.ok) {
+    throw new Error("Falha ao buscar JSON");
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error("JSON inválido");
+  }
+}
+
 async function fetchXmltvWithRetry(session) {
   const urls = buildCandidateUrls(session);
 
   for (const url of urls) {
     try {
-      const first = await fetchXmltvOnce(url);
+      const first = await fetchTextOnce(url);
 
       if (first.ok && looksLikeValidXmltv(first.text)) {
         return first.text;
@@ -304,7 +343,7 @@ async function fetchXmltvWithRetry(session) {
       if (looksLikeCloudflareOrHtml(first.text)) {
         await sleep(RETRY_DELAY_MS);
 
-        const second = await fetchXmltvOnce(url);
+        const second = await fetchTextOnce(url);
         if (second.ok && looksLikeValidXmltv(second.text)) {
           return second.text;
         }
@@ -442,17 +481,168 @@ function extractRelevantProgrammes(xml = "", channelMap = {}, matchedChannelIds 
   return Object.values(bucketMap).flat();
 }
 
-async function doLoadEPG(session) {
-  const now = Date.now();
+function buildXtreamApiBase(session) {
+  const server =
+    safeText(session?.server) ||
+    safeText(session?.serverUrl) ||
+    safeText(session?.data?.server) ||
+    safeText(session?.data?.serverUrl);
 
-  if (
-    Array.isArray(MEMORY_EPG_CACHE) &&
-    MEMORY_EPG_CACHE.length > 0 &&
-    now - MEMORY_EPG_CACHE_TIME < EPG_CACHE_MS
-  ) {
-    return MEMORY_EPG_CACHE;
+  const username =
+    safeText(session?.username) ||
+    safeText(session?.user) ||
+    safeText(session?.data?.username) ||
+    safeText(session?.data?.user);
+
+  const password =
+    safeText(session?.password) ||
+    safeText(session?.pass) ||
+    safeText(session?.data?.password) ||
+    safeText(session?.data?.pass);
+
+  if (!server || !username || !password) return "";
+
+  return `${server.replace(/\/+$/, "")}/player_api.php?username=${encodeURIComponent(
+    username
+  )}&password=${encodeURIComponent(password)}`;
+}
+
+function buildXtreamProgrammeItem(channel, row = {}) {
+  const title =
+    decodeMaybeBase64(row?.title) ||
+    decodeMaybeBase64(row?.name) ||
+    safeText(row?.title) ||
+    safeText(row?.name);
+
+  const desc =
+    decodeMaybeBase64(row?.description) ||
+    safeText(row?.description) ||
+    safeText(row?.desc);
+
+  const start =
+    parseXmltvDate(
+      safeText(row?.start) ||
+        safeText(row?.start_timestamp) ||
+        safeText(row?.epg_start)
+    ) || null;
+
+  const stop =
+    parseXmltvDate(
+      safeText(row?.end) ||
+        safeText(row?.stop) ||
+        safeText(row?.stop_timestamp) ||
+        safeText(row?.epg_end)
+    ) || null;
+
+  return {
+    channel: safeText(channel?.tvgId || channel?.streamId || channel?.id),
+    normalizedChannel: normalizeId(safeText(channel?.tvgId || channel?.streamId || channel?.id)),
+    displayNames: [safeText(channel?.name)],
+    aliases: buildAliases(
+      safeText(channel?.name),
+      safeText(channel?.tvgId),
+      safeText(channel?.tvgName || channel?.name),
+      [safeText(channel?.name)]
+    ),
+    start,
+    stop,
+    title,
+    desc,
+  };
+}
+
+function parseXtreamShortEpgResponse(channel, json) {
+  const rows =
+    (Array.isArray(json?.epg_listings) && json.epg_listings) ||
+    (Array.isArray(json?.listings) && json.listings) ||
+    (Array.isArray(json) && json) ||
+    [];
+
+  const items = rows
+    .map((row) => buildXtreamProgrammeItem(channel, row))
+    .filter((item) => item.start && item.stop);
+
+  if (!items.length) return [];
+
+  return items
+    .sort((a, b) => itemTime(a.start) - itemTime(b.start))
+    .slice(0, MAX_ITEMS_PER_CHANNEL);
+}
+
+async function fetchXtreamShortEpgForChannel(apiBase, channel) {
+  const streamId = safeText(channel?.streamId);
+  if (!apiBase || !streamId) return [];
+
+  try {
+    const shortJson = await fetchJsonOnce(
+      `${apiBase}&action=get_short_epg&stream_id=${encodeURIComponent(streamId)}&limit=${MAX_ITEMS_PER_CHANNEL}`
+    );
+
+    const items = parseXtreamShortEpgResponse(channel, shortJson);
+    if (items.length) return items;
+  } catch (e) {}
+
+  try {
+    const tableJson = await fetchJsonOnce(
+      `${apiBase}&action=get_simple_data_table&stream_id=${encodeURIComponent(streamId)}`
+    );
+
+    const items = parseXtreamShortEpgResponse(channel, tableJson);
+    if (items.length) return items;
+  } catch (e) {}
+
+  return [];
+}
+
+async function runWithConcurrency(tasks = [], limit = 6) {
+  const results = new Array(tasks.length);
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < tasks.length) {
+      const current = cursor;
+      cursor += 1;
+
+      try {
+        results[current] = await tasks[current]();
+      } catch (e) {
+        results[current] = [];
+      }
+    }
   }
 
+  const workers = Array.from({ length: Math.max(1, limit) }, () => worker());
+  await Promise.all(workers);
+  return results;
+}
+
+async function loadXtreamEpg(session) {
+  const liveItems = Array.isArray(session?.data?.live) ? session.data.live : [];
+  const apiBase = buildXtreamApiBase(session);
+
+  if (!apiBase || !liveItems.length) {
+    return [];
+  }
+
+  const channelsToPrefetch = liveItems
+    .filter((item) => safeText(item?.streamId))
+    .slice(0, XTREAM_PREFETCH_LIMIT);
+
+  if (!channelsToPrefetch.length) {
+    return [];
+  }
+
+  const tasks = channelsToPrefetch.map((channel) => {
+    return async () => fetchXtreamShortEpgForChannel(apiBase, channel);
+  });
+
+  const chunks = await runWithConcurrency(tasks, XTREAM_CONCURRENCY);
+  const items = chunks.flat().filter(Boolean);
+
+  return Array.isArray(items) ? items : [];
+}
+
+async function loadXmltvEpg(session) {
   const xml = await fetchXmltvWithRetry(session);
 
   if (!looksLikeValidXmltv(xml)) {
@@ -476,13 +666,39 @@ async function doLoadEPG(session) {
       matchedChannelIds
     );
 
-    MEMORY_EPG_CACHE = Array.isArray(programmes) ? programmes : [];
-    MEMORY_EPG_CACHE_TIME = Date.now();
-
-    return MEMORY_EPG_CACHE;
+    return Array.isArray(programmes) ? programmes : [];
   } catch (e) {
     return MEMORY_EPG_CACHE || [];
   }
+}
+
+async function doLoadEPG(session) {
+  const now = Date.now();
+
+  if (
+    Array.isArray(MEMORY_EPG_CACHE) &&
+    MEMORY_EPG_CACHE.length > 0 &&
+    now - MEMORY_EPG_CACHE_TIME < EPG_CACHE_MS
+  ) {
+    return MEMORY_EPG_CACHE;
+  }
+
+  let programmes = [];
+
+  if (safeText(session?.type).toLowerCase() === "xtream") {
+    programmes = await loadXtreamEpg(session);
+
+    if (!Array.isArray(programmes) || !programmes.length) {
+      programmes = await loadXmltvEpg(session);
+    }
+  } else {
+    programmes = await loadXmltvEpg(session);
+  }
+
+  MEMORY_EPG_CACHE = Array.isArray(programmes) ? programmes : [];
+  MEMORY_EPG_CACHE_TIME = Date.now();
+
+  return MEMORY_EPG_CACHE;
 }
 
 export async function warmupEPG(session) {
