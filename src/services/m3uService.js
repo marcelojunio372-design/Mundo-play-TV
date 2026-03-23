@@ -144,7 +144,6 @@ function inferType(name = "", group = "", url = "", tvgId = "", tvgName = "") {
   const urlText = safeText(url).toLowerCase();
   const metaText = `${name} ${group} ${tvgId} ${tvgName}`.toLowerCase();
 
-  // série real por URL
   if (
     /\/series\//.test(urlText) ||
     /action=get_series/.test(urlText) ||
@@ -154,7 +153,6 @@ function inferType(name = "", group = "", url = "", tvgId = "", tvgName = "") {
     return "series";
   }
 
-  // filme real por URL
   if (
     /\/movie\//.test(urlText) ||
     /action=get_vod_stream/.test(urlText) ||
@@ -164,17 +162,14 @@ function inferType(name = "", group = "", url = "", tvgId = "", tvgName = "") {
     return "movie";
   }
 
-  // sinais muito fortes de série
   if (/temporada|season|epis[oó]dio|s\d{1,2}e\d{1,2}/.test(metaText)) {
     return "series";
   }
 
-  // sinais muito fortes de filme VOD
   if (/filme sob demanda|vod filme|cat[aá]logo filme/.test(metaText)) {
     return "movie";
   }
 
-  // todo resto entra como canal ao vivo
   return "live";
 }
 
@@ -203,6 +198,35 @@ function shouldKeepType(type, only = "all") {
   return true;
 }
 
+function pushItemByType(type, item, live, movies, series) {
+  if (type === "movie") {
+    movies.push(item);
+  } else if (type === "series") {
+    series.push(item);
+  } else {
+    live.push(item);
+  }
+}
+
+function iterateLines(text = "", onLine) {
+  let buffer = "";
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+
+    if (char === "\n") {
+      const line = buffer.replace(/\r/g, "").trim();
+      buffer = "";
+      if (line) onLine(line);
+    } else {
+      buffer += char;
+    }
+  }
+
+  const lastLine = buffer.replace(/\r/g, "").trim();
+  if (lastLine) onLine(lastLine);
+}
+
 export async function loadM3U(url, options = {}) {
   const only = safeText(options.only || "all").toLowerCase();
 
@@ -213,33 +237,35 @@ export async function loadM3U(url, options = {}) {
     throw new Error("Falha ao carregar lista");
   }
 
-  const lines = text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
+  if (!text.includes("#EXTM3U") && !text.includes("#EXTINF")) {
+    throw new Error("Lista M3U inválida");
+  }
 
   const live = [];
   const movies = [];
   const series = [];
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  let currentExtinf = "";
+  let index = 0;
 
-    if (!line.startsWith("#EXTINF")) continue;
-
-    const extinf = line;
-    let streamUrl = "";
-
-    for (let j = i + 1; j < lines.length; j++) {
-      if (!lines[j].startsWith("#")) {
-        streamUrl = lines[j];
-        i = j;
-        break;
-      }
+  iterateLines(text, (line) => {
+    if (line.startsWith("#EXTINF")) {
+      currentExtinf = line;
+      return;
     }
 
-    if (!streamUrl) continue;
+    if (line.startsWith("#")) {
+      return;
+    }
 
+    if (!currentExtinf) {
+      return;
+    }
+
+    const extinf = currentExtinf;
+    currentExtinf = "";
+
+    const streamUrl = line;
     const name = extractName(extinf);
     const group = extractGroup(extinf);
     const logo = extractLogo(extinf);
@@ -248,7 +274,8 @@ export async function loadM3U(url, options = {}) {
     const type = inferType(name, group, streamUrl, tvgId, tvgName);
 
     if (!shouldKeepType(type, only)) {
-      continue;
+      index += 1;
+      return;
     }
 
     const year = extractYear(name, group);
@@ -256,7 +283,7 @@ export async function loadM3U(url, options = {}) {
     const aliases = buildChannelAliases(name, group, tvgId, tvgName);
 
     const item = {
-      id: `${type}_${i}_${name}`.replace(/\s+/g, "_"),
+      id: `${type}_${index}_${name}`.replace(/\s+/g, "_"),
       name,
       group,
       logo,
@@ -271,14 +298,9 @@ export async function loadM3U(url, options = {}) {
       aliases,
     };
 
-    if (type === "movie") {
-      movies.push(item);
-    } else if (type === "series") {
-      series.push(item);
-    } else {
-      live.push(item);
-    }
-  }
+    pushItemByType(type, item, live, movies, series);
+    index += 1;
+  });
 
   return {
     live,
