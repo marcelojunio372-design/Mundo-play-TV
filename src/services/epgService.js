@@ -5,6 +5,7 @@ let MEMORY_EPG_LOADING = null;
 const EPG_CACHE_MS = 10 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 12000;
 const RETRY_DELAY_MS = 1200;
+const MAX_ITEMS_PER_CHANNEL = 4;
 
 function safeText(value) {
   if (value === null || value === undefined) return "";
@@ -314,8 +315,29 @@ async function fetchXmltvWithRetry(session) {
   return "";
 }
 
-function extractChannelMap(xml = "") {
+function buildSessionTargetAliases(session) {
+  const liveItems = Array.isArray(session?.data?.live) ? session.data.live : [];
+  const targetAliases = new Set();
+
+  liveItems.forEach((item) => {
+    const aliases = buildAliases(
+      safeText(item?.name),
+      safeText(item?.tvgId),
+      safeText(item?.tvgName || item?.name),
+      []
+    );
+
+    aliases.forEach((alias) => {
+      if (alias) targetAliases.add(alias);
+    });
+  });
+
+  return targetAliases;
+}
+
+function extractRelevantChannelMap(xml = "", targetAliases = new Set()) {
   const channelMap = {};
+  const matchedChannelIds = new Set();
   const regex = /<channel\b([^>]*)>([\s\S]*?)<\/channel>/gi;
 
   let match;
@@ -328,15 +350,25 @@ function extractChannelMap(xml = "") {
 
     if (!channelId) continue;
 
+    const aliases = buildAliases(channelId, channelId, channelId, displayNames);
+    const isRelevant = aliases.some((alias) => targetAliases.has(alias));
+
+    if (!isRelevant) continue;
+
     channelMap[channelId] = {
       id: channelId,
       normalizedId: normalizeId(channelId),
       displayNames,
-      aliases: buildAliases(channelId, channelId, channelId, displayNames),
+      aliases,
     };
+
+    matchedChannelIds.add(channelId);
   }
 
-  return channelMap;
+  return {
+    channelMap,
+    matchedChannelIds,
+  };
 }
 
 function shouldKeepProgramme(start, stop) {
@@ -352,9 +384,26 @@ function shouldKeepProgramme(start, stop) {
   return stopTime >= minStart && startTime <= maxStart;
 }
 
-function extractProgrammes(xml = "", channelMap = {}) {
-  const programmes = [];
+function itemTime(date) {
+  return date instanceof Date ? date.getTime() : 0;
+}
+
+function pushProgramme(bucketMap, channelId, item) {
+  if (!bucketMap[channelId]) {
+    bucketMap[channelId] = [];
+  }
+
+  bucketMap[channelId].push(item);
+  bucketMap[channelId].sort((a, b) => itemTime(a.start) - itemTime(b.start));
+
+  if (bucketMap[channelId].length > MAX_ITEMS_PER_CHANNEL) {
+    bucketMap[channelId] = bucketMap[channelId].slice(0, MAX_ITEMS_PER_CHANNEL);
+  }
+}
+
+function extractRelevantProgrammes(xml = "", channelMap = {}, matchedChannelIds = new Set()) {
   const regex = /<programme\b([^>]*)>([\s\S]*?)<\/programme>/gi;
+  const bucketMap = {};
 
   let match;
 
@@ -362,11 +411,11 @@ function extractProgrammes(xml = "", channelMap = {}) {
     const attrs = match[1] || "";
     const body = match[2] || "";
 
+    const channelId = getAttrValue(attrs, "channel");
+    if (!channelId || !matchedChannelIds.has(channelId)) continue;
+
     const start = parseXmltvDate(getAttrValue(attrs, "start"));
     const stop = parseXmltvDate(getAttrValue(attrs, "stop"));
-    const channelId = getAttrValue(attrs, "channel");
-
-    if (!channelId) continue;
     if (!shouldKeepProgramme(start, stop)) continue;
 
     const title = extractTag(body, "title");
@@ -378,7 +427,7 @@ function extractProgrammes(xml = "", channelMap = {}) {
       aliases: buildAliases(channelId, channelId, channelId, []),
     };
 
-    programmes.push({
+    pushProgramme(bucketMap, channelId, {
       channel: channelId,
       normalizedChannel: channelInfo.normalizedId,
       displayNames: channelInfo.displayNames || [],
@@ -390,11 +439,7 @@ function extractProgrammes(xml = "", channelMap = {}) {
     });
   }
 
-  return programmes;
-}
-
-function itemTime(date) {
-  return date instanceof Date ? date.getTime() : 0;
+  return Object.values(bucketMap).flat();
 }
 
 async function doLoadEPG(session) {
@@ -415,8 +460,21 @@ async function doLoadEPG(session) {
   }
 
   try {
-    const channelMap = extractChannelMap(xml);
-    const programmes = extractProgrammes(xml, channelMap);
+    const targetAliases = buildSessionTargetAliases(session);
+    const { channelMap, matchedChannelIds } = extractRelevantChannelMap(
+      xml,
+      targetAliases
+    );
+
+    if (!matchedChannelIds.size) {
+      return MEMORY_EPG_CACHE || [];
+    }
+
+    const programmes = extractRelevantProgrammes(
+      xml,
+      channelMap,
+      matchedChannelIds
+    );
 
     MEMORY_EPG_CACHE = Array.isArray(programmes) ? programmes : [];
     MEMORY_EPG_CACHE_TIME = Date.now();
