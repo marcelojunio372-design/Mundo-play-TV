@@ -3,11 +3,16 @@ let MEMORY_EPG_CACHE_TIME = 0;
 let MEMORY_EPG_LOADING = null;
 
 const EPG_CACHE_MS = 10 * 60 * 1000;
-const FETCH_TIMEOUT_MS = 5000;
+const FETCH_TIMEOUT_MS = 12000;
+const RETRY_DELAY_MS = 1200;
 
 function safeText(value) {
   if (value === null || value === undefined) return "";
   return String(value).trim();
+}
+
+function sleep(ms = 0) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function decodeXml(text = "") {
@@ -171,6 +176,87 @@ function buildXmltvUrlFromSession(session) {
   return "";
 }
 
+function buildCandidateUrls(session) {
+  const list = [];
+  const xmltvUrl = buildXmltvUrlFromSession(session);
+  const sessionUrl =
+    safeText(session?.url) ||
+    safeText(session?.playlistUrl) ||
+    safeText(session?.data?.url) ||
+    safeText(session?.data?.playlistUrl);
+
+  if (xmltvUrl) list.push(xmltvUrl);
+
+  if (sessionUrl) {
+    try {
+      const parsed = new URL(sessionUrl);
+      const username =
+        parsed.searchParams.get("username") ||
+        safeText(session?.username) ||
+        safeText(session?.data?.username);
+      const password =
+        parsed.searchParams.get("password") ||
+        safeText(session?.password) ||
+        safeText(session?.data?.password);
+
+      if (username && password) {
+        list.push(
+          `${parsed.origin}/xmltv.php?username=${encodeURIComponent(
+            username
+          )}&password=${encodeURIComponent(password)}`
+        );
+      }
+    } catch (e) {}
+  }
+
+  return Array.from(new Set(list.filter(Boolean)));
+}
+
+function looksLikeValidXmltv(text = "") {
+  const raw = String(text || "");
+  if (!raw) return false;
+  if (raw.includes("<tv")) return true;
+  if (raw.includes("<!DOCTYPE tv")) return true;
+  return false;
+}
+
+function looksLikeCloudflareOrHtml(text = "") {
+  const raw = String(text || "").toLowerCase();
+  if (!raw) return false;
+  return (
+    raw.includes("<html") ||
+    raw.includes("cloudflare") ||
+    raw.includes("attention required") ||
+    raw.includes("please enable cookies") ||
+    raw.includes("blocked")
+  );
+}
+
+function buildHeaders(url = "") {
+  let origin = "";
+  let referer = "";
+
+  try {
+    const parsed = new URL(url);
+    origin = parsed.origin;
+    referer = `${parsed.origin}/`;
+  } catch (e) {}
+
+  const headers = {
+    Accept: "application/xml,text/xml,application/xhtml+xml,text/html;q=0.9,*/*;q=0.8",
+    "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Cache-Control": "no-cache",
+    Pragma: "no-cache",
+    "User-Agent":
+      "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+  };
+
+  if (origin) headers.Origin = origin;
+  if (referer) headers.Referer = referer;
+
+  return headers;
+}
+
 async function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -183,6 +269,49 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS)
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function fetchXmltvOnce(url = "") {
+  const response = await fetchWithTimeout(
+    url,
+    {
+      method: "GET",
+      headers: buildHeaders(url),
+    },
+    FETCH_TIMEOUT_MS
+  );
+
+  const text = await response.text();
+  return {
+    ok: !!response?.ok,
+    status: response?.status || 0,
+    text,
+  };
+}
+
+async function fetchXmltvWithRetry(session) {
+  const urls = buildCandidateUrls(session);
+
+  for (const url of urls) {
+    try {
+      const first = await fetchXmltvOnce(url);
+
+      if (first.ok && looksLikeValidXmltv(first.text)) {
+        return first.text;
+      }
+
+      if (looksLikeCloudflareOrHtml(first.text)) {
+        await sleep(RETRY_DELAY_MS);
+
+        const second = await fetchXmltvOnce(url);
+        if (second.ok && looksLikeValidXmltv(second.text)) {
+          return second.text;
+        }
+      }
+    } catch (e) {}
+  }
+
+  return "";
 }
 
 function extractChannelMap(xml = "") {
@@ -279,29 +408,18 @@ async function doLoadEPG(session) {
     return MEMORY_EPG_CACHE;
   }
 
-  const url = buildXmltvUrlFromSession(session);
-  if (!url) return [];
+  const xml = await fetchXmltvWithRetry(session);
+
+  if (!looksLikeValidXmltv(xml)) {
+    return MEMORY_EPG_CACHE || [];
+  }
 
   try {
-    const response = await fetchWithTimeout(url, {
-      method: "GET",
-      headers: {
-        Accept: "application/xml,text/xml,*/*",
-        "Cache-Control": "no-cache",
-      },
-    });
-
-    const xml = await response.text();
-
-    if (!response.ok || !xml || !xml.includes("<tv")) {
-      return MEMORY_EPG_CACHE || [];
-    }
-
     const channelMap = extractChannelMap(xml);
     const programmes = extractProgrammes(xml, channelMap);
 
     MEMORY_EPG_CACHE = Array.isArray(programmes) ? programmes : [];
-    MEMORY_EPG_CACHE_TIME = now;
+    MEMORY_EPG_CACHE_TIME = Date.now();
 
     return MEMORY_EPG_CACHE;
   } catch (e) {
