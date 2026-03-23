@@ -76,9 +76,17 @@ export default function AppNavigator() {
     setSelectedSeries(null);
     setSelectedSeason(null);
 
-    setIsEpgLoading(false);
-    setIsEpgReady(false);
-    setEpgMessage("Preparando guia...");
+    const loginType = String(payload?.type || "").toLowerCase();
+
+    if (loginType === "m3u") {
+      setIsEpgLoading(false);
+      setIsEpgReady(false);
+      setEpgMessage("");
+    } else {
+      setIsEpgLoading(false);
+      setIsEpgReady(false);
+      setEpgMessage("Preparando guia...");
+    }
   };
 
   const handleLogout = () => {
@@ -113,8 +121,16 @@ export default function AppNavigator() {
 
       await writeCache(session.url, safeData);
 
-      setIsEpgReady(false);
-      setEpgMessage("Lista atualizada. Preparando guia...");
+      const loginType = String(session?.type || "").toLowerCase();
+
+      if (loginType === "m3u") {
+        setIsEpgLoading(false);
+        setIsEpgReady(false);
+        setEpgMessage("");
+      } else {
+        setIsEpgReady(false);
+        setEpgMessage("Lista atualizada. Preparando guia...");
+      }
 
       return true;
     } catch (e) {
@@ -126,12 +142,22 @@ export default function AppNavigator() {
 
   useEffect(() => {
     let active = true;
-    let timer = null;
 
     async function startEpgWarmup() {
       if (!session) return;
       if (screen !== "home") return;
       if (isEpgLoading || isEpgReady) return;
+
+      const loginType = String(session?.type || "").toLowerCase();
+
+      if (loginType === "m3u") {
+        if (active) {
+          setIsEpgLoading(false);
+          setIsEpgReady(false);
+          setEpgMessage("");
+        }
+        return;
+      }
 
       try {
         setIsEpgLoading(true);
@@ -155,12 +181,11 @@ export default function AppNavigator() {
     }
 
     if (session && screen === "home" && !isEpgLoading && !isEpgReady) {
-  startEpgWarmup();
-}
+      startEpgWarmup();
+    }
 
     return () => {
       active = false;
-      if (timer) clearTimeout(timer);
     };
   }, [session, screen, isEpgLoading, isEpgReady]);
 
