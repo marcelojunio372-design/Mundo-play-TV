@@ -25,6 +25,7 @@ function cleanName(name = "") {
   return decodeEntities(safeText(name))
     .replace(/\s+/g, " ")
     .replace(/tvg-logo="[^"]*"/gi, "")
+    .replace(/tvg-logo='[^']*'/gi, "")
     .trim();
 }
 
@@ -43,7 +44,7 @@ function buildChannelAliases(name = "", group = "", tvgId = "", tvgName = "") {
   const clean = cleanChannelName(original);
 
   const rawParts = `${original} ${group} ${tvgId} ${tvgName}`
-    .split(/[\-|/|]+/g)
+    .split(/[-/|]+/g)
     .map((item) => item.trim())
     .filter(Boolean);
 
@@ -60,23 +61,43 @@ function buildChannelAliases(name = "", group = "", tvgId = "", tvgName = "") {
 
 function extractAttr(line = "", attr = "") {
   const escaped = attr.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = line.match(new RegExp(`${escaped}="([^"]*)"`, "i"));
-  return match ? decodeEntities(match[1]) : "";
+
+  const doubleQuoted = line.match(
+    new RegExp(`${escaped}\\s*=\\s*"([^"]*)"`, "i")
+  );
+  if (doubleQuoted?.[1]) {
+    return decodeEntities(doubleQuoted[1]);
+  }
+
+  const singleQuoted = line.match(
+    new RegExp(`${escaped}\\s*=\\s*'([^']*)'`, "i")
+  );
+  if (singleQuoted?.[1]) {
+    return decodeEntities(singleQuoted[1]);
+  }
+
+  const unquoted = line.match(
+    new RegExp(`${escaped}\\s*=\\s*([^\\s,]+)`, "i")
+  );
+  if (unquoted?.[1]) {
+    return decodeEntities(unquoted[1]);
+  }
+
+  return "";
 }
 
 function extractGroup(extinf = "") {
   const g1 = extractAttr(extinf, "group-title");
   if (g1) return safeText(g1);
 
-  const parts = extinf.split(",");
-  if (parts.length > 1) return safeText(parts[1]);
-
   return "OUTROS";
 }
 
 function extractName(extinf = "") {
-  const parts = extinf.split(",");
-  if (parts.length > 1) return cleanName(parts.slice(1).join(","));
+  const commaIndex = extinf.indexOf(",");
+  if (commaIndex >= 0) {
+    return cleanName(extinf.slice(commaIndex + 1));
+  }
   return "Sem nome";
 }
 
@@ -153,7 +174,6 @@ function inferType(name = "", group = "", url = "", tvgId = "", tvgName = "") {
   const urlText = safeText(url).toLowerCase();
   const metaText = `${name} ${group} ${tvgId} ${tvgName}`.toLowerCase();
 
-  // 1) prioridade: URL claramente identifica
   if (
     /\/movie\//.test(urlText) ||
     /action=get_vod_stream/.test(urlText) ||
@@ -172,7 +192,6 @@ function inferType(name = "", group = "", url = "", tvgId = "", tvgName = "") {
     return "series";
   }
 
-  // 2) depois tenta grupo/nome
   if (looksLikeSeriesGroup(group, name)) {
     return "series";
   }
@@ -181,12 +200,10 @@ function inferType(name = "", group = "", url = "", tvgId = "", tvgName = "") {
     return "movie";
   }
 
-  // 3) sinais fortes de live
   if (looksLikeLiveGroup(group, name)) {
     return "live";
   }
 
-  // 4) heurística final
   if (/temporada|season|epis[oó]dio|s\d{1,2}e\d{1,2}/.test(metaText)) {
     return "series";
   }
