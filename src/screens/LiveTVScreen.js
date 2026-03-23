@@ -10,10 +10,12 @@ import {
   TextInput,
   StatusBar,
   Modal,
+  InteractionManager,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Video, ResizeMode } from "expo-av";
 import {
+  warmupEPG,
   findNowAndNextForChannel,
   formatProgramTime,
 } from "../services/epgService";
@@ -92,10 +94,13 @@ export default function LiveTVScreen({
   const [isFullscreenPaused, setIsFullscreenPaused] = useState(false);
   const [showFullscreen, setShowFullscreen] = useState(false);
   const [showFullscreenUi, setShowFullscreenUi] = useState(true);
+  const [epgItems, setEpgItems] = useState([]);
+  const [epgReady, setEpgReady] = useState(false);
 
   const videoRef = useRef(null);
   const fullscreenVideoRef = useRef(null);
   const fullscreenUiTimerRef = useRef(null);
+  const epgStartedRef = useRef(false);
 
   useEffect(() => {
     async function loadSavedData() {
@@ -120,6 +125,38 @@ export default function LiveTVScreen({
       }
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    let interactionTask = null;
+
+    async function startWarmup() {
+      if (epgStartedRef.current) return;
+      epgStartedRef.current = true;
+
+      try {
+        const items = await warmupEPG(session);
+        if (!active) return;
+        setEpgItems(Array.isArray(items) ? items : []);
+      } catch (e) {
+        if (!active) return;
+        setEpgItems([]);
+      } finally {
+        if (active) setEpgReady(true);
+      }
+    }
+
+    interactionTask = InteractionManager.runAfterInteractions(() => {
+      setTimeout(() => {
+        startWarmup();
+      }, 3000);
+    });
+
+    return () => {
+      active = false;
+      if (interactionTask?.cancel) interactionTask.cancel();
+    };
+  }, [session]);
 
   const favoriteChannels = useMemo(() => {
     const favoriteSet = new Set(favoriteIds);
@@ -171,18 +208,18 @@ export default function LiveTVScreen({
   }, [selectedChannel?.url]);
 
   const { nowProgram, nextProgram } = useMemo(() => {
-    if (!selectedChannel) {
+    if (!selectedChannel || !epgReady || !epgItems.length) {
       return { nowProgram: null, nextProgram: null };
     }
 
     return findNowAndNextForChannel(
-      [],
+      epgItems,
       safeText(selectedChannel.name),
       safeText(selectedChannel.group),
       safeText(selectedChannel.tvgId),
       safeText(selectedChannel.tvgName || selectedChannel.name)
     );
-  }, [selectedChannel]);
+  }, [epgItems, epgReady, selectedChannel]);
 
   const progressPercent = useMemo(() => getProgressPercent(nowProgram), [nowProgram]);
 
