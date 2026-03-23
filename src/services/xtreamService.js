@@ -98,7 +98,6 @@ export async function loadXtream(baseUrl, username, password) {
 
     return {
       id: `live_${streamId || index}`,
-      streamId,
       name,
       group,
       logo: safeText(item?.stream_icon),
@@ -109,10 +108,6 @@ export async function loadXtream(baseUrl, username, password) {
       tvgId: safeText(item?.epg_channel_id),
       tvgName: name,
       aliases: [],
-      epgSource: "xtream",
-      server: base,
-      username: safeText(username),
-      password: safeText(password),
     };
   });
 
