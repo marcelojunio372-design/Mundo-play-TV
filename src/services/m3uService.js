@@ -140,49 +140,11 @@ function extractDescription(extinf = "", name = "", group = "") {
   return safeText(name || "");
 }
 
-function looksLikeSeriesGroup(group = "", name = "") {
-  const text = `${group} ${name}`.toLowerCase();
-
-  return (
-    /s[eé]ries|series|temporadas|temporada|season|epis[oó]dio|episodios|novelas|animes|desenhos|kids|infantil/.test(
-      text
-    ) &&
-    !/filmes|movie|cinema|ao vivo|abertos|esportes|adult|xxx/.test(text)
-  );
-}
-
-function looksLikeMovieGroup(group = "", name = "") {
-  const text = `${group} ${name}`.toLowerCase();
-
-  return (
-    /filmes|movie|movies|cinema|lancamento|lançamento|terror|romance|comedia|comédia|acao|ação|drama|suspense|document[aá]rio|documentario|anima[cç][aã]o|desenho|infantil|faroeste/.test(
-      text
-    ) &&
-    !/s[eé]ries|series|temporada|season|epis[oó]dio/.test(text)
-  );
-}
-
-function looksLikeLiveGroup(group = "", name = "") {
-  const text = `${group} ${name}`.toLowerCase();
-
-  return /ao vivo|live|tv aberta|abertos|esportes|not[ií]cias|document[aá]rios|religiosos|canais|4k|24h|bbb|globo|sbt|record|band|rede|sportv|espn|premiere|telecine|hbo|warner|discovery|natgeo|animal planet/.test(
-    text
-  );
-}
-
 function inferType(name = "", group = "", url = "", tvgId = "", tvgName = "") {
   const urlText = safeText(url).toLowerCase();
   const metaText = `${name} ${group} ${tvgId} ${tvgName}`.toLowerCase();
 
-  if (
-    /\/movie\//.test(urlText) ||
-    /action=get_vod_stream/.test(urlText) ||
-    /type=movie/.test(urlText) ||
-    /\/vod\//.test(urlText)
-  ) {
-    return "movie";
-  }
-
+  // série real por URL
   if (
     /\/series\//.test(urlText) ||
     /action=get_series/.test(urlText) ||
@@ -192,26 +154,27 @@ function inferType(name = "", group = "", url = "", tvgId = "", tvgName = "") {
     return "series";
   }
 
-  if (looksLikeSeriesGroup(group, name)) {
-    return "series";
-  }
-
-  if (looksLikeMovieGroup(group, name)) {
+  // filme real por URL
+  if (
+    /\/movie\//.test(urlText) ||
+    /action=get_vod_stream/.test(urlText) ||
+    /type=movie/.test(urlText) ||
+    /\/vod\//.test(urlText)
+  ) {
     return "movie";
   }
 
-  if (looksLikeLiveGroup(group, name)) {
-    return "live";
-  }
-
+  // sinais muito fortes de série
   if (/temporada|season|epis[oó]dio|s\d{1,2}e\d{1,2}/.test(metaText)) {
     return "series";
   }
 
-  if (/filme|movie|movies|cinema|vod|lancamento|lançamento/.test(metaText)) {
+  // sinais muito fortes de filme VOD
+  if (/filme sob demanda|vod filme|cat[aá]logo filme/.test(metaText)) {
     return "movie";
   }
 
+  // todo resto entra como canal ao vivo
   return "live";
 }
 
