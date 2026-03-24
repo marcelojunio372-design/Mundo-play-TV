@@ -86,7 +86,7 @@ export default function HomeScreen({
 
             <TouchableOpacity style={styles.actionButton}>
               <Text style={styles.actionButtonText}>
-                {featured ? "CONTEÚDO CARREGADO" : "AGUARDANDO CONTEÚDO"}
+                {featured ? "CONTEÚDO PRONTO" : "SEM CONTEÚDO"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -103,8 +103,8 @@ const styles = StyleSheet.create({
   },
 
   topbar: {
-    height: 46,
-    paddingHorizontal: 10,
+    height: 40,
+    paddingHorizontal: 8,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -114,31 +114,31 @@ const styles = StyleSheet.create({
 
   appTitle: {
     color: "#ffffff",
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "900",
   },
 
   statusText: {
     color: "#35c8ff",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "700",
   },
 
   content: {
     flex: 1,
     flexDirection: "row",
-    padding: 8,
+    padding: 6,
   },
 
   sidebar: {
-    width: 112,
-    gap: 8,
-    paddingRight: 8,
+    width: 96,
+    gap: 6,
+    paddingRight: 6,
   },
 
   sideButton: {
-    height: 66,
-    borderRadius: 14,
+    height: 56,
+    borderRadius: 12,
     backgroundColor: "#08203a",
     alignItems: "center",
     justifyContent: "center",
@@ -146,13 +146,13 @@ const styles = StyleSheet.create({
 
   sideButtonText: {
     color: "#ffffff",
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "800",
   },
 
   sideButtonSmall: {
-    height: 58,
-    borderRadius: 14,
+    height: 48,
+    borderRadius: 12,
     backgroundColor: "#08203a",
     alignItems: "center",
     justifyContent: "center",
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
 
   sideButtonSmallText: {
     color: "#ffffff",
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: "800",
     textAlign: "center",
   },
@@ -170,27 +170,27 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     backgroundColor: "#020812",
-    borderRadius: 14,
-    padding: 12,
+    borderRadius: 12,
+    padding: 10,
   },
 
   posterBox: {
-    width: 120,
+    width: 90,
     alignItems: "center",
     justifyContent: "center",
   },
 
   poster: {
-    width: 95,
-    height: 145,
-    borderRadius: 12,
+    width: 72,
+    height: 112,
+    borderRadius: 10,
     resizeMode: "cover",
   },
 
   posterFallback: {
-    width: 95,
-    height: 145,
-    borderRadius: 12,
+    width: 72,
+    height: 112,
+    borderRadius: 10,
     backgroundColor: "#132a45",
     alignItems: "center",
     justifyContent: "center",
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
 
   posterFallbackText: {
     color: "#35c8ff",
-    fontSize: 13,
+    fontSize: 10,
     fontWeight: "900",
     textAlign: "center",
   },
@@ -206,34 +206,34 @@ const styles = StyleSheet.create({
   infoBox: {
     flex: 1,
     justifyContent: "center",
-    paddingLeft: 12,
+    paddingLeft: 10,
   },
 
   featureLabel: {
     color: "#35c8ff",
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "900",
-    marginBottom: 8,
+    marginBottom: 6,
   },
 
   featureTitle: {
     color: "#ffffff",
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "900",
-    marginBottom: 10,
+    marginBottom: 8,
   },
 
   featureDesc: {
     color: "#d8d8d8",
-    fontSize: 12,
-    marginBottom: 14,
+    fontSize: 10,
+    marginBottom: 10,
   },
 
   actionButton: {
-    height: 46,
-    width: 250,
+    height: 36,
+    width: 190,
     maxWidth: "100%",
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: "#35c8ff",
     alignItems: "center",
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
 
   actionButtonText: {
     color: "#35c8ff",
-    fontSize: 14,
+    fontSize: 10,
     fontWeight: "900",
   },
 });

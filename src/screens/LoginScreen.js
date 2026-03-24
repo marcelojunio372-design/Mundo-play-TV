@@ -8,8 +8,10 @@ import {
   StyleSheet,
   Alert,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { loadM3U } from "../services/m3uService";
 import { loadXtream } from "../services/xtreamService";
 
 const LOGIN_STORAGE_KEY = "mundoplaytv_login_data_v1";
@@ -22,6 +24,7 @@ export default function LoginScreen({ onLogin }) {
   const [password, setPassword] = useState("");
   const [mac] = useState("00:1A:79:12:34:56");
   const [loading, setLoading] = useState(false);
+  const [loadingText, setLoadingText] = useState("");
 
   useEffect(() => {
     async function loadSavedLogin() {
@@ -88,6 +91,7 @@ export default function LoginScreen({ onLogin }) {
 
     try {
       setLoading(true);
+      setLoadingText("Carregando lista...");
 
       await saveLoginData({
         mode: "m3u",
@@ -97,24 +101,21 @@ export default function LoginScreen({ onLogin }) {
         password: "",
       });
 
-      onLogin({
+      const data = await loadM3U(finalUrl);
+
+      setLoadingText("Entrando no aplicativo...");
+
+      await onLogin({
         type: "m3u",
         url: finalUrl,
         mac,
-        data: {
-          live: [],
-          movies: [],
-          series: [],
-          liveCategories: [],
-          movieCategories: [],
-          seriesCategories: [],
-          loadedAt: null,
-        },
+        data,
       });
     } catch (e) {
-      Alert.alert("Erro", "Falha ao iniciar login M3U");
+      Alert.alert("Erro", "Falha ao carregar a lista M3U");
     } finally {
       setLoading(false);
+      setLoadingText("");
     }
   };
 
@@ -132,6 +133,7 @@ export default function LoginScreen({ onLogin }) {
 
     try {
       setLoading(true);
+      setLoadingText("Carregando acesso...");
 
       await saveLoginData({
         mode: "xtream",
@@ -143,7 +145,9 @@ export default function LoginScreen({ onLogin }) {
 
       const data = await loadXtream(base, username, password);
 
-      onLogin({
+      setLoadingText("Entrando no aplicativo...");
+
+      await onLogin({
         type: "xtream",
         url: playlistUrl,
         server: base,
@@ -156,6 +160,7 @@ export default function LoginScreen({ onLogin }) {
       Alert.alert("Erro", "Falha ao carregar login Xtream");
     } finally {
       setLoading(false);
+      setLoadingText("");
     }
   };
 
@@ -247,14 +252,19 @@ export default function LoginScreen({ onLogin }) {
             </>
           )}
 
-          <TouchableOpacity style={styles.btn} onPress={handleConnect}>
-            <Text style={styles.btnText}>
-              {loading
-                ? mode === "xtream"
-                  ? "CARREGANDO XTREAM..."
-                  : "ENTRANDO M3U..."
-                : "CONECTAR"}
-            </Text>
+          <TouchableOpacity
+            style={[styles.btn, loading && styles.btnDisabled]}
+            onPress={handleConnect}
+            disabled={loading}
+          >
+            {loading ? (
+              <View style={styles.loadingRow}>
+                <ActivityIndicator size="small" color="#04121d" />
+                <Text style={styles.btnText}>{loadingText || "CARREGANDO..."}</Text>
+              </View>
+            ) : (
+              <Text style={styles.btnText}>CONECTAR</Text>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.clearBtn} onPress={clearSavedLogin}>
@@ -357,10 +367,21 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
 
+  btnDisabled: {
+    opacity: 0.9,
+  },
+
+  loadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
   btnText: {
     color: "#04121d",
     fontWeight: "900",
     fontSize: 15,
+    marginLeft: 8,
   },
 
   clearBtn: {

@@ -11,7 +11,7 @@ import SeasonEpisodesScreen from "../screens/SeasonEpisodesScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 import { loadM3U } from "../services/m3uService";
 
-const CACHE_KEY = "mundoplaytv_session_cache_v11";
+const CACHE_KEY = "mundoplaytv_session_cache_v12";
 
 const EMPTY_DATA = {
   live: [],
@@ -89,7 +89,15 @@ export default function AppNavigator() {
     try {
       setIsRefreshingData(true);
 
-      const data = await loadM3U(session.url);
+      const loginType = String(session?.type || "").toLowerCase();
+      let data = null;
+
+      if (loginType === "xtream") {
+        return true;
+      }
+
+      data = await loadM3U(session.url);
+
       const safeData = mergeData(data);
 
       setSession((prev) => {
@@ -143,7 +151,12 @@ export default function AppNavigator() {
   }
 
   if (screen === "movieDetails") {
-    return <MovieDetailsScreen movie={selectedMovie} onBack={() => setScreen("movies")} />;
+    return (
+      <MovieDetailsScreen
+        movie={selectedMovie}
+        onBack={() => setScreen("movies")}
+      />
+    );
   }
 
   if (screen === "series") {

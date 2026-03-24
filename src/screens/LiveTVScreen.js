@@ -312,8 +312,8 @@ export default function LiveTVScreen({
 
                 {isBuffering && (
                   <View style={styles.playerOverlay}>
-                    <ActivityIndicator size="large" color="#35c8ff" />
-                    <Text style={styles.playerOverlayText}>Carregando transmissão...</Text>
+                    <ActivityIndicator size="small" color="#35c8ff" />
+                    <Text style={styles.playerOverlayText}>Carregando...</Text>
                   </View>
                 )}
 
@@ -325,7 +325,7 @@ export default function LiveTVScreen({
               </>
             ) : (
               <View style={styles.emptyPlayer}>
-                <Text style={styles.emptyPlayerText}>Selecione um canal para reproduzir.</Text>
+                <Text style={styles.emptyPlayerText}>Selecione um canal.</Text>
               </View>
             )}
           </View>
@@ -358,7 +358,7 @@ export default function LiveTVScreen({
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.actionBtn}>
-                <Text style={styles.actionBtnText}>procurar</Text>
+                <Text style={styles.actionBtnText}>buscar</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -375,8 +375,8 @@ const styles = StyleSheet.create({
   },
 
   topbar: {
-    height: 42,
-    paddingHorizontal: 8,
+    height: 36,
+    paddingHorizontal: 6,
     flexDirection: "row",
     alignItems: "center",
     borderBottomWidth: 1,
@@ -386,35 +386,35 @@ const styles = StyleSheet.create({
 
   topNavText: {
     color: "#e6e6e6",
-    fontSize: 10,
+    fontSize: 9,
   },
 
   topNavTextActive: {
     color: "#f0c63c",
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "800",
   },
 
   topSeparator: {
     color: "#b2b2b2",
-    marginHorizontal: 8,
+    marginHorizontal: 6,
   },
 
   searchWrap: {
-    marginLeft: 10,
-    width: 150,
-    height: 30,
+    marginLeft: 8,
+    width: 130,
+    height: 26,
     borderWidth: 2,
     borderColor: "#ececec",
-    borderRadius: 15,
+    borderRadius: 13,
     justifyContent: "center",
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
   },
 
   searchInput: {
     color: "#ffffff",
     padding: 0,
-    fontSize: 11,
+    fontSize: 10,
   },
 
   layout: {
@@ -423,14 +423,14 @@ const styles = StyleSheet.create({
   },
 
   leftCol: {
-    width: 150,
+    width: 110,
     backgroundColor: "#2a1124",
     borderRightWidth: 1,
     borderRightColor: "rgba(255,255,255,0.08)",
   },
 
   middleCol: {
-    width: 180,
+    width: 130,
     backgroundColor: "#15111f",
     borderRightWidth: 1,
     borderRightColor: "rgba(255,255,255,0.08)",
@@ -442,8 +442,8 @@ const styles = StyleSheet.create({
   },
 
   categoryItem: {
-    minHeight: 40,
-    paddingHorizontal: 10,
+    minHeight: 32,
+    paddingHorizontal: 8,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -457,9 +457,9 @@ const styles = StyleSheet.create({
 
   categoryName: {
     color: "#f0f0f0",
-    fontSize: 10,
+    fontSize: 9,
     flex: 1,
-    marginRight: 8,
+    marginRight: 6,
   },
 
   categoryNameActive: {
@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
 
   categoryCount: {
     color: "#d4d4d4",
-    fontSize: 10,
+    fontSize: 9,
   },
 
   categoryCountActive: {
@@ -478,8 +478,8 @@ const styles = StyleSheet.create({
   },
 
   channelItem: {
-    minHeight: 40,
-    paddingHorizontal: 8,
+    minHeight: 32,
+    paddingHorizontal: 6,
     flexDirection: "row",
     alignItems: "center",
     borderBottomWidth: 1,
@@ -491,31 +491,31 @@ const styles = StyleSheet.create({
   },
 
   channelNumber: {
-    width: 20,
+    width: 16,
     color: "#d9d9d9",
-    fontSize: 10,
+    fontSize: 8,
     textAlign: "center",
   },
 
   channelLogo: {
-    width: 14,
-    height: 14,
+    width: 12,
+    height: 12,
     resizeMode: "contain",
-    marginHorizontal: 5,
+    marginHorizontal: 4,
   },
 
   channelLogoFallback: {
-    width: 14,
-    height: 14,
-    marginHorizontal: 5,
-    borderRadius: 3,
+    width: 12,
+    height: 12,
+    marginHorizontal: 4,
+    borderRadius: 2,
     backgroundColor: "#39465c",
   },
 
   channelName: {
     flex: 1,
     color: "#f3f3f3",
-    fontSize: 10,
+    fontSize: 8,
   },
 
   channelNameActive: {
@@ -524,9 +524,9 @@ const styles = StyleSheet.create({
   },
 
   playerWrap: {
-    height: 180,
+    height: 130,
     backgroundColor: "#000000",
-    margin: 6,
+    margin: 4,
     overflow: "hidden",
   },
 
@@ -541,13 +541,13 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.40)",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
   },
 
   playerOverlayText: {
-    marginTop: 8,
+    marginTop: 6,
     color: "#ffffff",
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: "700",
     textAlign: "center",
   },
@@ -556,33 +556,33 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: 10,
+    padding: 8,
   },
 
   emptyPlayerText: {
     color: "#ffffff",
-    fontSize: 10,
+    fontSize: 8,
     textAlign: "center",
   },
 
   infoBlock: {
     flex: 1,
-    paddingHorizontal: 8,
-    paddingBottom: 8,
+    paddingHorizontal: 6,
+    paddingBottom: 6,
   },
 
   channelInfoTitle: {
     color: "#ffffff",
-    fontSize: 13,
+    fontSize: 10,
     fontWeight: "900",
     marginTop: 2,
   },
 
   channelInfoGroup: {
     color: "#d2d2d2",
-    fontSize: 10,
-    marginTop: 3,
-    marginBottom: 8,
+    fontSize: 8,
+    marginTop: 2,
+    marginBottom: 6,
   },
 
   epgWrap: {
@@ -591,30 +591,30 @@ const styles = StyleSheet.create({
 
   epgRow: {
     flexDirection: "row",
-    marginBottom: 6,
+    marginBottom: 4,
   },
 
   epgTime: {
-    width: 72,
+    width: 56,
     color: "#f0d24c",
-    fontSize: 10,
+    fontSize: 8,
   },
 
   epgTitle: {
     flex: 1,
     color: "#ffffff",
-    fontSize: 10,
+    fontSize: 8,
   },
 
   actionsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 14,
+    marginTop: 10,
   },
 
   actionBtn: {
-    width: 66,
-    height: 28,
+    width: 52,
+    height: 22,
     borderRadius: 4,
     backgroundColor: "#7e5ca8",
     alignItems: "center",
@@ -623,7 +623,7 @@ const styles = StyleSheet.create({
 
   actionBtnText: {
     color: "#ffffff",
-    fontSize: 9,
+    fontSize: 7,
     fontWeight: "700",
     textTransform: "lowercase",
   },
