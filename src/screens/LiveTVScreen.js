@@ -1,744 +1,265 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  FlatList,
   SafeAreaView,
-  View,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  FlatList,
-  StyleSheet,
-  Dimensions,
-  TextInput,
-  StatusBar,
-  Modal,
+  View,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Video, ResizeMode } from "expo-av";
-import {
-  loadEPG,
-  findNowAndNextForChannel,
-  formatProgramTime,
-} from "../services/epgService";
+import { ResizeMode, Video } from "expo-av";
 
-const { width } = Dimensions.get("window");
-const isPhone = width < 900;
-
-const FAVORITES_KEY = "mundoplaytv_live_favorites";
-const RECENTS_KEY = "mundoplaytv_live_recents";
-const CATEGORY_ROW_HEIGHT = isPhone ? 34 : 46;
-const CHANNEL_ROW_HEIGHT = isPhone ? 38 : 48;
-const FULLSCREEN_HIDE_DELAY = 2500;
-
-function safeText(value) {
-  if (value === null || value === undefined) return "";
-  return String(value).trim();
+function safeArray(value) {
+  return Array.isArray(value) ? value : [];
 }
 
-function buildCategories(channels = [], favorites = [], recents = []) {
-  const groups = {};
-
-  channels.forEach((item) => {
-    const key = safeText(item.group || "OUTROS");
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(item);
-  });
-
-  return [
-    { name: "Tudo", items: channels },
-    { name: "Favoritos", items: favorites },
-    { name: "Visto por último", items: recents },
-    ...Object.keys(groups)
-      .sort((a, b) => a.localeCompare(b))
-      .map((group) => ({
-        name: group,
-        items: groups[group],
-      })),
-  ];
-}
-
-function getChannelStorageId(item = {}) {
-  return safeText(item.id || item.url || item.name);
-}
-
-function getProgressPercent(program) {
-  if (!program?.start || !program?.stop) return 0;
-
-  const now = Date.now();
-  const start = program.start.getTime();
-  const stop = program.stop.getTime();
-
-  if (stop <= start) return 0;
-  if (now <= start) return 0;
-  if (now >= stop) return 100;
-
-  return Math.max(0, Math.min(100, ((now - start) / (stop - start)) * 100));
+function normalizeUrl(url = "") {
+  return String(url || "").trim();
 }
 
 export default function LiveTVScreen({
   session,
+  isEpgReady,
   onOpenHome,
   onOpenLive,
   onOpenMovies,
   onOpenSeries,
-  isEpgReady,
 }) {
-  const channels = Array.isArray(session?.data?.live) ? session.data.live : [];
-
-  const [favoriteIds, setFavoriteIds] = useState([]);
-  const [recentIds, setRecentIds] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState(0);
-  const [selectedChannelIndex, setSelectedChannelIndex] = useState(0);
-  const [search, setSearch] = useState("");
-  const [playerKey, setPlayerKey] = useState(0);
-  const [fullscreenKey, setFullscreenKey] = useState(0);
-
-  const [isPaused, setIsPaused] = useState(false);
-  const [isFullscreenPaused, setIsFullscreenPaused] = useState(false);
-  const [showFullscreen, setShowFullscreen] = useState(false);
-  const [showFullscreenUi, setShowFullscreenUi] = useState(true);
-  const [epgItems, setEpgItems] = useState([]);
-
   const videoRef = useRef(null);
-  const fullscreenVideoRef = useRef(null);
-  const fullscreenUiTimerRef = useRef(null);
 
-  useEffect(() => {
-    async function loadSavedData() {
-      try {
-        const [savedFavorites, savedRecents] = await Promise.all([
-          AsyncStorage.getItem(FAVORITES_KEY),
-          AsyncStorage.getItem(RECENTS_KEY),
-        ]);
-
-        if (savedFavorites) setFavoriteIds(JSON.parse(savedFavorites));
-        if (savedRecents) setRecentIds(JSON.parse(savedRecents));
-      } catch (e) {}
-    }
-
-    loadSavedData();
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (fullscreenUiTimerRef.current) {
-        clearTimeout(fullscreenUiTimerRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-
-    async function readReadyCache() {
-      if (!isEpgReady) {
-        if (active) setEpgItems([]);
-        return;
-      }
-
-      try {
-        const items = await loadEPG(session);
-        if (!active) return;
-        setEpgItems(Array.isArray(items) ? items : []);
-      } catch (e) {
-        if (!active) return;
-        setEpgItems([]);
-      }
-    }
-
-    readReadyCache();
-
-    return () => {
-      active = false;
-    };
-  }, [session, isEpgReady]);
-
-  const favoriteChannels = useMemo(() => {
-    const favoriteSet = new Set(favoriteIds);
-    return channels.filter((item) => favoriteSet.has(getChannelStorageId(item)));
-  }, [channels, favoriteIds]);
-
-  const recentChannels = useMemo(() => {
-    const map = new Map(channels.map((item) => [getChannelStorageId(item), item]));
-    return recentIds.map((id) => map.get(id)).filter(Boolean);
-  }, [channels, recentIds]);
-
-  const categories = useMemo(() => {
-    return buildCategories(channels, favoriteChannels, recentChannels);
-  }, [channels, favoriteChannels, recentChannels]);
-
-  const baseChannels = categories[selectedCategory]?.items || channels;
-
-  const visibleChannels = useMemo(() => {
-    const term = safeText(search).toLowerCase();
-    if (!term) return baseChannels;
-
-    return baseChannels.filter((item) => {
-      const name = safeText(item.name).toLowerCase();
-      const group = safeText(item.group).toLowerCase();
-      return name.includes(term) || group.includes(term);
-    });
-  }, [baseChannels, search]);
-
-  useEffect(() => {
-    if (selectedChannelIndex >= visibleChannels.length) {
-      setSelectedChannelIndex(0);
-    }
-  }, [visibleChannels.length, selectedChannelIndex]);
-
-  const selectedChannel =
-    visibleChannels[selectedChannelIndex] || visibleChannels[0] || null;
-
-  const selectedChannelId = getChannelStorageId(selectedChannel);
-
-  const isFavorite = useMemo(() => {
-    return favoriteIds.includes(selectedChannelId);
-  }, [favoriteIds, selectedChannelId]);
-
-  useEffect(() => {
-    async function resetPlayers() {
-      try {
-        await videoRef.current?.stopAsync?.();
-      } catch (e) {}
-
-      try {
-        await fullscreenVideoRef.current?.stopAsync?.();
-      } catch (e) {}
-
-      setPlayerKey((prev) => prev + 1);
-      setFullscreenKey((prev) => prev + 1);
-
-      if (showFullscreen) {
-        setIsPaused(true);
-        setIsFullscreenPaused(false);
-      } else {
-        setIsPaused(false);
-        setIsFullscreenPaused(false);
-      }
-    }
-
-    resetPlayers();
-  }, [selectedChannel?.url]);
-
-  const { nowProgram, nextProgram } = useMemo(() => {
-    if (!selectedChannel || !epgItems.length) {
-      return { nowProgram: null, nextProgram: null };
-    }
-
-    return findNowAndNextForChannel(
-      epgItems,
-      safeText(selectedChannel.name),
-      safeText(selectedChannel.group),
-      safeText(selectedChannel.tvgId),
-      safeText(selectedChannel.tvgName || selectedChannel.name)
+  const channels = useMemo(() => {
+    return safeArray(session?.data?.live).filter(
+      (item) => item && item.url && item.name
     );
-  }, [epgItems, selectedChannel]);
+  }, [session]);
 
-  const progressPercent = useMemo(() => getProgressPercent(nowProgram), [nowProgram]);
+  const [selectedChannel, setSelectedChannel] = useState(
+    channels.length > 0 ? channels[0] : null
+  );
+  const [playerKey, setPlayerKey] = useState(1);
+  const [isBuffering, setIsBuffering] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [playerMessage, setPlayerMessage] = useState("");
 
-  const persistFavorites = async (ids) => {
-    try {
-      await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(ids));
-    } catch (e) {}
-  };
+  const streamUrl = useMemo(() => {
+    return normalizeUrl(selectedChannel?.url);
+  }, [selectedChannel]);
 
-  const persistRecents = async (ids) => {
-    try {
-      await AsyncStorage.setItem(RECENTS_KEY, JSON.stringify(ids));
-    } catch (e) {}
-  };
-
-  const addToRecent = async (channel) => {
-    const id = getChannelStorageId(channel);
-    if (!id) return;
-
-    const updated = [id, ...recentIds.filter((item) => item !== id)].slice(0, 50);
-    setRecentIds(updated);
-    await persistRecents(updated);
-  };
-
-  const toggleFavorite = async () => {
-    if (!selectedChannelId) return;
-
-    let updated = [];
-
-    if (favoriteIds.includes(selectedChannelId)) {
-      updated = favoriteIds.filter((id) => id !== selectedChannelId);
-    } else {
-      updated = [selectedChannelId, ...favoriteIds];
-    }
-
-    setFavoriteIds(updated);
-    await persistFavorites(updated);
-    showFullscreenControls();
-  };
-
-  const handleSelectCategory = async (index) => {
-    try {
-      await videoRef.current?.stopAsync?.();
-    } catch (e) {}
-
-    try {
-      await fullscreenVideoRef.current?.stopAsync?.();
-    } catch (e) {}
-
-    setSelectedCategory(index);
-    setSelectedChannelIndex(0);
-    setSearch("");
-  };
-
-  const handleSelectChannel = async (index) => {
-    try {
-      await videoRef.current?.stopAsync?.();
-    } catch (e) {}
-
-    try {
-      await fullscreenVideoRef.current?.stopAsync?.();
-    } catch (e) {}
-
-    setSelectedChannelIndex(index);
-
-    const item = visibleChannels[index];
-    if (item) await addToRecent(item);
-
+  const handleSelectChannel = async (channel) => {
+    setSelectedChannel(channel);
+    setHasError(false);
+    setPlayerMessage("");
     setPlayerKey((prev) => prev + 1);
-    setFullscreenKey((prev) => prev + 1);
 
-    if (showFullscreen) {
-      setIsPaused(true);
-      setIsFullscreenPaused(false);
-    } else {
-      setIsPaused(false);
-      setIsFullscreenPaused(false);
-    }
-  };
-
-  const togglePauseFullscreen = async () => {
     try {
-      if (isFullscreenPaused) {
-        await fullscreenVideoRef.current?.playAsync?.();
-        setIsFullscreenPaused(false);
-      } else {
-        await fullscreenVideoRef.current?.pauseAsync?.();
-        setIsFullscreenPaused(true);
+      if (videoRef.current) {
+        await videoRef.current.stopAsync().catch(() => {});
       }
-      showFullscreenControls();
     } catch (e) {}
   };
 
-  const goToPreviousChannel = async () => {
-    if (!visibleChannels.length) return;
-    const nextIndex =
-      selectedChannelIndex <= 0 ? visibleChannels.length - 1 : selectedChannelIndex - 1;
-    await handleSelectChannel(nextIndex);
-    showFullscreenControls();
-  };
+  const handleReloadPlayer = async () => {
+    setHasError(false);
+    setPlayerMessage("");
+    setPlayerKey((prev) => prev + 1);
 
-  const goToNextChannel = async () => {
-    if (!visibleChannels.length) return;
-    const nextIndex =
-      selectedChannelIndex >= visibleChannels.length - 1 ? 0 : selectedChannelIndex + 1;
-    await handleSelectChannel(nextIndex);
-    showFullscreenControls();
-  };
-
-  const showFullscreenControls = () => {
-    setShowFullscreenUi(true);
-
-    if (fullscreenUiTimerRef.current) {
-      clearTimeout(fullscreenUiTimerRef.current);
-    }
-
-    fullscreenUiTimerRef.current = setTimeout(() => {
-      setShowFullscreenUi(false);
-    }, FULLSCREEN_HIDE_DELAY);
-  };
-
-  const toggleFullscreenControls = () => {
-    if (showFullscreenUi) {
-      setShowFullscreenUi(false);
-      if (fullscreenUiTimerRef.current) {
-        clearTimeout(fullscreenUiTimerRef.current);
+    try {
+      if (videoRef.current) {
+        await videoRef.current.stopAsync().catch(() => {});
       }
-    } else {
-      showFullscreenControls();
-    }
-  };
-
-  const openFullscreen = async () => {
-    if (!selectedChannel?.url) return;
-
-    await addToRecent(selectedChannel);
-
-    try {
-      await videoRef.current?.pauseAsync?.();
     } catch (e) {}
-
-    setIsPaused(true);
-    setFullscreenKey((prev) => prev + 1);
-    setIsFullscreenPaused(false);
-    setShowFullscreen(true);
-    showFullscreenControls();
   };
 
-  const closeFullscreen = async () => {
-    try {
-      await fullscreenVideoRef.current?.stopAsync?.();
-    } catch (e) {}
+  const renderMenu = () => {
+    return (
+      <View style={styles.menu}>
+        <TouchableOpacity style={styles.menuBtn} onPress={onOpenLive}>
+          <Text style={styles.menuBtnText}>LIVE TV</Text>
+        </TouchableOpacity>
 
-    if (fullscreenUiTimerRef.current) {
-      clearTimeout(fullscreenUiTimerRef.current);
-    }
+        <TouchableOpacity style={styles.menuBtn} onPress={onOpenMovies}>
+          <Text style={styles.menuBtnText}>FILMES</Text>
+        </TouchableOpacity>
 
-    setShowFullscreen(false);
-    setIsFullscreenPaused(false);
+        <TouchableOpacity style={styles.menuBtn} onPress={onOpenSeries}>
+          <Text style={styles.menuBtnText}>SÉRIES</Text>
+        </TouchableOpacity>
 
-    setTimeout(async () => {
-      try {
-        setIsPaused(false);
-        await videoRef.current?.playAsync?.();
-      } catch (e) {}
-    }, 150);
+        <TouchableOpacity style={styles.menuBtn} onPress={onOpenHome}>
+          <Text style={styles.menuBtnText}>VOLTAR</Text>
+        </TouchableOpacity>
+      </View>
+    );
   };
 
-  const renderCategoryRow = ({ item, index }) => {
-    const active = index === selectedCategory;
+  const renderChannelItem = ({ item }) => {
+    const active = selectedChannel?.id === item?.id;
 
     return (
       <TouchableOpacity
-        style={[styles.categoryRow, active && styles.categoryActive]}
-        onPress={() => handleSelectCategory(index)}
-        activeOpacity={0.8}
+        style={[styles.channelItem, active && styles.channelItemActive]}
+        onPress={() => handleSelectChannel(item)}
       >
         <Text
-          style={[styles.categoryText, active && styles.categoryTextActive]}
+          style={[styles.channelName, active && styles.channelNameActive]}
           numberOfLines={1}
         >
-          {item.name}
+          {item?.name || "Canal"}
         </Text>
 
-        <Text style={[styles.categoryCount, active && styles.categoryTextActive]}>
-          {item.items.length}
+        <Text style={styles.channelGroup} numberOfLines={1}>
+          {item?.group || "AO VIVO"}
         </Text>
-      </TouchableOpacity>
-    );
-  };
-
-  const renderChannelRow = ({ item, index }) => {
-    const active = index === selectedChannelIndex;
-    const rowFavorite = favoriteIds.includes(getChannelStorageId(item));
-
-    return (
-      <TouchableOpacity
-        style={[styles.channelRow, active && styles.channelRowActive]}
-        onPress={() => handleSelectChannel(index)}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.channelNumber}>{index + 1}</Text>
-
-        <View style={styles.channelTextWrap}>
-          <Text
-            style={[styles.channelName, active && styles.channelNameActive]}
-            numberOfLines={1}
-          >
-            {rowFavorite ? "★ " : ""}
-            {item.name || "Sem nome"}
-          </Text>
-
-          <Text style={styles.channelSub} numberOfLines={1}>
-            {item.group || "Canal"}
-          </Text>
-        </View>
       </TouchableOpacity>
     );
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#050814" />
-
-      <View style={styles.topnav}>
-        <TouchableOpacity onPress={onOpenHome}>
-          <Text style={styles.topLink}>Casa</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.topSep}>|</Text>
-
-        <TouchableOpacity onPress={onOpenLive}>
-          <Text style={styles.topLinkActive}>TV ao Vivo</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.topSep}>|</Text>
-
-        <TouchableOpacity onPress={onOpenMovies}>
-          <Text style={styles.topLink}>Filmes</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.topSep}>|</Text>
-
-        <TouchableOpacity onPress={onOpenSeries}>
-          <Text style={styles.topLink}>Séries</Text>
-        </TouchableOpacity>
-
-        <View style={styles.searchWrap}>
-          <TextInput
-            value={search}
-            onChangeText={(text) => {
-              setSearch(text);
-              setSelectedChannelIndex(0);
-            }}
-            placeholder="Buscar canal..."
-            placeholderTextColor="#c2c6d2"
-            style={styles.searchInput}
-          />
-        </View>
+      <View style={styles.topbar}>
+        <Text style={styles.title}>MUNDO PLAY TV</Text>
+        <Text style={styles.subtitle}>
+          {isEpgReady ? "Guia pronto" : "Modo ao vivo"}
+        </Text>
       </View>
 
-      <View style={styles.main}>
-        <View style={styles.leftPanel}>
-          <FlatList
-            data={categories}
-            keyExtractor={(item, index) => `${item.name}_${index}`}
-            renderItem={renderCategoryRow}
-            getItemLayout={(_, index) => ({
-              length: CATEGORY_ROW_HEIGHT,
-              offset: CATEGORY_ROW_HEIGHT * index,
-              index,
-            })}
-            initialNumToRender={18}
-            maxToRenderPerBatch={18}
-            windowSize={8}
-            removeClippedSubviews
-          />
-        </View>
+      <View style={styles.content}>
+        {renderMenu()}
 
-        <View style={styles.centerPanel}>
-          <FlatList
-            data={visibleChannels}
-            keyExtractor={(item, index) => item.id || `${item.name}_${index}`}
-            renderItem={renderChannelRow}
-            getItemLayout={(_, index) => ({
-              length: CHANNEL_ROW_HEIGHT,
-              offset: CHANNEL_ROW_HEIGHT * index,
-              index,
-            })}
-            initialNumToRender={28}
-            maxToRenderPerBatch={28}
-            windowSize={10}
-            removeClippedSubviews
-            ListEmptyComponent={
-              <View style={styles.emptyList}>
-                <Text style={styles.emptyListText}>Nenhum canal encontrado</Text>
+        <View style={styles.main}>
+          <View style={styles.playerCard}>
+            <View style={styles.playerHeader}>
+              <View>
+                <Text style={styles.playerTitle}>
+                  {selectedChannel?.name || "Selecione um canal"}
+                </Text>
+                <Text style={styles.playerSubtitle}>
+                  {selectedChannel?.group || "TV AO VIVO"}
+                </Text>
               </View>
-            }
-          />
-        </View>
 
-        <View style={styles.rightPanel}>
-          <TouchableOpacity
-            style={styles.previewBox}
-            activeOpacity={0.95}
-            onPress={openFullscreen}
-          >
-            {selectedChannel?.url ? (
-              <Video
-                key={`${selectedChannel.url}_${playerKey}`}
-                ref={videoRef}
-                source={{ uri: selectedChannel.url }}
-                style={styles.previewVideo}
-                resizeMode={ResizeMode.COVER}
-                shouldPlay={!isPaused && !showFullscreen}
-                isLooping
-                isMuted={false}
-                useNativeControls={false}
-              />
-            ) : (
-              <View style={styles.previewEmpty}>
-                <Text style={styles.previewEmptyText}>Sem sinal</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          <View style={styles.infoPanel}>
-            <Text style={styles.channelTitle}>
-              {safeText(selectedChannel?.name) || "Sem canal"}
-            </Text>
-
-            <Text style={styles.epgTimeMain}>
-              {nowProgram ? formatProgramTime(nowProgram) : "Sem horário atual"}
-            </Text>
-
-            <Text style={styles.epgCurrentMain} numberOfLines={2}>
-              {!isEpgReady
-                ? "Guia ainda está sendo preparado no início."
-                : nowProgram?.title || "Programação atual não encontrada"}
-            </Text>
-
-            <View style={styles.progressTrack}>
-              <View
-                style={[styles.progressFill, { width: `${progressPercent}%` }]}
-              />
+              <TouchableOpacity
+                style={styles.reloadBtn}
+                onPress={handleReloadPlayer}
+              >
+                <Text style={styles.reloadBtnText}>RECARREGAR</Text>
+              </TouchableOpacity>
             </View>
 
-            <View style={styles.scheduleBox}>
-              <View style={styles.scheduleRow}>
-                <Text style={styles.scheduleTime}>
-                  {nowProgram ? formatProgramTime(nowProgram) : "--:--"}
-                </Text>
-                <Text style={styles.scheduleTitle} numberOfLines={1}>
-                  {!isEpgReady
-                    ? "Aguardando guia ficar pronto"
-                    : nowProgram?.title || "Sem programação disponível"}
-                </Text>
-              </View>
+            <View style={styles.playerBox}>
+              {streamUrl ? (
+                <>
+                  <Video
+                    key={`live-player-${playerKey}`}
+                    ref={videoRef}
+                    style={styles.video}
+                    source={{
+                      uri: streamUrl,
+                      headers: {
+                        "User-Agent": "Mozilla/5.0",
+                        Accept: "*/*",
+                        Connection: "keep-alive",
+                      },
+                    }}
+                    useNativeControls
+                    resizeMode={ResizeMode.CONTAIN}
+                    shouldPlay
+                    isLooping={false}
+                    volume={1.0}
+                    onLoadStart={() => {
+                      setIsBuffering(true);
+                      setHasError(false);
+                      setPlayerMessage("Abrindo canal...");
+                    }}
+                    onReadyForDisplay={() => {
+                      setIsBuffering(false);
+                      setHasError(false);
+                      setPlayerMessage("");
+                    }}
+                    onPlaybackStatusUpdate={(status) => {
+                      if (!status) return;
 
-              {!!nextProgram && (
-                <View style={styles.scheduleRow}>
-                  <Text style={styles.scheduleTime}>
-                    {formatProgramTime(nextProgram)}
-                  </Text>
-                  <Text style={styles.scheduleTitle} numberOfLines={1}>
-                    {nextProgram.title || "Próximo programa"}
-                  </Text>
-                </View>
-              )}
+                      if (status.isLoaded) {
+                        if (status.isBuffering) {
+                          setIsBuffering(true);
+                          setPlayerMessage("Carregando transmissão...");
+                        } else {
+                          setIsBuffering(false);
+                          if (!hasError) {
+                            setPlayerMessage("");
+                          }
+                        }
+                      } else if (status.error) {
+                        setIsBuffering(false);
+                        setHasError(true);
+                        setPlayerMessage("Não foi possível reproduzir este canal.");
+                      }
+                    }}
+                    onError={() => {
+                      setIsBuffering(false);
+                      setHasError(true);
+                      setPlayerMessage("Erro no player deste canal.");
+                    }}
+                  />
 
-              {!nextProgram && (
-                <View style={styles.scheduleRow}>
-                  <Text style={styles.scheduleTime}>--:--</Text>
-                  <Text style={styles.scheduleTitle} numberOfLines={1}>
-                    Sem programação seguinte
+                  {(isBuffering || hasError || !!playerMessage) && (
+                    <View style={styles.overlay}>
+                      {isBuffering && (
+                        <ActivityIndicator size="large" color="#38d7ff" />
+                      )}
+
+                      {!!playerMessage && (
+                        <Text style={styles.overlayText}>{playerMessage}</Text>
+                      )}
+
+                      {hasError && (
+                        <TouchableOpacity
+                          style={styles.overlayRetryBtn}
+                          onPress={handleReloadPlayer}
+                        >
+                          <Text style={styles.overlayRetryText}>TENTAR DE NOVO</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+                </>
+              ) : (
+                <View style={styles.emptyPlayer}>
+                  <Text style={styles.emptyPlayerText}>
+                    Selecione um canal para reproduzir.
                   </Text>
                 </View>
               )}
             </View>
           </View>
+
+          <View style={styles.listCard}>
+            <Text style={styles.listTitle}>CANAIS</Text>
+
+            {channels.length === 0 ? (
+              <View style={styles.emptyList}>
+                <Text style={styles.emptyListText}>
+                  Nenhum canal ao vivo encontrado na lista.
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={channels}
+                keyExtractor={(item, index) =>
+                  String(item?.id || `${item?.name || "canal"}_${index}`)
+                }
+                renderItem={renderChannelItem}
+                showsVerticalScrollIndicator={false}
+                initialNumToRender={20}
+                maxToRenderPerBatch={20}
+                windowSize={8}
+                removeClippedSubviews
+              />
+            )}
+          </View>
         </View>
       </View>
-
-      <Modal
-        visible={showFullscreen}
-        animationType="fade"
-        transparent={false}
-        onRequestClose={closeFullscreen}
-      >
-        <SafeAreaView style={styles.fullscreenContainer}>
-          <TouchableOpacity
-            activeOpacity={1}
-            style={styles.fullscreenTouchLayer}
-            onPress={toggleFullscreenControls}
-          >
-            {selectedChannel?.url ? (
-              <Video
-                key={`${selectedChannel.url}_${fullscreenKey}_fullscreen`}
-                ref={fullscreenVideoRef}
-                source={{ uri: selectedChannel.url }}
-                style={styles.fullscreenVideo}
-                resizeMode={ResizeMode.COVER}
-                shouldPlay={!isFullscreenPaused && showFullscreen}
-                isLooping
-                isMuted={false}
-                useNativeControls={false}
-              />
-            ) : (
-              <View style={styles.previewEmpty}>
-                <Text style={styles.previewEmptyText}>Sem sinal</Text>
-              </View>
-            )}
-
-            {showFullscreenUi && (
-              <View style={styles.fullscreenOverlay}>
-                <View style={styles.fullscreenTopRow}>
-                  <TouchableOpacity
-                    style={styles.fullscreenIconBtn}
-                    onPress={closeFullscreen}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.fullscreenIconText}>↩</Text>
-                  </TouchableOpacity>
-
-                  <View style={styles.fullscreenTopIcons}>
-                    <TouchableOpacity
-                      style={styles.fullscreenIconBtn}
-                      onPress={toggleFavorite}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.fullscreenIconText}>
-                        {isFavorite ? "♥" : "♡"}
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.fullscreenIconBtn}
-                      onPress={togglePauseFullscreen}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.fullscreenIconText}>
-                        {isFullscreenPaused ? "▶" : "❚❚"}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                <View style={styles.fullscreenCenterControls}>
-                  <TouchableOpacity
-                    style={styles.fullscreenCenterBtn}
-                    onPress={goToPreviousChannel}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.fullscreenCenterText}>◀◀</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.fullscreenCenterBtnPlay}
-                    onPress={togglePauseFullscreen}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.fullscreenCenterText}>
-                      {isFullscreenPaused ? "▶" : "❚❚"}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.fullscreenCenterBtn}
-                    onPress={goToNextChannel}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.fullscreenCenterText}>▶▶</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.fullscreenBottomInfo}>
-                  <Text style={styles.fullscreenChannelText}>
-                    {selectedChannelIndex + 1} {safeText(selectedChannel?.name) || "Sem canal"}
-                  </Text>
-
-                  <Text style={styles.fullscreenProgramText} numberOfLines={1}>
-                    {!isEpgReady
-                      ? "Guia ainda está sendo preparado"
-                      : nowProgram?.title || "Programação atual não encontrada"}
-                  </Text>
-
-                  <Text style={styles.fullscreenTimesText} numberOfLines={1}>
-                    {nowProgram ? formatProgramTime(nowProgram) : "--:--"}
-                  </Text>
-
-                  <View style={styles.fullscreenProgressTrack}>
-                    <View
-                      style={[
-                        styles.fullscreenProgressFill,
-                        { width: `${progressPercent}%` },
-                      ]}
-                    />
-                  </View>
-
-                  <View style={styles.fullscreenLiveBadge}>
-                    <Text style={styles.fullscreenLiveBadgeText}>LIVE</Text>
-                  </View>
-                </View>
-              </View>
-            )}
-          </TouchableOpacity>
-        </SafeAreaView>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -746,388 +267,220 @@ export default function LiveTVScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#050814",
+    backgroundColor: "#06111d",
   },
 
-  topnav: {
-    height: isPhone ? 42 : 58,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 10,
+  topbar: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "#050814",
+    borderBottomColor: "rgba(255,255,255,0.06)",
   },
 
-  topLink: {
-    color: "#d7d7d7",
-    fontSize: isPhone ? 10 : 14,
-  },
-
-  topLinkActive: {
-    color: "#f3df58",
-    fontSize: isPhone ? 10 : 14,
+  title: {
+    color: "#ffffff",
+    fontSize: 18,
     fontWeight: "900",
   },
 
-  topSep: {
-    color: "#c8c8c8",
-    marginHorizontal: 8,
-    fontSize: isPhone ? 10 : 14,
+  subtitle: {
+    color: "#38d7ff",
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: "700",
   },
 
-  searchWrap: {
-    marginLeft: "auto",
-    width: isPhone ? 120 : 220,
+  content: {
+    flex: 1,
+    flexDirection: "row",
   },
 
-  searchInput: {
-    height: isPhone ? 30 : 38,
-    borderRadius: 18,
+  menu: {
+    width: 110,
+    padding: 10,
+    gap: 10,
+  },
+
+  menuBtn: {
+    height: 70,
+    backgroundColor: "#0b1c2d",
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.35)",
-    backgroundColor: "rgba(0,0,0,0.25)",
-    color: "#fff",
-    paddingHorizontal: 14,
-    fontSize: isPhone ? 10 : 13,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+
+  menuBtnText: {
+    color: "#ffffff",
+    fontWeight: "800",
+    fontSize: 15,
   },
 
   main: {
     flex: 1,
     flexDirection: "row",
+    padding: 10,
+    gap: 10,
   },
 
-  leftPanel: {
-    width: isPhone ? 108 : 220,
-    backgroundColor: "#301f2d",
-    borderRightWidth: 1,
-    borderRightColor: "rgba(255,255,255,0.08)",
+  playerCard: {
+    flex: 1.2,
+    backgroundColor: "#081522",
+    borderRadius: 18,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
   },
 
-  categoryRow: {
-    minHeight: isPhone ? 34 : 46,
-    paddingHorizontal: 10,
+  playerHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.08)",
+    marginBottom: 10,
   },
 
-  categoryActive: {
-    backgroundColor: "rgba(243,223,88,0.18)",
-  },
-
-  categoryText: {
-    color: "#f4f4f4",
-    fontSize: isPhone ? 8 : 12,
-    flex: 1,
-    marginRight: 6,
-  },
-
-  categoryTextActive: {
-    color: "#f3df58",
+  playerTitle: {
+    color: "#ffffff",
+    fontSize: 18,
     fontWeight: "900",
   },
 
-  categoryCount: {
-    color: "#f4f4f4",
-    fontSize: isPhone ? 8 : 12,
+  playerSubtitle: {
+    color: "#8fb2cb",
+    marginTop: 4,
+    fontSize: 12,
   },
 
-  centerPanel: {
-    width: isPhone ? 130 : 260,
-    backgroundColor: "#1a1730",
-    borderRightWidth: 1,
-    borderRightColor: "rgba(255,255,255,0.08)",
+  reloadBtn: {
+    backgroundColor: "#10263b",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "#1e4d75",
   },
 
-  channelRow: {
-    minHeight: isPhone ? 38 : 48,
-    flexDirection: "row",
+  reloadBtnText: {
+    color: "#38d7ff",
+    fontWeight: "800",
+    fontSize: 12,
+  },
+
+  playerBox: {
+    flex: 1,
+    backgroundColor: "#000",
+    borderRadius: 16,
+    overflow: "hidden",
+    minHeight: 240,
+  },
+
+  video: {
+    width: "100%",
+    height: "100%",
+    minHeight: 240,
+    backgroundColor: "#000",
+  },
+
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.45)",
     alignItems: "center",
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.08)",
+    justifyContent: "center",
+    padding: 20,
   },
 
-  channelRowActive: {
-    backgroundColor: "rgba(255,255,255,0.08)",
+  overlayText: {
+    color: "#ffffff",
+    marginTop: 12,
+    textAlign: "center",
+    fontSize: 14,
+    fontWeight: "700",
   },
 
-  channelNumber: {
-    width: isPhone ? 26 : 34,
-    color: "#f2f2f2",
-    fontSize: isPhone ? 7 : 10,
+  overlayRetryBtn: {
+    marginTop: 14,
+    backgroundColor: "#38d7ff",
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+
+  overlayRetryText: {
+    color: "#04121d",
     fontWeight: "900",
   },
 
-  channelTextWrap: {
+  emptyPlayer: {
     flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+
+  emptyPlayerText: {
+    color: "#c7d7e5",
+    textAlign: "center",
+    fontSize: 14,
+  },
+
+  listCard: {
+    width: 280,
+    backgroundColor: "#081522",
+    borderRadius: 18,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+
+  listTitle: {
+    color: "#38d7ff",
+    fontWeight: "900",
+    fontSize: 16,
+    marginBottom: 10,
+  },
+
+  channelItem: {
+    backgroundColor: "#0c1f31",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+
+  channelItemActive: {
+    borderColor: "#38d7ff",
+    backgroundColor: "#10263b",
   },
 
   channelName: {
-    color: "#fff",
-    fontSize: isPhone ? 7.5 : 11,
+    color: "#ffffff",
     fontWeight: "800",
+    fontSize: 14,
   },
 
   channelNameActive: {
-    color: "#f3df58",
+    color: "#38d7ff",
   },
 
-  channelSub: {
-    color: "#c6d2e8",
-    fontSize: isPhone ? 6 : 9,
-    marginTop: 1,
+  channelGroup: {
+    color: "#90a8bc",
+    marginTop: 4,
+    fontSize: 11,
   },
 
   emptyList: {
     flex: 1,
-    paddingVertical: 20,
-    alignItems: "center",
     justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
   },
 
   emptyListText: {
-    color: "#cfd7e2",
-    fontSize: isPhone ? 9 : 12,
+    color: "#c7d7e5",
     textAlign: "center",
-  },
-
-  rightPanel: {
-    flex: 1,
-    padding: isPhone ? 8 : 12,
-    backgroundColor: "#07112b",
-  },
-
-  previewBox: {
-    width: "100%",
-    height: isPhone ? 160 : 255,
-    borderRadius: 8,
-    overflow: "hidden",
-    backgroundColor: "#000",
-    marginBottom: 10,
-  },
-
-  previewVideo: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: "#000",
-  },
-
-  previewEmpty: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#000",
-  },
-
-  previewEmptyText: {
-    color: "#c8d4e2",
-    fontSize: isPhone ? 9 : 12,
-  },
-
-  infoPanel: {
-    flex: 1,
-    backgroundColor: "#07112b",
-  },
-
-  channelTitle: {
-    color: "#ffffff",
-    fontSize: isPhone ? 16 : 24,
-    fontWeight: "900",
-    marginBottom: 8,
-  },
-
-  epgTimeMain: {
-    color: "#f3df58",
-    fontSize: isPhone ? 10 : 13,
-    fontWeight: "800",
-    marginBottom: 8,
-  },
-
-  epgCurrentMain: {
-    color: "#ffffff",
-    fontSize: isPhone ? 11 : 16,
-    marginBottom: 10,
-  },
-
-  progressTrack: {
-    width: "100%",
-    height: 6,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    overflow: "hidden",
-    marginBottom: 12,
-  },
-
-  progressFill: {
-    height: "100%",
-    borderRadius: 999,
-    backgroundColor: "#29a3ff",
-  },
-
-  scheduleBox: {
-    backgroundColor: "rgba(255,255,255,0.03)",
-    borderRadius: 8,
-    paddingVertical: 6,
-    marginBottom: 14,
-  },
-
-  scheduleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-  },
-
-  scheduleTime: {
-    width: isPhone ? 82 : 120,
-    color: "#f3df58",
-    fontSize: isPhone ? 9 : 12,
-    fontWeight: "800",
-  },
-
-  scheduleTitle: {
-    flex: 1,
-    color: "#ffffff",
-    fontSize: isPhone ? 9 : 12,
-  },
-
-  fullscreenContainer: {
-    flex: 1,
-    backgroundColor: "#000",
-  },
-
-  fullscreenTouchLayer: {
-    flex: 1,
-  },
-
-  fullscreenVideo: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#000",
-  },
-
-  fullscreenOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "space-between",
-    paddingTop: isPhone ? 18 : 24,
-    paddingBottom: isPhone ? 16 : 24,
-    paddingHorizontal: isPhone ? 10 : 16,
-  },
-
-  fullscreenTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-
-  fullscreenTopIcons: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  fullscreenIconBtn: {
-    width: isPhone ? 40 : 48,
-    height: isPhone ? 40 : 48,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.28)",
-    marginLeft: 8,
-  },
-
-  fullscreenIconText: {
-    color: "#fff",
-    fontSize: isPhone ? 18 : 22,
-    fontWeight: "900",
-  },
-
-  fullscreenCenterControls: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: "auto",
-    marginBottom: 40,
-  },
-
-  fullscreenCenterBtn: {
-    width: isPhone ? 56 : 70,
-    height: isPhone ? 56 : 70,
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.18)",
-    marginHorizontal: 18,
-  },
-
-  fullscreenCenterBtnPlay: {
-    width: isPhone ? 72 : 88,
-    height: isPhone ? 72 : 88,
-    borderRadius: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.22)",
-    marginHorizontal: 18,
-  },
-
-  fullscreenCenterText: {
-    color: "#fff",
-    fontSize: isPhone ? 22 : 30,
-    fontWeight: "900",
-  },
-
-  fullscreenBottomInfo: {
-    width: "100%",
-    marginTop: "auto",
-  },
-
-  fullscreenChannelText: {
-    color: "#fff",
-    fontSize: isPhone ? 18 : 28,
-    fontWeight: "300",
-    marginBottom: 4,
-  },
-
-  fullscreenProgramText: {
-    color: "#f1f1f1",
-    fontSize: isPhone ? 10 : 14,
-    marginBottom: 4,
-  },
-
-  fullscreenTimesText: {
-    color: "#d7d7d7",
-    fontSize: isPhone ? 10 : 13,
-    marginBottom: 10,
-  },
-
-  fullscreenProgressTrack: {
-    width: "100%",
-    height: 5,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    overflow: "hidden",
-    marginBottom: 10,
-  },
-
-  fullscreenProgressFill: {
-    height: "100%",
-    borderRadius: 999,
-    backgroundColor: "#1ea0ff",
-  },
-
-  fullscreenLiveBadge: {
-    alignSelf: "flex-end",
-    backgroundColor: "rgba(30,30,30,0.72)",
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-
-  fullscreenLiveBadgeText: {
-    color: "#ff4a4a",
-    fontSize: isPhone ? 10 : 13,
-    fontWeight: "900",
   },
 });

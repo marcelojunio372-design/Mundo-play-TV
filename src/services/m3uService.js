@@ -1,3 +1,5 @@
+const API_PROXY_BASE = "https://mundoplaytv-api.onrender.com";
+
 function safeText(value) {
   if (value === null || value === undefined) return "";
   return String(value).trim();
@@ -89,7 +91,6 @@ function extractAttr(line = "", attr = "") {
 function extractGroup(extinf = "") {
   const g1 = extractAttr(extinf, "group-title");
   if (g1) return safeText(g1);
-
   return "OUTROS";
 }
 
@@ -198,74 +199,60 @@ function shouldKeepType(type, only = "all") {
   return true;
 }
 
-function pushItemByType(type, item, live, movies, series) {
-  if (type === "movie") {
-    movies.push(item);
-  } else if (type === "series") {
-    series.push(item);
-  } else {
-    live.push(item);
-  }
-}
-
-function iterateLines(text = "", onLine) {
-  let buffer = "";
-
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-
-    if (char === "\n") {
-      const line = buffer.replace(/\r/g, "").trim();
-      buffer = "";
-      if (line) onLine(line);
-    } else {
-      buffer += char;
-    }
-  }
-
-  const lastLine = buffer.replace(/\r/g, "").trim();
-  if (lastLine) onLine(lastLine);
+function buildProxyUrl(rawUrl = "") {
+  const clean = safeText(rawUrl);
+  if (!clean) return "";
+  return `${API_PROXY_BASE}/m3u?url=${encodeURIComponent(clean)}`;
 }
 
 export async function loadM3U(url, options = {}) {
   const only = safeText(options.only || "all").toLowerCase();
+  const finalUrl = buildProxyUrl(url);
 
-  const response = await fetch(url);
+  if (!finalUrl) {
+    throw new Error("URL da lista inválida");
+  }
+
+  const response = await fetch(finalUrl, {
+    headers: {
+      Accept: "*/*",
+      "Cache-Control": "no-cache",
+    },
+  });
+
   const text = await response.text();
 
-  if (!response.ok || !text) {
+  if (!response.ok || !text || !text.includes("#EXTM3U")) {
     throw new Error("Falha ao carregar lista");
   }
 
-  if (!text.includes("#EXTM3U") && !text.includes("#EXTINF")) {
-    throw new Error("Lista M3U inválida");
-  }
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
 
   const live = [];
   const movies = [];
   const series = [];
 
-  let currentExtinf = "";
-  let index = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
 
-  iterateLines(text, (line) => {
-    if (line.startsWith("#EXTINF")) {
-      currentExtinf = line;
-      return;
+    if (!line.startsWith("#EXTINF")) continue;
+
+    const extinf = line;
+    let streamUrl = "";
+
+    for (let j = i + 1; j < lines.length; j++) {
+      if (!lines[j].startsWith("#")) {
+        streamUrl = lines[j];
+        i = j;
+        break;
+      }
     }
 
-    if (line.startsWith("#")) {
-      return;
-    }
+    if (!streamUrl) continue;
 
-    if (!currentExtinf) {
-      return;
-    }
-
-    const extinf = currentExtinf;
-    currentExtinf = "";
-
-    const streamUrl = line;
     const name = extractName(extinf);
     const group = extractGroup(extinf);
     const logo = extractLogo(extinf);
@@ -274,8 +261,7 @@ export async function loadM3U(url, options = {}) {
     const type = inferType(name, group, streamUrl, tvgId, tvgName);
 
     if (!shouldKeepType(type, only)) {
-      index += 1;
-      return;
+      continue;
     }
 
     const year = extractYear(name, group);
@@ -283,7 +269,7 @@ export async function loadM3U(url, options = {}) {
     const aliases = buildChannelAliases(name, group, tvgId, tvgName);
 
     const item = {
-      id: `${type}_${index}_${name}`.replace(/\s+/g, "_"),
+      id: `${type}_${i}_${name}`.replace(/\s+/g, "_"),
       name,
       group,
       logo,
@@ -298,9 +284,14 @@ export async function loadM3U(url, options = {}) {
       aliases,
     };
 
-    pushItemByType(type, item, live, movies, series);
-    index += 1;
-  });
+    if (type === "movie") {
+      movies.push(item);
+    } else if (type === "series") {
+      series.push(item);
+    } else {
+      live.push(item);
+    }
+  }
 
   return {
     live,
