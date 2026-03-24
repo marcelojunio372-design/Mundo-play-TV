@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -11,6 +11,8 @@ import {
   View,
 } from "react-native";
 import { ResizeMode, Video } from "expo-av";
+
+const PLAYER_TIMEOUT_MS = 12000;
 
 function safeArray(value) {
   return Array.isArray(value) ? value : [];
@@ -57,12 +59,43 @@ function buildCategories(items = []) {
   ];
 }
 
-function getFakeEpg(channelName = "") {
-  const name = safeText(channelName || "Canal");
+function formatClock(value) {
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) return "";
+  return value.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getEpgRows(channel) {
+  const nowProgram = channel?.nowProgram || null;
+  const nextProgram = channel?.nextProgram || null;
+
+  if (nowProgram || nextProgram) {
+    const rows = [];
+
+    if (nowProgram) {
+      rows.push({
+        key: "now",
+        time: `${formatClock(nowProgram.start)} ~ ${formatClock(nowProgram.stop)}`,
+        title: safeText(nowProgram.title || "Agora"),
+      });
+    }
+
+    if (nextProgram) {
+      rows.push({
+        key: "next",
+        time: `${formatClock(nextProgram.start)} ~ ${formatClock(nextProgram.stop)}`,
+        title: safeText(nextProgram.title || "Próximo"),
+      });
+    }
+
+    return rows;
+  }
+
   return [
-    { time: "12:00 ~ 16:00", title: `${name} - ao vivo` },
-    { time: "16:00 ~ 20:00", title: "Programação contínua" },
-    { time: "20:00 ~ 00:00", title: "Faixa principal" },
+    { key: "f1", time: "--:-- ~ --:--", title: "EPG ainda não carregado" },
+    { key: "f2", time: "--:-- ~ --:--", title: "Selecione um canal para reproduzir" },
   ];
 }
 
@@ -73,6 +106,7 @@ export default function LiveTVScreen({
   onOpenSeries,
 }) {
   const videoRef = useRef(null);
+  const loadingTimerRef = useRef(null);
 
   const allChannels = useMemo(() => {
     return safeArray(session?.data?.live).filter(
@@ -86,9 +120,10 @@ export default function LiveTVScreen({
   const [search, setSearch] = useState("");
   const [selectedChannelId, setSelectedChannelId] = useState(null);
   const [playerUri, setPlayerUri] = useState("");
+  const [playerReloadKey, setPlayerReloadKey] = useState(1);
   const [isBuffering, setIsBuffering] = useState(false);
   const [playerError, setPlayerError] = useState("");
-  const [playerReloadKey, setPlayerReloadKey] = useState(1);
+  const [hasStartedPlayback, setHasStartedPlayback] = useState(false);
 
   const selectedCategory = useMemo(() => {
     return categories.find((c) => c.key === selectedCategoryKey) || categories[0];
@@ -113,63 +148,60 @@ export default function LiveTVScreen({
     );
   }, [visibleChannels, allChannels, selectedChannelId]);
 
-  useEffect(() => {
-    if (!selectedChannel && visibleChannels.length > 0) {
-      const first = visibleChannels[0];
-      setSelectedChannelId(first.id);
-      setPlayerUri(first.url);
-      setPlayerReloadKey((prev) => prev + 1);
-      setPlayerError("");
-      setIsBuffering(true);
-    }
-  }, [visibleChannels, selectedChannel]);
+  const epgRows = useMemo(() => getEpgRows(selectedChannel), [selectedChannel]);
 
-  const handleSelectCategory = (category) => {
-    setSelectedCategoryKey(category.key);
-    setSearch("");
-
-    const first = safeArray(category.items)[0];
-    if (first) {
-      setSelectedChannelId(first.id);
-      setPlayerUri(first.url);
-      setPlayerReloadKey((prev) => prev + 1);
-      setPlayerError("");
-      setIsBuffering(true);
+  const clearLoadingTimer = () => {
+    if (loadingTimerRef.current) {
+      clearTimeout(loadingTimerRef.current);
+      loadingTimerRef.current = null;
     }
   };
 
-  const handleSelectChannel = async (channel) => {
+  const startLoadingTimer = () => {
+    clearLoadingTimer();
+    loadingTimerRef.current = setTimeout(() => {
+      setIsBuffering(false);
+      setPlayerError("Este canal demorou para abrir. Toque em recarregar.");
+    }, PLAYER_TIMEOUT_MS);
+  };
+
+  const stopCurrentVideo = async () => {
+    try {
+      if (videoRef.current) {
+        await videoRef.current.stopAsync().catch(() => {});
+        await videoRef.current.unloadAsync().catch(() => {});
+      }
+    } catch (e) {}
+  };
+
+  const openChannel = async (channel) => {
     if (!channel?.url) return;
+
+    clearLoadingTimer();
+    await stopCurrentVideo();
 
     setSelectedChannelId(channel.id);
     setPlayerUri(channel.url);
     setPlayerReloadKey((prev) => prev + 1);
     setPlayerError("");
+    setHasStartedPlayback(false);
     setIsBuffering(true);
+    startLoadingTimer();
+  };
 
-    try {
-      if (videoRef.current) {
-        await videoRef.current.stopAsync().catch(() => {});
-      }
-    } catch (e) {}
+  const handleSelectCategory = (category) => {
+    setSelectedCategoryKey(category.key);
+    setSearch("");
+  };
+
+  const handleSelectChannel = async (channel) => {
+    await openChannel(channel);
   };
 
   const handleReload = async () => {
     if (!selectedChannel?.url) return;
-
-    setPlayerUri(selectedChannel.url);
-    setPlayerReloadKey((prev) => prev + 1);
-    setPlayerError("");
-    setIsBuffering(true);
-
-    try {
-      if (videoRef.current) {
-        await videoRef.current.stopAsync().catch(() => {});
-      }
-    } catch (e) {}
+    await openChannel(selectedChannel);
   };
-
-  const epgItems = useMemo(() => getFakeEpg(selectedChannel?.name || ""), [selectedChannel]);
 
   const renderCategoryItem = ({ item }) => {
     const active = item.key === selectedCategoryKey;
@@ -179,10 +211,15 @@ export default function LiveTVScreen({
         style={[styles.categoryItem, active && styles.categoryItemActive]}
         onPress={() => handleSelectCategory(item)}
       >
-        <Text style={[styles.categoryName, active && styles.categoryNameActive]} numberOfLines={1}>
+        <Text
+          style={[styles.categoryName, active && styles.categoryNameActive]}
+          numberOfLines={1}
+        >
           {item.name}
         </Text>
-        <Text style={[styles.categoryCount, active && styles.categoryCountActive]}>
+        <Text
+          style={[styles.categoryCount, active && styles.categoryCountActive]}
+        >
           {item.count}
         </Text>
       </TouchableOpacity>
@@ -223,7 +260,9 @@ export default function LiveTVScreen({
         </TouchableOpacity>
 
         <Text style={styles.topSeparator}>|</Text>
+
         <Text style={styles.topNavTextActive}>TV ao Vivo</Text>
+
         <Text style={styles.topSeparator}>|</Text>
 
         <TouchableOpacity onPress={onOpenMovies}>
@@ -270,7 +309,11 @@ export default function LiveTVScreen({
 
         <View style={styles.rightCol}>
           <View style={styles.playerWrap}>
-            {playerUri ? (
+            {!playerUri ? (
+              <View style={styles.emptyPlayer}>
+                <Text style={styles.emptyPlayerText}>Selecione um canal.</Text>
+              </View>
+            ) : (
               <>
                 <Video
                   key={`live_${playerReloadKey}`}
@@ -290,21 +333,45 @@ export default function LiveTVScreen({
                   onLoadStart={() => {
                     setIsBuffering(true);
                     setPlayerError("");
+                    setHasStartedPlayback(false);
+                    startLoadingTimer();
                   }}
                   onReadyForDisplay={() => {
+                    clearLoadingTimer();
                     setIsBuffering(false);
+                    setPlayerError("");
+                    setHasStartedPlayback(true);
                   }}
                   onPlaybackStatusUpdate={(status) => {
                     if (!status) return;
 
                     if (status.isLoaded) {
-                      setIsBuffering(!!status.isBuffering);
+                      if (status.isPlaying || status.positionMillis > 0) {
+                        clearLoadingTimer();
+                        setHasStartedPlayback(true);
+                        setIsBuffering(false);
+                        setPlayerError("");
+                        return;
+                      }
+
+                      if (status.isBuffering) {
+                        setIsBuffering(true);
+                        return;
+                      }
+
+                      if (!hasStartedPlayback) {
+                        return;
+                      }
+
+                      setIsBuffering(false);
                     } else if (status.error) {
+                      clearLoadingTimer();
                       setIsBuffering(false);
                       setPlayerError("Erro ao reproduzir este canal.");
                     }
                   }}
                   onError={() => {
+                    clearLoadingTimer();
                     setIsBuffering(false);
                     setPlayerError("Erro ao reproduzir este canal.");
                   }}
@@ -323,10 +390,6 @@ export default function LiveTVScreen({
                   </View>
                 )}
               </>
-            ) : (
-              <View style={styles.emptyPlayer}>
-                <Text style={styles.emptyPlayerText}>Selecione um canal.</Text>
-              </View>
             )}
           </View>
 
@@ -340,8 +403,8 @@ export default function LiveTVScreen({
             </Text>
 
             <View style={styles.epgWrap}>
-              {epgItems.map((item, index) => (
-                <View key={`${item.time}_${index}`} style={styles.epgRow}>
+              {epgRows.map((item) => (
+                <View key={item.key} style={styles.epgRow}>
                   <Text style={styles.epgTime}>{item.time}</Text>
                   <Text style={styles.epgTitle}>{item.title}</Text>
                 </View>
