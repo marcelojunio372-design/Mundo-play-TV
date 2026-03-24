@@ -23,10 +23,9 @@ export default function HomeScreen({
 }) {
   const movies = useMemo(() => safeArray(session?.data?.movies), [session]);
   const series = useMemo(() => safeArray(session?.data?.series), [session]);
+  const live = useMemo(() => safeArray(session?.data?.live), [session]);
 
-  const featuredMovie = movies[0] || null;
-  const featuredSeries = series[0] || null;
-  const featured = featuredMovie || featuredSeries || null;
+  const featured = movies[0] || series[0] || live[0] || null;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -55,8 +54,8 @@ export default function HomeScreen({
             <Text style={styles.sideButtonText}>CONFIG.</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.sideButton} onPress={onReload}>
-            <Text style={styles.sideButtonText}>
+          <TouchableOpacity style={styles.sideButtonSmall} onPress={onReload}>
+            <Text style={styles.sideButtonSmallText}>
               {isRefreshingData ? "ATUALIZANDO..." : "RECARREGAR"}
             </Text>
           </TouchableOpacity>
@@ -74,16 +73,15 @@ export default function HomeScreen({
           </View>
 
           <View style={styles.infoBox}>
-            <Text style={styles.featureLabel}>
-              {featuredMovie ? "FILME" : featuredSeries ? "SÉRIE" : "DESTAQUE"}
-            </Text>
+            <Text style={styles.featureLabel}>DESTAQUE</Text>
 
             <Text style={styles.featureTitle}>
               {featured?.name || "MUNDO PLAY TV"}
             </Text>
 
             <Text style={styles.featureDesc}>
-              {featured?.group || "Abra Filmes, Séries ou TV ao Vivo para navegar no conteúdo."}
+              {featured?.group ||
+                "Abra Filmes, Séries ou TV ao Vivo para navegar no conteúdo."}
             </Text>
 
             <TouchableOpacity style={styles.actionButton}>
@@ -105,8 +103,8 @@ const styles = StyleSheet.create({
   },
 
   topbar: {
-    height: 72,
-    paddingHorizontal: 18,
+    height: 56,
+    paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -116,31 +114,31 @@ const styles = StyleSheet.create({
 
   appTitle: {
     color: "#ffffff",
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: "900",
   },
 
   statusText: {
     color: "#35c8ff",
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: "700",
   },
 
   content: {
     flex: 1,
     flexDirection: "row",
-    padding: 12,
+    padding: 10,
   },
 
   sidebar: {
-    width: 180,
-    gap: 18,
-    paddingRight: 14,
+    width: 140,
+    gap: 12,
+    paddingRight: 10,
   },
 
   sideButton: {
-    height: 102,
-    borderRadius: 20,
+    height: 86,
+    borderRadius: 18,
     backgroundColor: "#08203a",
     alignItems: "center",
     justifyContent: "center",
@@ -148,35 +146,50 @@ const styles = StyleSheet.create({
 
   sideButtonText: {
     color: "#ffffff",
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: "800",
+  },
+
+  sideButtonSmall: {
+    height: 72,
+    borderRadius: 18,
+    backgroundColor: "#08203a",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  sideButtonSmallText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "800",
+    textAlign: "center",
   },
 
   mainCard: {
     flex: 1,
     flexDirection: "row",
     backgroundColor: "#020812",
-    borderRadius: 20,
-    padding: 22,
+    borderRadius: 18,
+    padding: 16,
   },
 
   posterBox: {
-    width: 260,
+    width: 180,
     alignItems: "center",
     justifyContent: "center",
   },
 
   poster: {
-    width: 200,
-    height: 280,
-    borderRadius: 20,
+    width: 140,
+    height: 210,
+    borderRadius: 16,
     resizeMode: "cover",
   },
 
   posterFallback: {
-    width: 200,
-    height: 280,
-    borderRadius: 20,
+    width: 140,
+    height: 210,
+    borderRadius: 16,
     backgroundColor: "#132a45",
     alignItems: "center",
     justifyContent: "center",
@@ -184,7 +197,7 @@ const styles = StyleSheet.create({
 
   posterFallbackText: {
     color: "#35c8ff",
-    fontSize: 26,
+    fontSize: 18,
     fontWeight: "900",
     textAlign: "center",
   },
@@ -192,35 +205,35 @@ const styles = StyleSheet.create({
   infoBox: {
     flex: 1,
     justifyContent: "center",
-    paddingLeft: 20,
+    paddingLeft: 16,
   },
 
   featureLabel: {
     color: "#35c8ff",
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "900",
-    marginBottom: 18,
+    marginBottom: 12,
   },
 
   featureTitle: {
     color: "#ffffff",
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: "900",
-    marginBottom: 20,
+    marginBottom: 16,
   },
 
   featureDesc: {
     color: "#d8d8d8",
-    fontSize: 18,
-    marginBottom: 28,
+    fontSize: 16,
+    marginBottom: 22,
   },
 
   actionButton: {
-    height: 78,
-    width: 430,
+    height: 64,
+    width: 320,
     maxWidth: "100%",
-    borderRadius: 22,
-    borderWidth: 3,
+    borderRadius: 18,
+    borderWidth: 2,
     borderColor: "#35c8ff",
     alignItems: "center",
     justifyContent: "center",
@@ -228,7 +241,7 @@ const styles = StyleSheet.create({
 
   actionButtonText: {
     color: "#35c8ff",
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: "900",
   },
 });

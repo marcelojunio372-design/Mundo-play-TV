@@ -11,7 +11,7 @@ import SeasonEpisodesScreen from "../screens/SeasonEpisodesScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 import { loadM3U } from "../services/m3uService";
 
-const CACHE_KEY = "mundoplaytv_session_cache_v10";
+const CACHE_KEY = "mundoplaytv_session_cache_v11";
 
 const EMPTY_DATA = {
   live: [],
@@ -55,11 +55,11 @@ export default function AppNavigator() {
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [selectedSeries, setSelectedSeries] = useState(null);
   const [selectedSeason, setSelectedSeason] = useState(null);
-
   const [isRefreshingData, setIsRefreshingData] = useState(false);
 
   const handleLogin = async (payload) => {
     const safeData = mergeData(payload?.data);
+
     await writeCache(payload?.url, safeData);
 
     setSession({
@@ -84,8 +84,7 @@ export default function AppNavigator() {
   };
 
   const handleReload = async () => {
-    if (!session?.url) return false;
-    if (isRefreshingData) return false;
+    if (!session?.url || isRefreshingData) return false;
 
     try {
       setIsRefreshingData(true);
@@ -144,12 +143,7 @@ export default function AppNavigator() {
   }
 
   if (screen === "movieDetails") {
-    return (
-      <MovieDetailsScreen
-        movie={selectedMovie}
-        onBack={() => setScreen("movies")}
-      />
-    );
+    return <MovieDetailsScreen movie={selectedMovie} onBack={() => setScreen("movies")} />;
   }
 
   if (screen === "series") {
@@ -213,15 +207,6 @@ export default function AppNavigator() {
       onOpenSeries={() => setScreen("series")}
       onOpenSettings={() => setScreen("settings")}
       onReload={handleReload}
-      onLogout={handleLogout}
-      onSelectMovie={(movie) => {
-        setSelectedMovie(movie);
-        setScreen("movieDetails");
-      }}
-      onSelectSeries={(series) => {
-        setSelectedSeries(series);
-        setScreen("seriesDetails");
-      }}
     />
   );
 }

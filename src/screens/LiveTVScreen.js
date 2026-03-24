@@ -60,10 +60,9 @@ function buildCategories(items = []) {
 function getFakeEpg(channelName = "") {
   const name = safeText(channelName || "Canal");
   return [
-    { time: "12:00 PM ~ 04:00 PM", title: `Programa ao vivo - ${name}` },
-    { time: "04:00 PM ~ 08:00 PM", title: "Programação contínua" },
-    { time: "08:00 PM ~ 12:00 AM", title: "Faixa principal" },
-    { time: "12:00 AM ~ 12:30 AM", title: "Conteúdo da madrugada" },
+    { time: "12:00 ~ 16:00", title: `${name} - ao vivo` },
+    { time: "16:00 ~ 20:00", title: "Programação contínua" },
+    { time: "20:00 ~ 00:00", title: "Faixa principal" },
   ];
 }
 
@@ -176,9 +175,7 @@ export default function LiveTVScreen({
     } catch (e) {}
   };
 
-  const epgItems = useMemo(() => {
-    return getFakeEpg(selectedChannel?.name || "");
-  }, [selectedChannel]);
+  const epgItems = useMemo(() => getFakeEpg(selectedChannel?.name || ""), [selectedChannel]);
 
   const renderCategoryItem = ({ item }) => {
     const active = item.key === selectedCategoryKey;
@@ -188,7 +185,7 @@ export default function LiveTVScreen({
         style={[styles.categoryItem, active && styles.categoryItemActive]}
         onPress={() => handleSelectCategory(item)}
       >
-        <Text style={[styles.categoryName, active && styles.categoryNameActive]}>
+        <Text style={[styles.categoryName, active && styles.categoryNameActive]} numberOfLines={1}>
           {item.name}
         </Text>
         <Text style={[styles.categoryCount, active && styles.categoryCountActive]}>
@@ -232,9 +229,7 @@ export default function LiveTVScreen({
         </TouchableOpacity>
 
         <Text style={styles.topSeparator}>|</Text>
-
         <Text style={styles.topNavTextActive}>TV ao Vivo</Text>
-
         <Text style={styles.topSeparator}>|</Text>
 
         <TouchableOpacity onPress={onOpenMovies}>
@@ -265,9 +260,7 @@ export default function LiveTVScreen({
             keyExtractor={(item) => item.key}
             renderItem={renderCategoryItem}
             showsVerticalScrollIndicator={false}
-            initialNumToRender={18}
-            maxToRenderPerBatch={24}
-            windowSize={8}
+            initialNumToRender={16}
           />
         </View>
 
@@ -278,8 +271,6 @@ export default function LiveTVScreen({
             renderItem={renderChannelItem}
             showsVerticalScrollIndicator={false}
             initialNumToRender={20}
-            maxToRenderPerBatch={30}
-            windowSize={10}
           />
         </View>
 
@@ -313,11 +304,7 @@ export default function LiveTVScreen({
                     if (!status) return;
 
                     if (status.isLoaded) {
-                      if (status.isBuffering) {
-                        setIsBuffering(true);
-                      } else {
-                        setIsBuffering(false);
-                      }
+                      setIsBuffering(!!status.isBuffering);
                     } else if (status.error) {
                       setIsBuffering(false);
                       setPlayerError("Erro ao reproduzir este canal.");
@@ -332,9 +319,7 @@ export default function LiveTVScreen({
                 {isBuffering && (
                   <View style={styles.playerOverlay}>
                     <ActivityIndicator size="large" color="#35c8ff" />
-                    <Text style={styles.playerOverlayText}>
-                      Carregando transmissão...
-                    </Text>
+                    <Text style={styles.playerOverlayText}>Carregando transmissão...</Text>
                   </View>
                 )}
 
@@ -346,9 +331,7 @@ export default function LiveTVScreen({
               </>
             ) : (
               <View style={styles.emptyPlayer}>
-                <Text style={styles.emptyPlayerText}>
-                  Selecione um canal para reproduzir.
-                </Text>
+                <Text style={styles.emptyPlayerText}>Selecione um canal para reproduzir.</Text>
               </View>
             )}
           </View>
@@ -398,8 +381,8 @@ const styles = StyleSheet.create({
   },
 
   topbar: {
-    height: 58,
-    paddingHorizontal: 14,
+    height: 50,
+    paddingHorizontal: 10,
     flexDirection: "row",
     alignItems: "center",
     borderBottomWidth: 1,
@@ -409,34 +392,35 @@ const styles = StyleSheet.create({
 
   topNavText: {
     color: "#e6e6e6",
-    fontSize: 14,
+    fontSize: 12,
   },
 
   topNavTextActive: {
     color: "#f0c63c",
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "800",
   },
 
   topSeparator: {
     color: "#b2b2b2",
-    marginHorizontal: 14,
+    marginHorizontal: 10,
   },
 
   searchWrap: {
-    marginLeft: 18,
-    width: 220,
-    height: 40,
+    marginLeft: 14,
+    width: 180,
+    height: 36,
     borderWidth: 2,
     borderColor: "#ececec",
-    borderRadius: 20,
+    borderRadius: 18,
     justifyContent: "center",
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
   },
 
   searchInput: {
     color: "#ffffff",
     padding: 0,
+    fontSize: 13,
   },
 
   layout: {
@@ -445,14 +429,14 @@ const styles = StyleSheet.create({
   },
 
   leftCol: {
-    width: 300,
+    width: 190,
     backgroundColor: "#2a1124",
     borderRightWidth: 1,
     borderRightColor: "rgba(255,255,255,0.08)",
   },
 
   middleCol: {
-    width: 360,
+    width: 230,
     backgroundColor: "#15111f",
     borderRightWidth: 1,
     borderRightColor: "rgba(255,255,255,0.08)",
@@ -464,8 +448,8 @@ const styles = StyleSheet.create({
   },
 
   categoryItem: {
-    minHeight: 56,
-    paddingHorizontal: 18,
+    minHeight: 48,
+    paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -479,7 +463,9 @@ const styles = StyleSheet.create({
 
   categoryName: {
     color: "#f0f0f0",
-    fontSize: 13,
+    fontSize: 12,
+    flex: 1,
+    marginRight: 8,
   },
 
   categoryNameActive: {
@@ -489,7 +475,7 @@ const styles = StyleSheet.create({
 
   categoryCount: {
     color: "#d4d4d4",
-    fontSize: 13,
+    fontSize: 12,
   },
 
   categoryCountActive: {
@@ -498,8 +484,8 @@ const styles = StyleSheet.create({
   },
 
   channelItem: {
-    minHeight: 56,
-    paddingHorizontal: 14,
+    minHeight: 48,
+    paddingHorizontal: 10,
     flexDirection: "row",
     alignItems: "center",
     borderBottomWidth: 1,
@@ -511,31 +497,31 @@ const styles = StyleSheet.create({
   },
 
   channelNumber: {
-    width: 28,
+    width: 24,
     color: "#d9d9d9",
-    fontSize: 13,
+    fontSize: 11,
     textAlign: "center",
   },
 
   channelLogo: {
-    width: 24,
-    height: 24,
+    width: 18,
+    height: 18,
     resizeMode: "contain",
-    marginHorizontal: 10,
+    marginHorizontal: 6,
   },
 
   channelLogoFallback: {
-    width: 24,
-    height: 24,
-    marginHorizontal: 10,
-    borderRadius: 4,
+    width: 18,
+    height: 18,
+    marginHorizontal: 6,
+    borderRadius: 3,
     backgroundColor: "#39465c",
   },
 
   channelName: {
     flex: 1,
     color: "#f3f3f3",
-    fontSize: 14,
+    fontSize: 12,
   },
 
   channelNameActive: {
@@ -544,7 +530,7 @@ const styles = StyleSheet.create({
   },
 
   playerWrap: {
-    height: 320,
+    height: 220,
     backgroundColor: "#000000",
     margin: 8,
     overflow: "hidden",
@@ -561,76 +547,80 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.40)",
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 10,
   },
 
   playerOverlayText: {
-    marginTop: 12,
+    marginTop: 10,
     color: "#ffffff",
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: "700",
+    textAlign: "center",
   },
 
   emptyPlayer: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    padding: 12,
   },
 
   emptyPlayerText: {
     color: "#ffffff",
-    fontSize: 16,
+    fontSize: 12,
+    textAlign: "center",
   },
 
   infoBlock: {
     flex: 1,
-    paddingHorizontal: 14,
-    paddingBottom: 12,
+    paddingHorizontal: 10,
+    paddingBottom: 10,
   },
 
   channelInfoTitle: {
     color: "#ffffff",
-    fontSize: 20,
+    fontSize: 15,
     fontWeight: "900",
     marginTop: 2,
   },
 
   channelInfoGroup: {
     color: "#d2d2d2",
-    fontSize: 13,
-    marginTop: 6,
-    marginBottom: 14,
+    fontSize: 11,
+    marginTop: 4,
+    marginBottom: 10,
   },
 
   epgWrap: {
-    marginTop: 4,
+    marginTop: 2,
   },
 
   epgRow: {
     flexDirection: "row",
-    marginBottom: 10,
+    marginBottom: 8,
   },
 
   epgTime: {
-    width: 180,
+    width: 90,
     color: "#f0d24c",
-    fontSize: 14,
+    fontSize: 11,
   },
 
   epgTitle: {
     flex: 1,
     color: "#ffffff",
-    fontSize: 14,
+    fontSize: 11,
   },
 
   actionsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 24,
+    marginTop: 18,
   },
 
   actionBtn: {
-    width: 150,
-    height: 42,
+    width: 82,
+    height: 34,
     borderRadius: 4,
     backgroundColor: "#7e5ca8",
     alignItems: "center",
@@ -639,7 +629,7 @@ const styles = StyleSheet.create({
 
   actionBtnText: {
     color: "#ffffff",
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "700",
     textTransform: "lowercase",
   },
