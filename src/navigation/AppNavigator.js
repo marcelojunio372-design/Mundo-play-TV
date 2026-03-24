@@ -11,7 +11,7 @@ import SeasonEpisodesScreen from "../screens/SeasonEpisodesScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 import { loadM3U } from "../services/m3uService";
 
-const CACHE_KEY = "mundoplaytv_session_cache_v8";
+const CACHE_KEY = "mundoplaytv_session_cache_v10";
 
 const EMPTY_DATA = {
   live: [],
@@ -57,9 +57,6 @@ export default function AppNavigator() {
   const [selectedSeason, setSelectedSeason] = useState(null);
 
   const [isRefreshingData, setIsRefreshingData] = useState(false);
-  const [isEpgLoading, setIsEpgLoading] = useState(false);
-  const [isEpgReady, setIsEpgReady] = useState(false);
-  const [epgMessage, setEpgMessage] = useState("");
 
   const handleLogin = async (payload) => {
     const safeData = mergeData(payload?.data);
@@ -74,11 +71,7 @@ export default function AppNavigator() {
     setSelectedMovie(null);
     setSelectedSeries(null);
     setSelectedSeason(null);
-
     setIsRefreshingData(false);
-    setIsEpgLoading(false);
-    setIsEpgReady(false);
-    setEpgMessage("");
   };
 
   const handleLogout = () => {
@@ -88,9 +81,6 @@ export default function AppNavigator() {
     setSelectedSeries(null);
     setSelectedSeason(null);
     setIsRefreshingData(false);
-    setIsEpgLoading(false);
-    setIsEpgReady(false);
-    setEpgMessage("");
   };
 
   const handleReload = async () => {
@@ -100,7 +90,7 @@ export default function AppNavigator() {
     try {
       setIsRefreshingData(true);
 
-      const data = await loadM3U(session.url, { only: "all" });
+      const data = await loadM3U(session.url);
       const safeData = mergeData(data);
 
       setSession((prev) => {
@@ -112,11 +102,6 @@ export default function AppNavigator() {
       });
 
       await writeCache(session.url, safeData);
-
-      setIsEpgLoading(false);
-      setIsEpgReady(false);
-      setEpgMessage("");
-
       return true;
     } catch (e) {
       return false;
@@ -133,9 +118,7 @@ export default function AppNavigator() {
     return (
       <LiveTVScreen
         session={session}
-        isEpgReady={isEpgReady}
         onOpenHome={() => setScreen("home")}
-        onOpenLive={() => setScreen("live")}
         onOpenMovies={() => setScreen("movies")}
         onOpenSeries={() => setScreen("series")}
       />
@@ -225,9 +208,6 @@ export default function AppNavigator() {
     <HomeScreen
       session={session}
       isRefreshingData={isRefreshingData}
-      isEpgLoading={isEpgLoading}
-      isEpgReady={isEpgReady}
-      epgMessage={epgMessage}
       onOpenLive={() => setScreen("live")}
       onOpenMovies={() => setScreen("movies")}
       onOpenSeries={() => setScreen("series")}

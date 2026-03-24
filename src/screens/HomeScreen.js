@@ -1,425 +1,234 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import {
+  Image,
   SafeAreaView,
-  View,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  ImageBackground,
-  Image,
-  ActivityIndicator,
+  View,
 } from "react-native";
 
-const { width } = Dimensions.get("window");
-const isPhone = width < 900;
+function safeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
 
 export default function HomeScreen({
   session,
+  isRefreshingData,
   onOpenLive,
   onOpenMovies,
   onOpenSeries,
   onOpenSettings,
   onReload,
-  onLogout,
-  onSelectMovie,
-  onSelectSeries,
-  isRefreshingData,
-  isEpgLoading,
-  isEpgReady,
-  epgMessage,
 }) {
-  const movies = session?.data?.movies || [];
-  const series = session?.data?.series || [];
+  const movies = useMemo(() => safeArray(session?.data?.movies), [session]);
+  const series = useMemo(() => safeArray(session?.data?.series), [session]);
 
-  const featured = useMemo(() => {
-    const movieItems = movies.slice(0, 10).map((item) => ({
-      ...item,
-      mediaType: "movie",
-    }));
-
-    const seriesItems = series.slice(0, 10).map((item) => ({
-      ...item,
-      mediaType: "series",
-    }));
-
-    const combined = [...movieItems, ...seriesItems];
-
-    if (combined.length > 0) return combined;
-
-    return [
-      {
-        id: "fallback_home",
-        name: "MUNDO PLAY TV",
-        description: "Abra Filmes ou Séries para atualizar o conteúdo desta lista.",
-        logo: "",
-        cover: "",
-        backdrop: "",
-        fanart: "",
-        group: "Destaques",
-        year: "-",
-        mediaType: "movie",
-      },
-    ];
-  }, [movies, series]);
-
-  const [index, setIndex] = useState(0);
-
-  useEffect(() => {
-    setIndex(0);
-  }, [featured.length]);
-
-  useEffect(() => {
-    if (!featured.length) return;
-
-    const timer = setInterval(() => {
-      setIndex((prev) => (prev + 1) % featured.length);
-    }, 5000);
-
-    return () => clearInterval(timer);
-  }, [featured]);
-
-  const item = featured[index] || featured[0] || null;
-
-  const openFeatured = () => {
-    if (!item) return;
-    if (item.id === "fallback_home") return;
-
-    if (item.mediaType === "series") {
-      onSelectSeries?.(item);
-    } else {
-      onSelectMovie?.(item);
-    }
-  };
-
-  const heroUri =
-    item?.backdrop ||
-    item?.fanart ||
-    item?.cover ||
-    item?.poster ||
-    item?.logo ||
-    "";
-
-  const posterUri =
-    item?.logo ||
-    item?.poster ||
-    item?.cover ||
-    "";
-
-  const homeStatusText = isRefreshingData
-    ? "Atualizando lista..."
-    : isEpgLoading
-    ? (epgMessage || "Carregando guia de programação...")
-    : isEpgReady
-    ? "Guia pronto para TV ao vivo"
-    : (epgMessage || "Aguardando preparação do guia...");
+  const featuredMovie = movies[0] || null;
+  const featuredSeries = series[0] || null;
+  const featured = featuredMovie || featuredSeries || null;
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topbar}>
-        <Text style={styles.brand}>MUNDO PLAY TV</Text>
-        <Text style={styles.datetime}>
-          {new Date().toLocaleTimeString("pt-BR")}
+        <Text style={styles.appTitle}>MUNDO PLAY TV</Text>
+        <Text style={styles.statusText}>
+          {isRefreshingData ? "Recarregando..." : "Conteúdo pronto"}
         </Text>
-      </View>
-
-      <View style={styles.statusBarWrap}>
-        <View style={styles.statusLeft}>
-          {(isRefreshingData || isEpgLoading) ? (
-            <ActivityIndicator size="small" color="#38d7ff" />
-          ) : (
-            <View
-              style={[
-                styles.statusDot,
-                isEpgReady ? styles.statusDotOk : styles.statusDotIdle,
-              ]}
-            />
-          )}
-
-          <Text style={styles.statusText}>{homeStatusText}</Text>
-        </View>
-
-        {isEpgReady ? (
-          <Text style={styles.statusReady}>EPG pronto</Text>
-        ) : (
-          <Text style={styles.statusLoading}>Preparando...</Text>
-        )}
       </View>
 
       <View style={styles.content}>
         <View style={styles.sidebar}>
-          <Btn text="LIVE TV" onPress={onOpenLive} />
-          <Btn text="FILMES" onPress={onOpenMovies} />
-          <Btn text="SÉRIES" onPress={onOpenSeries} />
-          <Btn text="CONFIG." onPress={onOpenSettings} />
-          <Btn text={isRefreshingData ? "ATUALIZANDO..." : "RECARREGAR"} onPress={onReload} />
-          <Btn text="SAIR" onPress={onLogout} />
+          <TouchableOpacity style={styles.sideButton} onPress={onOpenLive}>
+            <Text style={styles.sideButtonText}>LIVE TV</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.sideButton} onPress={onOpenMovies}>
+            <Text style={styles.sideButtonText}>FILMES</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.sideButton} onPress={onOpenSeries}>
+            <Text style={styles.sideButtonText}>SÉRIES</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.sideButton} onPress={onOpenSettings}>
+            <Text style={styles.sideButtonText}>CONFIG.</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.sideButton} onPress={onReload}>
+            <Text style={styles.sideButtonText}>
+              {isRefreshingData ? "ATUALIZANDO..." : "RECARREGAR"}
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        <TouchableOpacity
-          style={styles.main}
-          onPress={openFeatured}
-          activeOpacity={0.92}
-          disabled={item?.id === "fallback_home"}
-        >
-          <ImageBackground
-            source={heroUri ? { uri: heroUri } : undefined}
-            style={styles.hero}
-            imageStyle={styles.heroImage}
-          >
-            <View style={styles.overlay} />
-
-            <View style={styles.heroContent}>
-              {posterUri ? (
-                <Image source={{ uri: posterUri }} style={styles.poster} />
-              ) : (
-                <View style={styles.posterFallback}>
-                  <Text style={styles.posterFallbackText}>MUNDO{"\n"}PLAY TV</Text>
-                </View>
-              )}
-
-              <View style={styles.info}>
-                <Text style={styles.type}>
-                  {item?.mediaType === "series" ? "SÉRIE" : "FILME"}
-                </Text>
-
-                <Text style={styles.title} numberOfLines={2}>
-                  {item?.name || "MUNDO PLAY TV"}
-                </Text>
-
-                <Text style={styles.meta} numberOfLines={1}>
-                  {(item?.year || "-") + " • " + (item?.group || "Destaques")}
-                </Text>
-
-                <Text style={styles.desc} numberOfLines={4}>
-                  {item?.description || "Conteúdo disponível"}
-                </Text>
-
-                <View style={styles.button}>
-                  <Text style={styles.buttonText}>
-                    {item?.id === "fallback_home" ? "AGUARDANDO CONTEÚDO" : "TOQUE PARA ABRIR"}
-                  </Text>
-                </View>
+        <View style={styles.mainCard}>
+          <View style={styles.posterBox}>
+            {featured?.logo ? (
+              <Image source={{ uri: featured.logo }} style={styles.poster} />
+            ) : (
+              <View style={styles.posterFallback}>
+                <Text style={styles.posterFallbackText}>MUNDO{"\n"}PLAY TV</Text>
               </View>
-            </View>
-          </ImageBackground>
-        </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.infoBox}>
+            <Text style={styles.featureLabel}>
+              {featuredMovie ? "FILME" : featuredSeries ? "SÉRIE" : "DESTAQUE"}
+            </Text>
+
+            <Text style={styles.featureTitle}>
+              {featured?.name || "MUNDO PLAY TV"}
+            </Text>
+
+            <Text style={styles.featureDesc}>
+              {featured?.group || "Abra Filmes, Séries ou TV ao Vivo para navegar no conteúdo."}
+            </Text>
+
+            <TouchableOpacity style={styles.actionButton}>
+              <Text style={styles.actionButtonText}>
+                {featured ? "CONTEÚDO CARREGADO" : "AGUARDANDO CONTEÚDO"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
     </SafeAreaView>
   );
 }
 
-const Btn = ({ text, onPress }) => (
-  <TouchableOpacity style={styles.sideBtn} onPress={onPress} activeOpacity={0.8}>
-    <Text style={styles.sideText}>{text}</Text>
-  </TouchableOpacity>
-);
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#07111e",
+    backgroundColor: "#04111f",
   },
 
   topbar: {
-    height: isPhone ? 56 : 70,
-    backgroundColor: "#0c1c2c",
-    justifyContent: "space-between",
+    height: 72,
+    paddingHorizontal: 18,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 15,
+    justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
   },
 
-  brand: {
-    color: "#fff",
-    fontSize: isPhone ? 18 : 24,
+  appTitle: {
+    color: "#ffffff",
+    fontSize: 22,
     fontWeight: "900",
   },
 
-  datetime: {
-    color: "#9eb3c7",
-    fontSize: isPhone ? 10 : 12,
-  },
-
-  statusBarWrap: {
-    minHeight: isPhone ? 42 : 50,
-    backgroundColor: "#081827",
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.08)",
-    paddingHorizontal: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-
-  statusLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-    paddingRight: 10,
-  },
-
-  statusDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 999,
-    marginRight: 10,
-  },
-
-  statusDotOk: {
-    backgroundColor: "#44d17a",
-  },
-
-  statusDotIdle: {
-    backgroundColor: "#7b8ca0",
-  },
-
   statusText: {
-    color: "#d6e3ef",
-    fontSize: isPhone ? 10 : 13,
-    flex: 1,
-  },
-
-  statusReady: {
-    color: "#44d17a",
-    fontSize: isPhone ? 10 : 12,
-    fontWeight: "800",
-  },
-
-  statusLoading: {
-    color: "#38d7ff",
-    fontSize: isPhone ? 10 : 12,
-    fontWeight: "800",
+    color: "#35c8ff",
+    fontSize: 16,
+    fontWeight: "700",
   },
 
   content: {
     flex: 1,
     flexDirection: "row",
+    padding: 12,
   },
 
   sidebar: {
-    width: isPhone ? 110 : 150,
-    backgroundColor: "#061522",
-    padding: 10,
+    width: 180,
+    gap: 18,
+    paddingRight: 14,
   },
 
-  sideBtn: {
-    backgroundColor: "#0b1b2b",
-    paddingVertical: isPhone ? 14 : 16,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-
-  sideText: {
-    color: "#fff",
-    fontWeight: "700",
-    textAlign: "center",
-    fontSize: isPhone ? 10 : 14,
-  },
-
-  main: {
-    flex: 1,
-    padding: isPhone ? 10 : 14,
-  },
-
-  hero: {
-    flex: 1,
-    borderRadius: 18,
-    overflow: "hidden",
-    justifyContent: "center",
-    backgroundColor: "#09111d",
-  },
-
-  heroImage: {
-    resizeMode: "contain",
-    opacity: 0.78,
-  },
-
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.50)",
-  },
-
-  heroContent: {
-    flexDirection: "row",
+  sideButton: {
+    height: 102,
+    borderRadius: 20,
+    backgroundColor: "#08203a",
     alignItems: "center",
-    paddingHorizontal: isPhone ? 18 : 28,
-    paddingVertical: isPhone ? 18 : 26,
+    justifyContent: "center",
+  },
+
+  sideButtonText: {
+    color: "#ffffff",
+    fontSize: 18,
+    fontWeight: "800",
+  },
+
+  mainCard: {
+    flex: 1,
+    flexDirection: "row",
+    backgroundColor: "#020812",
+    borderRadius: 20,
+    padding: 22,
+  },
+
+  posterBox: {
+    width: 260,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   poster: {
-    width: isPhone ? 105 : 160,
-    height: isPhone ? 155 : 235,
-    borderRadius: 12,
-    marginRight: isPhone ? 16 : 24,
-    backgroundColor: "#132235",
+    width: 200,
+    height: 280,
+    borderRadius: 20,
+    resizeMode: "cover",
   },
 
   posterFallback: {
-    width: isPhone ? 105 : 160,
-    height: isPhone ? 155 : 235,
-    borderRadius: 12,
-    marginRight: isPhone ? 16 : 24,
-    backgroundColor: "#132235",
+    width: 200,
+    height: 280,
+    borderRadius: 20,
+    backgroundColor: "#132a45",
     alignItems: "center",
     justifyContent: "center",
-    padding: 10,
   },
 
   posterFallbackText: {
-    color: "#38d7ff",
+    color: "#35c8ff",
+    fontSize: 26,
     fontWeight: "900",
     textAlign: "center",
-    fontSize: isPhone ? 16 : 22,
   },
 
-  info: {
+  infoBox: {
     flex: 1,
+    justifyContent: "center",
+    paddingLeft: 20,
   },
 
-  type: {
-    color: "#38d7ff",
-    fontSize: isPhone ? 12 : 15,
+  featureLabel: {
+    color: "#35c8ff",
+    fontSize: 18,
     fontWeight: "900",
-    marginBottom: 6,
+    marginBottom: 18,
   },
 
-  title: {
-    color: "#fff",
-    fontSize: isPhone ? 24 : 40,
+  featureTitle: {
+    color: "#ffffff",
+    fontSize: 32,
     fontWeight: "900",
-    marginBottom: 8,
-  },
-
-  meta: {
-    color: "#d0d9e2",
-    fontSize: isPhone ? 12 : 16,
-    marginBottom: 10,
-  },
-
-  desc: {
-    color: "#f0f4f8",
-    fontSize: isPhone ? 14 : 18,
-    lineHeight: isPhone ? 20 : 26,
     marginBottom: 20,
   },
 
-  button: {
-    minHeight: 48,
-    borderRadius: 14,
-    paddingHorizontal: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    alignSelf: "flex-start",
-    borderWidth: 2,
-    borderColor: "#38d7ff",
-    backgroundColor: "rgba(56,215,255,0.08)",
+  featureDesc: {
+    color: "#d8d8d8",
+    fontSize: 18,
+    marginBottom: 28,
   },
 
-  buttonText: {
-    color: "#38d7ff",
+  actionButton: {
+    height: 78,
+    width: 430,
+    maxWidth: "100%",
+    borderRadius: 22,
+    borderWidth: 3,
+    borderColor: "#35c8ff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  actionButtonText: {
+    color: "#35c8ff",
+    fontSize: 22,
     fontWeight: "900",
-    fontSize: isPhone ? 14 : 18,
   },
 });
