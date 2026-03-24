@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import LoginScreen from "../screens/LoginScreen";
 import HomeScreen from "../screens/HomeScreen";
@@ -10,9 +10,8 @@ import SeriesDetailsScreen from "../screens/SeriesDetailsScreen";
 import SeasonEpisodesScreen from "../screens/SeasonEpisodesScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 import { loadM3U } from "../services/m3uService";
-import { warmupEPG } from "../services/epgService";
 
-const CACHE_KEY = "mundoplaytv_session_cache_v7";
+const CACHE_KEY = "mundoplaytv_session_cache_v8";
 
 const EMPTY_DATA = {
   live: [],
@@ -76,19 +75,10 @@ export default function AppNavigator() {
     setSelectedSeries(null);
     setSelectedSeason(null);
 
-    const loginType = String(payload?.type || "").toLowerCase();
-
-    if (loginType === "m3u") {
-      setIsRefreshingData(false);
-      setIsEpgLoading(false);
-      setIsEpgReady(false);
-      setEpgMessage("Carregando Live TV...");
-    } else {
-      setIsRefreshingData(false);
-      setIsEpgLoading(false);
-      setIsEpgReady(false);
-      setEpgMessage("Preparando guia...");
-    }
+    setIsRefreshingData(false);
+    setIsEpgLoading(false);
+    setIsEpgReady(false);
+    setEpgMessage("");
   };
 
   const handleLogout = () => {
@@ -107,75 +97,8 @@ export default function AppNavigator() {
     if (!session?.url) return false;
     if (isRefreshingData) return false;
 
-    const loginType = String(session?.type || "").toLowerCase();
-
     try {
       setIsRefreshingData(true);
-
-      if (loginType === "m3u") {
-        setEpgMessage("Atualizando Live TV...");
-
-        const liveData = await loadM3U(session.url, { only: "live" });
-        const safeLiveData = mergeData({
-          ...session?.data,
-          live: liveData.live,
-          liveCategories: liveData.liveCategories,
-        });
-
-        setSession((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            data: safeLiveData,
-          };
-        });
-
-        await writeCache(session.url, safeLiveData);
-
-        setEpgMessage("Atualizando filmes...");
-
-        const movieData = await loadM3U(session.url, { only: "movie" });
-        const safeMovieData = mergeData({
-          ...safeLiveData,
-          movies: movieData.movies,
-          movieCategories: movieData.movieCategories,
-        });
-
-        setSession((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            data: safeMovieData,
-          };
-        });
-
-        await writeCache(session.url, safeMovieData);
-
-        setEpgMessage("Atualizando séries...");
-
-        const seriesData = await loadM3U(session.url, { only: "series" });
-        const safeSeriesData = mergeData({
-          ...safeMovieData,
-          series: seriesData.series,
-          seriesCategories: seriesData.seriesCategories,
-          loadedAt: new Date().toISOString(),
-        });
-
-        setSession((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            data: safeSeriesData,
-          };
-        });
-
-        await writeCache(session.url, safeSeriesData);
-
-        setIsEpgLoading(false);
-        setIsEpgReady(false);
-        setEpgMessage("Lista M3U carregada.");
-        return true;
-      }
 
       const data = await loadM3U(session.url, { only: "all" });
       const safeData = mergeData(data);
@@ -190,156 +113,17 @@ export default function AppNavigator() {
 
       await writeCache(session.url, safeData);
 
+      setIsEpgLoading(false);
       setIsEpgReady(false);
-      setEpgMessage("Lista atualizada. Preparando guia...");
+      setEpgMessage("");
+
       return true;
     } catch (e) {
-      if (loginType === "m3u") {
-        setEpgMessage("Falha ao atualizar lista M3U.");
-      }
       return false;
     } finally {
       setIsRefreshingData(false);
     }
   };
-
-  useEffect(() => {
-    let active = true;
-
-    async function startBackgroundLoads() {
-      if (!session) return;
-      if (screen !== "home") return;
-      if (isRefreshingData) return;
-
-      const loginType = String(session?.type || "").toLowerCase();
-      const hasLive = Array.isArray(session?.data?.live) && session.data.live.length > 0;
-      const hasMovies = Array.isArray(session?.data?.movies) && session.data.movies.length > 0;
-      const hasSeries = Array.isArray(session?.data?.series) && session.data.series.length > 0;
-
-      if (loginType === "m3u") {
-        try {
-          if (!hasLive) {
-            setIsRefreshingData(true);
-            setEpgMessage("Carregando Live TV...");
-
-            const liveData = await loadM3U(session.url, { only: "live" });
-            if (!active) return;
-
-            const safeLiveData = mergeData({
-              ...session?.data,
-              live: liveData.live,
-              liveCategories: liveData.liveCategories,
-            });
-
-            setSession((prev) => {
-              if (!prev) return prev;
-              return {
-                ...prev,
-                data: safeLiveData,
-              };
-            });
-
-            await writeCache(session.url, safeLiveData);
-
-            if (!active) return;
-            setEpgMessage("Live TV carregada.");
-          }
-
-          if (!hasMovies) {
-            setEpgMessage("Carregando filmes...");
-
-            const movieData = await loadM3U(session.url, { only: "movie" });
-            if (!active) return;
-
-            setSession((prev) => {
-              if (!prev) return prev;
-
-              const nextData = mergeData({
-                ...prev.data,
-                movies: movieData.movies,
-                movieCategories: movieData.movieCategories,
-              });
-
-              writeCache(prev.url, nextData);
-              return {
-                ...prev,
-                data: nextData,
-              };
-            });
-
-            if (!active) return;
-            setEpgMessage("Filmes carregados.");
-          }
-
-          if (!hasSeries) {
-            setEpgMessage("Carregando séries...");
-
-            const seriesData = await loadM3U(session.url, { only: "series" });
-            if (!active) return;
-
-            setSession((prev) => {
-              if (!prev) return prev;
-
-              const nextData = mergeData({
-                ...prev.data,
-                series: seriesData.series,
-                seriesCategories: seriesData.seriesCategories,
-                loadedAt: new Date().toISOString(),
-              });
-
-              writeCache(prev.url, nextData);
-              return {
-                ...prev,
-                data: nextData,
-              };
-            });
-
-            if (!active) return;
-            setEpgMessage("Lista M3U carregada.");
-          }
-        } catch (e) {
-          if (!active) return;
-          setEpgMessage("Falha ao carregar lista M3U.");
-        } finally {
-          if (active) {
-            setIsRefreshingData(false);
-          }
-        }
-
-        return;
-      }
-
-      if (isEpgLoading || isEpgReady) return;
-
-      try {
-        setIsEpgLoading(true);
-        setEpgMessage("Carregando guia de programação...");
-        await warmupEPG(session);
-
-        if (!active) return;
-
-        setIsEpgReady(true);
-        setEpgMessage("Guia carregado.");
-      } catch (e) {
-        if (!active) return;
-
-        setIsEpgReady(false);
-        setEpgMessage("Não foi possível carregar o guia agora.");
-      } finally {
-        if (active) {
-          setIsEpgLoading(false);
-        }
-      }
-    }
-
-    if (session && screen === "home") {
-      startBackgroundLoads();
-    }
-
-    return () => {
-      active = false;
-    };
-  }, [session, screen, isRefreshingData, isEpgLoading, isEpgReady]);
 
   if (!session) {
     return <LoginScreen onLogin={handleLogin} />;

@@ -144,6 +144,7 @@ function extractDescription(extinf = "", name = "", group = "") {
 function inferType(name = "", group = "", url = "", tvgId = "", tvgName = "") {
   const urlText = safeText(url).toLowerCase();
   const metaText = `${name} ${group} ${tvgId} ${tvgName}`.toLowerCase();
+  const groupText = safeText(group).toLowerCase();
 
   if (
     /\/series\//.test(urlText) ||
@@ -163,11 +164,17 @@ function inferType(name = "", group = "", url = "", tvgId = "", tvgName = "") {
     return "movie";
   }
 
-  if (/temporada|season|epis[oó]dio|s\d{1,2}e\d{1,2}/.test(metaText)) {
+  if (
+    /temporada|season|epis[oó]dio|s\d{1,2}e\d{1,2}|séries|series/.test(metaText) ||
+    /series|séries|temporadas|episodios|episódios/.test(groupText)
+  ) {
     return "series";
   }
 
-  if (/filme sob demanda|vod filme|cat[aá]logo filme/.test(metaText)) {
+  if (
+    /movie|filme|cinema|vod|lancamento|lançamento/.test(metaText) ||
+    /filmes|filme|movies|movie|cinema|vod/.test(groupText)
+  ) {
     return "movie";
   }
 
@@ -260,9 +267,7 @@ export async function loadM3U(url, options = {}) {
     const tvgName = extractTvgName(extinf);
     const type = inferType(name, group, streamUrl, tvgId, tvgName);
 
-    if (!shouldKeepType(type, only)) {
-      continue;
-    }
+    if (!shouldKeepType(type, only)) continue;
 
     const year = extractYear(name, group);
     const description = extractDescription(extinf, name, group);
