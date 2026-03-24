@@ -103,8 +103,8 @@ const styles = StyleSheet.create({
   },
 
   topbar: {
-    height: 56,
-    paddingHorizontal: 14,
+    height: 46,
+    paddingHorizontal: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -114,31 +114,31 @@ const styles = StyleSheet.create({
 
   appTitle: {
     color: "#ffffff",
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "900",
   },
 
   statusText: {
     color: "#35c8ff",
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "700",
   },
 
   content: {
     flex: 1,
     flexDirection: "row",
-    padding: 10,
+    padding: 8,
   },
 
   sidebar: {
-    width: 140,
-    gap: 12,
-    paddingRight: 10,
+    width: 112,
+    gap: 8,
+    paddingRight: 8,
   },
 
   sideButton: {
-    height: 86,
-    borderRadius: 18,
+    height: 66,
+    borderRadius: 14,
     backgroundColor: "#08203a",
     alignItems: "center",
     justifyContent: "center",
@@ -146,21 +146,22 @@ const styles = StyleSheet.create({
 
   sideButtonText: {
     color: "#ffffff",
-    fontSize: 15,
+    fontSize: 12,
     fontWeight: "800",
   },
 
   sideButtonSmall: {
-    height: 72,
-    borderRadius: 18,
+    height: 58,
+    borderRadius: 14,
     backgroundColor: "#08203a",
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 4,
   },
 
   sideButtonSmallText: {
     color: "#ffffff",
-    fontSize: 13,
+    fontSize: 10,
     fontWeight: "800",
     textAlign: "center",
   },
@@ -169,27 +170,27 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     backgroundColor: "#020812",
-    borderRadius: 18,
-    padding: 16,
+    borderRadius: 14,
+    padding: 12,
   },
 
   posterBox: {
-    width: 180,
+    width: 120,
     alignItems: "center",
     justifyContent: "center",
   },
 
   poster: {
-    width: 140,
-    height: 210,
-    borderRadius: 16,
+    width: 95,
+    height: 145,
+    borderRadius: 12,
     resizeMode: "cover",
   },
 
   posterFallback: {
-    width: 140,
-    height: 210,
-    borderRadius: 16,
+    width: 95,
+    height: 145,
+    borderRadius: 12,
     backgroundColor: "#132a45",
     alignItems: "center",
     justifyContent: "center",
@@ -197,7 +198,7 @@ const styles = StyleSheet.create({
 
   posterFallbackText: {
     color: "#35c8ff",
-    fontSize: 18,
+    fontSize: 13,
     fontWeight: "900",
     textAlign: "center",
   },
@@ -205,34 +206,34 @@ const styles = StyleSheet.create({
   infoBox: {
     flex: 1,
     justifyContent: "center",
-    paddingLeft: 16,
+    paddingLeft: 12,
   },
 
   featureLabel: {
     color: "#35c8ff",
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: "900",
-    marginBottom: 12,
+    marginBottom: 8,
   },
 
   featureTitle: {
     color: "#ffffff",
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: "900",
-    marginBottom: 16,
+    marginBottom: 10,
   },
 
   featureDesc: {
     color: "#d8d8d8",
-    fontSize: 16,
-    marginBottom: 22,
+    fontSize: 12,
+    marginBottom: 14,
   },
 
   actionButton: {
-    height: 64,
-    width: 320,
+    height: 46,
+    width: 250,
     maxWidth: "100%",
-    borderRadius: 18,
+    borderRadius: 14,
     borderWidth: 2,
     borderColor: "#35c8ff",
     alignItems: "center",
@@ -241,7 +242,7 @@ const styles = StyleSheet.create({
 
   actionButtonText: {
     color: "#35c8ff",
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "900",
   },
 });
