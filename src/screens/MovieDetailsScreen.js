@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -9,7 +9,20 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ResizeMode, Video } from "expo-av";
+
+const FAVORITES_KEY = "mundoplaytv_movie_favorites";
+const RECENTS_KEY = "mundoplaytv_movie_recents";
+
+function safeText(value) {
+  if (value === null || value === undefined) return "";
+  return String(value).trim();
+}
+
+function getMovieStorageId(item = {}) {
+  return safeText(item.id || item.url || item.name);
+}
 
 export default function MovieDetailsScreen({ movie, onBack }) {
   const videoRef = useRef(null);
@@ -18,8 +31,54 @@ export default function MovieDetailsScreen({ movie, onBack }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
 
   const sourceUri = movie?.url || "";
+
+  useEffect(() => {
+    async function loadFavorite() {
+      try {
+        const raw = await AsyncStorage.getItem(FAVORITES_KEY);
+        const ids = raw ? JSON.parse(raw) : [];
+        setIsFavorite(ids.includes(getMovieStorageId(movie)));
+      } catch (e) {}
+    }
+
+    loadFavorite();
+  }, [movie]);
+
+  useEffect(() => {
+    async function addRecent() {
+      try {
+        const raw = await AsyncStorage.getItem(RECENTS_KEY);
+        const ids = raw ? JSON.parse(raw) : [];
+        const id = getMovieStorageId(movie);
+        const updated = [id, ...ids.filter((item) => item !== id)].slice(0, 50);
+        await AsyncStorage.setItem(RECENTS_KEY, JSON.stringify(updated));
+      } catch (e) {}
+    }
+
+    if (movie) addRecent();
+  }, [movie]);
+
+  const toggleFavorite = async () => {
+    try {
+      const raw = await AsyncStorage.getItem(FAVORITES_KEY);
+      const ids = raw ? JSON.parse(raw) : [];
+      const id = getMovieStorageId(movie);
+
+      let updated = [];
+      if (ids.includes(id)) {
+        updated = ids.filter((item) => item !== id);
+        setIsFavorite(false);
+      } else {
+        updated = [id, ...ids];
+        setIsFavorite(true);
+      }
+
+      await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
+    } catch (e) {}
+  };
 
   return (
     <>
@@ -42,10 +101,34 @@ export default function MovieDetailsScreen({ movie, onBack }) {
           </View>
 
           <View style={styles.right}>
-            <Text style={styles.title}>{movie?.name || "Filme"}</Text>
-            <Text style={styles.meta}>{movie?.group || "Filmes"}</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>{movie?.name || "Filme"}</Text>
+              <TouchableOpacity onPress={toggleFavorite}>
+                <Text style={[styles.star, isFavorite && styles.starActive]}>★</Text>
+              </TouchableOpacity>
+            </View>
 
-            <View style={styles.playerWrap}>
+            <Text style={styles.metaLine}>
+              {(movie?.year || "-") + " • " + (movie?.group || "Filmes")}
+            </Text>
+
+            <Text style={styles.description}>
+              {movie?.description ||
+                movie?.plot ||
+                movie?.desc ||
+                "Descrição não disponível."}
+            </Text>
+
+            <TouchableOpacity
+              activeOpacity={0.95}
+              style={styles.playerWrap}
+              onPress={() => {
+                if (sourceUri) {
+                  setIsPlaying(true);
+                  setIsFullscreen(true);
+                }
+              }}
+            >
               {isPlaying && sourceUri ? (
                 <>
                   <Video
@@ -53,6 +136,7 @@ export default function MovieDetailsScreen({ movie, onBack }) {
                     style={styles.video}
                     source={{ uri: sourceUri }}
                     shouldPlay
+                    useNativeControls
                     resizeMode={ResizeMode.CONTAIN}
                     onLoadStart={() => setIsBuffering(true)}
                     onReadyForDisplay={() => setIsBuffering(false)}
@@ -67,31 +151,10 @@ export default function MovieDetailsScreen({ movie, onBack }) {
                 </>
               ) : (
                 <View style={styles.emptyPlayer}>
-                  <Text style={styles.emptyPlayerText}>Toque em reproduzir</Text>
+                  <Text style={styles.emptyPlayerText}>Toque para reproduzir</Text>
                 </View>
               )}
-            </View>
-
-            <View style={styles.actions}>
-              <TouchableOpacity
-                style={styles.btn}
-                onPress={() => setIsPlaying(true)}
-              >
-                <Text style={styles.btnText}>reproduzir</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.btn}
-                onPress={() => {
-                  if (sourceUri) {
-                    setIsPlaying(true);
-                    setIsFullscreen(true);
-                  }
-                }}
-              >
-                <Text style={styles.btnText}>tela cheia</Text>
-              </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
           </View>
         </View>
       </SafeAreaView>
@@ -109,6 +172,7 @@ export default function MovieDetailsScreen({ movie, onBack }) {
               style={styles.fullscreenVideo}
               source={{ uri: sourceUri }}
               shouldPlay
+              useNativeControls
               resizeMode={ResizeMode.CONTAIN}
             />
           ) : null}
@@ -153,7 +217,7 @@ const styles = StyleSheet.create({
   left: {
     width: 140,
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-start",
   },
 
   right: {
@@ -182,15 +246,39 @@ const styles = StyleSheet.create({
     fontSize: 10,
   },
 
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+
   title: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "900",
-    marginBottom: 6,
+    flex: 1,
+    marginRight: 10,
   },
 
-  meta: {
+  star: {
+    color: "#666",
+    fontSize: 18,
+  },
+
+  starActive: {
+    color: "#ffe04f",
+  },
+
+  metaLine: {
     color: "#b7c6d6",
+    marginBottom: 10,
+  },
+
+  description: {
+    color: "#d6dce5",
+    fontSize: 12,
+    lineHeight: 18,
     marginBottom: 12,
   },
 
@@ -223,27 +311,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.35)",
     alignItems: "center",
     justifyContent: "center",
-  },
-
-  actions: {
-    flexDirection: "row",
-    marginTop: 12,
-    justifyContent: "space-between",
-  },
-
-  btn: {
-    width: 120,
-    height: 38,
-    borderRadius: 8,
-    backgroundColor: "#7e5ca8",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  btnText: {
-    color: "#fff",
-    fontWeight: "800",
-    textTransform: "lowercase",
   },
 
   fullscreenWrap: {

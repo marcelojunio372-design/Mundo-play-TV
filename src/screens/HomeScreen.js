@@ -1,5 +1,6 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
+  FlatList,
   Image,
   SafeAreaView,
   StyleSheet,
@@ -12,10 +13,21 @@ function safeArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
-function getFeaturedItem(movies = [], series = []) {
-  if (movies.length > 0) return movies[0];
-  if (series.length > 0) return series[0];
-  return null;
+function pickFeaturedItems(session) {
+  const movies = safeArray(session?.data?.movies);
+  const series = safeArray(session?.data?.series);
+
+  const movieLaunches = movies.slice(0, 8).map((item) => ({
+    ...item,
+    homeType: "movie",
+  }));
+
+  const seriesLaunches = series.slice(0, 8).map((item) => ({
+    ...item,
+    homeType: "series",
+  }));
+
+  return [...movieLaunches, ...seriesLaunches].slice(0, 12);
 }
 
 export default function HomeScreen({
@@ -26,9 +38,10 @@ export default function HomeScreen({
   onOpenSettings,
   onReload,
 }) {
-  const movies = useMemo(() => safeArray(session?.data?.movies), [session]);
-  const series = useMemo(() => safeArray(session?.data?.series), [session]);
-  const featured = useMemo(() => getFeaturedItem(movies, series), [movies, series]);
+  const items = useMemo(() => pickFeaturedItems(session), [session]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  const featured = items[selectedIndex] || items[0] || null;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -61,34 +74,72 @@ export default function HomeScreen({
         </View>
 
         <View style={styles.mainCard}>
-          <View style={styles.posterBox}>
-            {featured?.logo ? (
-              <Image source={{ uri: featured.logo }} style={styles.poster} />
-            ) : (
-              <View style={styles.posterFallback}>
-                <Text style={styles.posterFallbackText}>MUNDO{"\n"}PLAY TV</Text>
-              </View>
-            )}
-          </View>
+          {featured?.logo ? (
+            <Image
+              source={{ uri: featured.logo }}
+              style={styles.backgroundImage}
+            />
+          ) : null}
 
-          <View style={styles.infoBox}>
-            <Text style={styles.featureLabel}>DESTAQUE</Text>
+          <View style={styles.overlay} />
 
-            <Text style={styles.featureTitle}>
-              {featured?.name || "MUNDO PLAY TV"}
-            </Text>
+          <View style={styles.featuredRow}>
+            <View style={styles.posterBox}>
+              {featured?.logo ? (
+                <Image source={{ uri: featured.logo }} style={styles.poster} />
+              ) : (
+                <View style={styles.posterFallback}>
+                  <Text style={styles.posterFallbackText}>MUNDO{"\n"}PLAY TV</Text>
+                </View>
+              )}
+            </View>
 
-            <Text style={styles.featureDesc}>
-              {featured?.group ||
-                "Abra Filmes ou Séries para ver o destaque do catálogo."}
-            </Text>
+            <View style={styles.infoBox}>
+              <Text style={styles.featureLabel}>LANÇAMENTOS</Text>
 
-            <TouchableOpacity style={styles.actionButton}>
-              <Text style={styles.actionButtonText}>
-                {featured ? "CATÁLOGO PRONTO" : "SEM DESTAQUE"}
+              <Text style={styles.featureTitle}>
+                {featured?.name || "MUNDO PLAY TV"}
               </Text>
-            </TouchableOpacity>
+
+              <Text style={styles.featureDesc}>
+                {featured?.group ||
+                  "Abra Filmes ou Séries para navegar no conteúdo."}
+              </Text>
+
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() =>
+                  featured?.homeType === "series" ? onOpenSeries() : onOpenMovies()
+                }
+              >
+                <Text style={styles.actionButtonText}>ABRIR CATÁLOGO</Text>
+              </TouchableOpacity>
+            </View>
           </View>
+
+          <FlatList
+            data={items}
+            horizontal
+            keyExtractor={(item, index) => item.id || `${item.name}_${index}`}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.carouselContent}
+            renderItem={({ item, index }) => {
+              const active = index === selectedIndex;
+
+              return (
+                <TouchableOpacity
+                  style={[styles.carouselItem, active && styles.carouselItemActive]}
+                  onPress={() => setSelectedIndex(index)}
+                >
+                  {item?.logo ? (
+                    <Image source={{ uri: item.logo }} style={styles.carouselPoster} />
+                  ) : (
+                    <View style={styles.carouselPosterFallback} />
+                  )}
+                </TouchableOpacity>
+              );
+            }}
+          />
         </View>
       </View>
     </SafeAreaView>
@@ -103,7 +154,7 @@ const styles = StyleSheet.create({
 
   topbar: {
     height: 34,
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -126,17 +177,17 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     flexDirection: "row",
-    padding: 5,
+    padding: 6,
   },
 
   sidebar: {
-    width: 84,
-    gap: 5,
-    paddingRight: 5,
+    width: 90,
+    gap: 6,
+    paddingRight: 6,
   },
 
   sideButton: {
-    height: 48,
+    height: 50,
     borderRadius: 10,
     backgroundColor: "#08203a",
     alignItems: "center",
@@ -150,46 +201,63 @@ const styles = StyleSheet.create({
   },
 
   sideButtonSmall: {
-    height: 40,
+    height: 42,
     borderRadius: 10,
     backgroundColor: "#08203a",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 4,
   },
 
   sideButtonSmallText: {
     color: "#ffffff",
     fontSize: 7,
     fontWeight: "800",
-    textAlign: "center",
   },
 
   mainCard: {
     flex: 1,
-    flexDirection: "row",
+    borderRadius: 12,
+    overflow: "hidden",
     backgroundColor: "#020812",
-    borderRadius: 10,
-    padding: 8,
+    position: "relative",
+    padding: 10,
+  },
+
+  backgroundImage: {
+    ...StyleSheet.absoluteFillObject,
+    resizeMode: "cover",
+    opacity: 0.24,
+  },
+
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(2,8,18,0.72)",
+  },
+
+  featuredRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    zIndex: 2,
+    marginBottom: 10,
   },
 
   posterBox: {
-    width: 78,
+    width: 90,
     alignItems: "center",
     justifyContent: "center",
   },
 
   poster: {
-    width: 62,
-    height: 98,
-    borderRadius: 8,
+    width: 72,
+    height: 110,
+    borderRadius: 10,
     resizeMode: "cover",
   },
 
   posterFallback: {
-    width: 62,
-    height: 98,
-    borderRadius: 8,
+    width: 72,
+    height: 110,
+    borderRadius: 10,
     backgroundColor: "#132a45",
     alignItems: "center",
     justifyContent: "center",
@@ -197,42 +265,41 @@ const styles = StyleSheet.create({
 
   posterFallbackText: {
     color: "#35c8ff",
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: "900",
     textAlign: "center",
   },
 
   infoBox: {
     flex: 1,
-    justifyContent: "center",
-    paddingLeft: 8,
+    paddingLeft: 10,
   },
 
   featureLabel: {
     color: "#35c8ff",
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: "900",
     marginBottom: 5,
   },
 
   featureTitle: {
     color: "#ffffff",
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "900",
     marginBottom: 6,
   },
 
   featureDesc: {
     color: "#d8d8d8",
-    fontSize: 9,
-    marginBottom: 8,
+    fontSize: 10,
+    marginBottom: 10,
   },
 
   actionButton: {
-    height: 30,
-    width: 160,
+    height: 34,
+    width: 170,
     maxWidth: "100%",
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: "#35c8ff",
     alignItems: "center",
@@ -241,7 +308,39 @@ const styles = StyleSheet.create({
 
   actionButtonText: {
     color: "#35c8ff",
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: "900",
+  },
+
+  carouselContent: {
+    paddingTop: 6,
+    paddingBottom: 4,
+    zIndex: 2,
+  },
+
+  carouselItem: {
+    width: 78,
+    height: 110,
+    borderRadius: 10,
+    marginRight: 8,
+    borderWidth: 2,
+    borderColor: "transparent",
+    overflow: "hidden",
+  },
+
+  carouselItemActive: {
+    borderColor: "#35c8ff",
+  },
+
+  carouselPoster: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
+
+  carouselPosterFallback: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#1c2f45",
   },
 });

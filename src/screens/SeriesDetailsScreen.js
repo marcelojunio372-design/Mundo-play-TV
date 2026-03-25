@@ -1,12 +1,17 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   FlatList,
+  Image,
   SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const FAVORITES_KEY = "mundoplaytv_series_favorites";
+const RECENTS_KEY = "mundoplaytv_series_recents";
 
 function safeArray(value) {
   return Array.isArray(value) ? value : [];
@@ -15,6 +20,10 @@ function safeArray(value) {
 function safeText(value) {
   if (value === null || value === undefined) return "";
   return String(value).trim();
+}
+
+function getSeriesStorageId(item = {}) {
+  return safeText(item.id || item.url || item.name);
 }
 
 function extractSeasonNumber(name = "") {
@@ -49,7 +58,53 @@ export default function SeriesDetailsScreen({
   onBack,
   onOpenSeason,
 }) {
+  const [isFavorite, setIsFavorite] = useState(false);
   const seasons = useMemo(() => buildSeasons(series), [series]);
+
+  useEffect(() => {
+    async function loadFavorite() {
+      try {
+        const raw = await AsyncStorage.getItem(FAVORITES_KEY);
+        const ids = raw ? JSON.parse(raw) : [];
+        setIsFavorite(ids.includes(getSeriesStorageId(series)));
+      } catch (e) {}
+    }
+
+    loadFavorite();
+  }, [series]);
+
+  useEffect(() => {
+    async function addRecent() {
+      try {
+        const raw = await AsyncStorage.getItem(RECENTS_KEY);
+        const ids = raw ? JSON.parse(raw) : [];
+        const id = getSeriesStorageId(series);
+        const updated = [id, ...ids.filter((item) => item !== id)].slice(0, 30);
+        await AsyncStorage.setItem(RECENTS_KEY, JSON.stringify(updated));
+      } catch (e) {}
+    }
+
+    if (series) addRecent();
+  }, [series]);
+
+  const toggleFavorite = async () => {
+    try {
+      const raw = await AsyncStorage.getItem(FAVORITES_KEY);
+      const ids = raw ? JSON.parse(raw) : [];
+      const id = getSeriesStorageId(series);
+
+      let updated = [];
+      if (ids.includes(id)) {
+        updated = ids.filter((item) => item !== id);
+        setIsFavorite(false);
+      } else {
+        updated = [id, ...ids];
+        setIsFavorite(true);
+      }
+
+      await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
+    } catch (e) {}
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -60,27 +115,51 @@ export default function SeriesDetailsScreen({
       </View>
 
       <View style={styles.content}>
-        <Text style={styles.title}>{series?.name || "Série"}</Text>
-        <Text style={styles.meta}>{series?.group || "Séries"}</Text>
-
-        <FlatList
-          data={seasons}
-          keyExtractor={(item) => `season_${item.seasonNumber}`}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.seasonRow}
-              onPress={() => onOpenSeason?.(item)}
-            >
-              <Text style={styles.seasonName}>{item.name}</Text>
-              <Text style={styles.seasonCount}>{item.episodes.length} eps</Text>
-            </TouchableOpacity>
-          )}
-          ListEmptyComponent={
-            <View style={styles.emptyWrap}>
-              <Text style={styles.emptyText}>Nenhuma temporada encontrada</Text>
+        <View style={styles.left}>
+          {series?.logo ? (
+            <Image source={{ uri: series.logo }} style={styles.poster} />
+          ) : (
+            <View style={styles.posterFallback}>
+              <Text style={styles.posterFallbackText}>SEM CAPA</Text>
             </View>
-          }
-        />
+          )}
+        </View>
+
+        <View style={styles.right}>
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>{series?.name || "Série"}</Text>
+            <TouchableOpacity onPress={toggleFavorite}>
+              <Text style={[styles.star, isFavorite && styles.starActive]}>★</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.meta}>
+            {(series?.year || "-") + " • " + (series?.group || "Séries")}
+          </Text>
+
+          <Text style={styles.description}>
+            {series?.description || "Descrição não disponível."}
+          </Text>
+
+          <FlatList
+            data={seasons}
+            keyExtractor={(item) => `season_${item.seasonNumber}`}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.seasonRow}
+                onPress={() => onOpenSeason?.(item)}
+              >
+                <Text style={styles.seasonName}>{item.name}</Text>
+                <Text style={styles.seasonCount}>{item.episodes.length} eps</Text>
+              </TouchableOpacity>
+            )}
+            ListEmptyComponent={
+              <View style={styles.emptyWrap}>
+                <Text style={styles.emptyText}>Nenhuma temporada encontrada</Text>
+              </View>
+            }
+          />
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -107,19 +186,76 @@ const styles = StyleSheet.create({
 
   content: {
     flex: 1,
+    flexDirection: "row",
     padding: 14,
+  },
+
+  left: {
+    width: 140,
+    alignItems: "center",
+    justifyContent: "flex-start",
+  },
+
+  right: {
+    flex: 1,
+    paddingLeft: 12,
+  },
+
+  poster: {
+    width: 110,
+    height: 160,
+    borderRadius: 10,
+    resizeMode: "cover",
+  },
+
+  posterFallback: {
+    width: 110,
+    height: 160,
+    borderRadius: 10,
+    backgroundColor: "#203148",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  posterFallbackText: {
+    color: "#fff",
+    fontSize: 10,
+  },
+
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
   },
 
   title: {
     color: "#fff",
     fontSize: 18,
     fontWeight: "900",
-    marginBottom: 6,
+    flex: 1,
+    marginRight: 10,
+  },
+
+  star: {
+    color: "#666",
+    fontSize: 18,
+  },
+
+  starActive: {
+    color: "#ffe04f",
   },
 
   meta: {
     color: "#b7c6d6",
-    marginBottom: 16,
+    marginBottom: 10,
+  },
+
+  description: {
+    color: "#d6dce5",
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 14,
   },
 
   seasonRow: {

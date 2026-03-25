@@ -52,11 +52,7 @@ export default function SeasonEpisodesScreen({
       }
     }
 
-    if (status.isBuffering) {
-      setIsBuffering(true);
-    } else {
-      setIsBuffering(false);
-    }
+    setIsBuffering(!!status.isBuffering);
   };
 
   return (
@@ -73,7 +69,16 @@ export default function SeasonEpisodesScreen({
             <Text style={styles.title}>{series?.name || "Série"}</Text>
             <Text style={styles.meta}>{season?.name || "Temporada"}</Text>
 
-            <View style={styles.playerWrap}>
+            <TouchableOpacity
+              activeOpacity={0.95}
+              style={styles.playerWrap}
+              onPress={() => {
+                if (selectedIndex !== null && sourceUri) {
+                  setIsPlaying(true);
+                  setIsFullscreen(true);
+                }
+              }}
+            >
               {isPlaying && sourceUri ? (
                 <>
                   <Video
@@ -82,6 +87,7 @@ export default function SeasonEpisodesScreen({
                     style={styles.video}
                     source={{ uri: sourceUri }}
                     shouldPlay
+                    useNativeControls
                     resizeMode={ResizeMode.CONTAIN}
                     onLoadStart={() => setIsBuffering(true)}
                     onReadyForDisplay={() => setIsBuffering(false)}
@@ -99,30 +105,14 @@ export default function SeasonEpisodesScreen({
                   <Text style={styles.emptyPlayerText}>Selecione um episódio</Text>
                 </View>
               )}
-            </View>
+            </TouchableOpacity>
 
-            <View style={styles.actions}>
-              <TouchableOpacity
-                style={styles.btn}
-                onPress={() => {
-                  if (selectedIndex !== null) setIsPlaying(true);
-                }}
-              >
-                <Text style={styles.btnText}>reproduzir</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.btn}
-                onPress={() => {
-                  if (selectedIndex !== null) {
-                    setIsPlaying(true);
-                    setIsFullscreen(true);
-                  }
-                }}
-              >
-                <Text style={styles.btnText}>tela cheia</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.episodeDesc}>
+              {selectedEpisode?.description ||
+                selectedEpisode?.plot ||
+                selectedEpisode?.desc ||
+                "Toque no player para abrir em tela cheia."}
+            </Text>
           </View>
 
           <View style={styles.listArea}>
@@ -165,6 +155,7 @@ export default function SeasonEpisodesScreen({
               style={styles.fullscreenVideo}
               source={{ uri: sourceUri }}
               shouldPlay
+              useNativeControls
               resizeMode={ResizeMode.CONTAIN}
               onPlaybackStatusUpdate={handleStatus}
             />
@@ -261,25 +252,11 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
 
-  actions: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  episodeDesc: {
+    color: "#d6dce5",
+    fontSize: 12,
+    lineHeight: 18,
     marginTop: 12,
-  },
-
-  btn: {
-    width: 120,
-    height: 38,
-    borderRadius: 8,
-    backgroundColor: "#7e5ca8",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  btnText: {
-    color: "#fff",
-    fontWeight: "800",
-    textTransform: "lowercase",
   },
 
   episodeRow: {

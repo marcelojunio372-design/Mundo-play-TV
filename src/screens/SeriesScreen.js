@@ -57,6 +57,7 @@ function buildSeriesGroups(items = []) {
         group: safeText(item.group || "OUTROS"),
         logo: safeText(item.logo || ""),
         year: safeText(item.year || ""),
+        description: safeText(item.description || item.desc || item.plot || ""),
         episodes: [],
       });
     }
@@ -65,6 +66,10 @@ function buildSeriesGroups(items = []) {
     current.episodes.push(item);
 
     if (!current.logo && item.logo) current.logo = item.logo;
+    if (!current.year && item.year) current.year = item.year;
+    if (!current.description && (item.description || item.desc || item.plot)) {
+      current.description = item.description || item.desc || item.plot || "";
+    }
   });
 
   return Array.from(map.values()).sort((a, b) =>
@@ -301,8 +306,8 @@ export default function SeriesScreen({
                       style={styles.favoriteBtn}
                       onPress={() => toggleFavorite(item)}
                     >
-                      <Text style={styles.favoriteBtnText}>
-                        {favorite ? "★" : "☆"}
+                      <Text style={[styles.favoriteBtnText, favorite && styles.favoriteBtnTextActive]}>
+                        ★
                       </Text>
                     </TouchableOpacity>
 
@@ -493,9 +498,13 @@ const styles = StyleSheet.create({
   },
 
   favoriteBtnText: {
-    color: "#ffe04f",
+    color: "#666",
     fontSize: isPhone ? 12 : 16,
     fontWeight: "900",
+  },
+
+  favoriteBtnTextActive: {
+    color: "#ffe04f",
   },
 
   poster: {

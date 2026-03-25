@@ -111,7 +111,6 @@ export default function LiveTVScreen({
   const videoRef = useRef(null);
   const fullscreenVideoRef = useRef(null);
   const loadingTimerRef = useRef(null);
-  const searchInputRef = useRef(null);
 
   const allChannels = useMemo(() => {
     return safeArray(session?.data?.live).filter(
@@ -291,7 +290,7 @@ export default function LiveTVScreen({
     clearLoadingTimer();
     loadingTimerRef.current = setTimeout(() => {
       setIsBuffering(false);
-      setPlayerError("Este canal demorou para abrir. Toque em recarregar.");
+      setPlayerError("Este canal demorou para abrir.");
     }, PLAYER_TIMEOUT_MS);
   };
 
@@ -316,7 +315,6 @@ export default function LiveTVScreen({
 
     clearLoadingTimer();
     await stopCurrentVideo();
-
     await addToRecent(channel);
 
     setSelectedChannelId(channel.id);
@@ -326,20 +324,6 @@ export default function LiveTVScreen({
     setHasStartedPlayback(false);
     setIsBuffering(true);
     startLoadingTimer();
-  };
-
-  const handleSelectCategory = (category) => {
-    setSelectedCategoryKey(category.key);
-    setSearch("");
-  };
-
-  const handleSelectChannel = async (channel) => {
-    await openChannel(channel);
-  };
-
-  const handleReload = async () => {
-    if (!selectedChannel?.url) return;
-    await openChannel(selectedChannel);
   };
 
   const handlePlaybackStatus = (status) => {
@@ -375,7 +359,10 @@ export default function LiveTVScreen({
     return (
       <TouchableOpacity
         style={[styles.categoryItem, active && styles.categoryItemActive]}
-        onPress={() => handleSelectCategory(item)}
+        onPress={() => {
+          setSelectedCategoryKey(item.key);
+          setSearch("");
+        }}
       >
         <Text
           style={[styles.categoryName, active && styles.categoryNameActive]}
@@ -394,11 +381,12 @@ export default function LiveTVScreen({
 
   const renderChannelItem = ({ item, index }) => {
     const active = item.id === selectedChannelId;
+    const favorite = favoriteIds.includes(getLiveStorageId(item));
 
     return (
       <TouchableOpacity
         style={[styles.channelItem, active && styles.channelItemActive]}
-        onPress={() => handleSelectChannel(item)}
+        onPress={() => openChannel(item)}
       >
         <Text style={styles.channelNumber}>{index + 1}</Text>
 
@@ -414,13 +402,18 @@ export default function LiveTVScreen({
         >
           {item.name}
         </Text>
+
+        <TouchableOpacity
+          style={styles.starBtn}
+          onPress={() => toggleFavorite(item)}
+        >
+          <Text style={[styles.starText, favorite && styles.starTextActive]}>
+            ★
+          </Text>
+        </TouchableOpacity>
       </TouchableOpacity>
     );
   };
-
-  const isFavoriteSelected = selectedChannel
-    ? favoriteIds.includes(getLiveStorageId(selectedChannel))
-    : false;
 
   return (
     <>
@@ -448,7 +441,6 @@ export default function LiveTVScreen({
 
           <View style={styles.searchWrap}>
             <TextInput
-              ref={searchInputRef}
               value={search}
               onChangeText={setSearch}
               placeholder="Buscar canal..."
@@ -482,7 +474,13 @@ export default function LiveTVScreen({
           </View>
 
           <View style={styles.rightCol}>
-            <View style={styles.playerWrap}>
+            <TouchableOpacity
+              activeOpacity={0.95}
+              style={styles.playerWrap}
+              onPress={() => {
+                if (playerUri) setIsFullscreen(true);
+              }}
+            >
               {!playerUri ? (
                 <View style={styles.emptyPlayer}>
                   <Text style={styles.emptyPlayerText}>Selecione um canal.</Text>
@@ -502,6 +500,7 @@ export default function LiveTVScreen({
                       },
                     }}
                     shouldPlay
+                    useNativeControls
                     resizeMode={ResizeMode.CONTAIN}
                     onLoadStart={() => {
                       setIsBuffering(true);
@@ -537,12 +536,28 @@ export default function LiveTVScreen({
                   )}
                 </>
               )}
-            </View>
+            </TouchableOpacity>
 
             <View style={styles.infoBlock}>
-              <Text style={styles.channelInfoTitle}>
-                {selectedChannel?.name || "Canal"}
-              </Text>
+              <View style={styles.titleRow}>
+                <Text style={styles.channelInfoTitle}>
+                  {selectedChannel?.name || "Canal"}
+                </Text>
+
+                {selectedChannel ? (
+                  <TouchableOpacity onPress={() => toggleFavorite(selectedChannel)}>
+                    <Text
+                      style={[
+                        styles.titleStar,
+                        favoriteIds.includes(getLiveStorageId(selectedChannel)) &&
+                          styles.titleStarActive,
+                      ]}
+                    >
+                      ★
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
 
               <Text style={styles.channelInfoGroup}>
                 {selectedChannel?.group || "TV ao Vivo"}
@@ -558,47 +573,16 @@ export default function LiveTVScreen({
               </View>
 
               <View style={styles.actionsRow}>
-                <TouchableOpacity style={styles.actionBtn} onPress={handleReload}>
-                  <Text style={styles.actionBtnText}>recarregar</Text>
+                <TouchableOpacity style={styles.actionBtn} onPress={() => search && setSearch("")}>
+                  <Text style={styles.actionBtnText}>limpar busca</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.actionBtn}
-                  onPress={() => {
-                    if (playerUri) setIsFullscreen(true);
-                  }}
-                >
-                  <Text style={styles.actionBtnText}>tela cheia</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.actionBtn}
-                  onPress={() => toggleFavorite(selectedChannel)}
-                >
-                  <Text style={styles.actionBtnText}>
-                    {isFavoriteSelected ? "desfavor." : "favorito"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.actionsRow}>
-                <TouchableOpacity
-                  style={styles.actionBtnWide}
-                  onPress={() => {
-                    setSelectedCategoryKey("all");
-                    setTimeout(() => {
-                      searchInputRef.current?.focus?.();
-                    }, 150);
-                  }}
-                >
-                  <Text style={styles.actionBtnText}>buscar</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.actionBtnWide}
-                  onPress={() => setSelectedCategoryKey("recents")}
-                >
+                <TouchableOpacity style={styles.actionBtn} onPress={() => setSelectedCategoryKey("recents")}>
                   <Text style={styles.actionBtnText}>visto por último</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.actionBtn} onPress={() => selectedChannel && openChannel(selectedChannel)}>
+                  <Text style={styles.actionBtnText}>recarregar</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -627,6 +611,7 @@ export default function LiveTVScreen({
                 },
               }}
               shouldPlay
+              useNativeControls
               resizeMode={ResizeMode.CONTAIN}
               onPlaybackStatusUpdate={handlePlaybackStatus}
             />
@@ -799,11 +784,28 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
+  starBtn: {
+    width: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 4,
+  },
+
+  starText: {
+    color: "#777",
+    fontSize: 10,
+  },
+
+  starTextActive: {
+    color: "#ffe04f",
+  },
+
   playerWrap: {
     height: 130,
     backgroundColor: "#000000",
     margin: 4,
     overflow: "hidden",
+    borderRadius: 4,
   },
 
   video: {
@@ -847,11 +849,28 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
   },
 
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 2,
+  },
+
   channelInfoTitle: {
     color: "#ffffff",
     fontSize: 10,
     fontWeight: "900",
-    marginTop: 2,
+    flex: 1,
+    marginRight: 8,
+  },
+
+  titleStar: {
+    color: "#666",
+    fontSize: 14,
+  },
+
+  titleStarActive: {
+    color: "#ffe04f",
   },
 
   channelInfoGroup: {
@@ -889,17 +908,8 @@ const styles = StyleSheet.create({
   },
 
   actionBtn: {
-    width: 58,
-    height: 22,
-    borderRadius: 4,
-    backgroundColor: "#7e5ca8",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  actionBtnWide: {
-    width: 92,
-    height: 22,
+    width: 78,
+    height: 24,
     borderRadius: 4,
     backgroundColor: "#7e5ca8",
     alignItems: "center",
@@ -916,8 +926,6 @@ const styles = StyleSheet.create({
   fullscreenWrap: {
     flex: 1,
     backgroundColor: "#000",
-    justifyContent: "center",
-    alignItems: "center",
   },
 
   fullscreenVideo: {
