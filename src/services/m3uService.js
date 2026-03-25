@@ -96,44 +96,7 @@ function hasRealEpisodePattern(text = "") {
   );
 }
 
-function hasMovieLikeTitle(text = "") {
-  return (
-    /\((19|20)\d{2}\)/.test(text) ||
-    /\b(bluray|web-dl|webrip|hdrip|dvdrip|cam|h264|h265|x264|x265|1080p|720p|2160p)\b/i.test(
-      text
-    )
-  );
-}
-
-function hasChannelQuality(text = "") {
-  return /\b(fhd|hd|sd|uhd|4k)\b/i.test(text);
-}
-
-function hasKnownLinearChannelName(text = "") {
-  return (
-    /\b(a&e|amc|axn|animal planet|band|band news|globo|record|sbt|espn|premiere|combate|telecine|hbo|cnn|nick|cartoon|discovery|arte 1|amazon sat|agro canal|agro\+|agrobrasil|all sports|bah tv|apple tv)\b/i.test(
-      text
-    )
-  );
-}
-
-function isStrongLiveGroup(groupText = "") {
-  return (
-    /\babertos\b/.test(groupText) ||
-    /\besportes\b/.test(groupText) ||
-    /\bdocumentarios\b/.test(groupText) ||
-    /\bnoticias\b/.test(groupText) ||
-    /\bvariedades\b/.test(groupText) ||
-    /\bband\b/.test(groupText) ||
-    /\bcanais 4k\b/.test(groupText) ||
-    /\bcanais 24h\b/.test(groupText) ||
-    /\binfantis\b/.test(groupText) ||
-    /\breligiosos\b/.test(groupText) ||
-    /\besportes ppv\b/.test(groupText)
-  );
-}
-
-function isStrongMovieGroup(groupText = "") {
+function isMovieGroup(groupText = "") {
   return (
     /\bfilmes\b/.test(groupText) ||
     /\bfilme\b/.test(groupText) ||
@@ -142,7 +105,6 @@ function isStrongMovieGroup(groupText = "") {
     /\bespecial\b/.test(groupText) ||
     /\bcoletanea\b/.test(groupText) ||
     /\bcoletania\b/.test(groupText) ||
-    /\bcolecao\b/.test(groupText) ||
     /\bcolecao\b/.test(groupText) ||
     /\blancamentos\b/.test(groupText) ||
     /\blancamento\b/.test(groupText) ||
@@ -164,7 +126,7 @@ function isStrongMovieGroup(groupText = "") {
   );
 }
 
-function isStrongSeriesGroup(groupText = "") {
+function isSeriesGroup(groupText = "") {
   return (
     /\bseries\b/.test(groupText) ||
     /\bserie\b/.test(groupText) ||
@@ -174,106 +136,62 @@ function isStrongSeriesGroup(groupText = "") {
   );
 }
 
-function hasVodUrl(url = "") {
-  const lower = normalizeText(url);
+function looksLikeMovieUrl(url = "") {
+  const clean = String(url || "").trim().toLowerCase();
   return (
-    lower.includes("/movie/") ||
-    lower.includes("/series/") ||
-    lower.includes("/vod/")
+    clean.includes("/movie/") ||
+    /\.(mp4|mkv|avi|mov|m4v|mpg|mpeg)(\?|$)/i.test(clean)
   );
 }
 
-function looksLikeNumericLiveStream(url = "") {
+function looksLikeSeriesUrl(url = "") {
+  const clean = String(url || "").trim().toLowerCase();
+  return clean.includes("/series/");
+}
+
+function looksLikeLiveUrl(url = "") {
   const clean = String(url || "").trim();
-  return /\/\d+(\?.*)?$/.test(clean);
-}
-
-function looksLikeTmdbLogo(logo = "") {
-  return String(logo || "").includes("image.tmdb.org");
-}
-
-function looksLikeLinearChannel(name = "", group = "", tvgName = "", tvgId = "") {
-  const nameText = normalizeText(name);
-  const groupText = normalizeText(group);
-  const tvgNameText = normalizeText(tvgName);
-  const tvgIdText = normalizeText(tvgId);
-
-  if (
-    safeText(tvgIdText) &&
-    (hasKnownLinearChannelName(nameText) || hasKnownLinearChannelName(tvgNameText))
-  ) {
-    return true;
-  }
-
-  if (hasKnownLinearChannelName(nameText) || hasKnownLinearChannelName(tvgNameText)) {
-    return true;
-  }
-
-  if (
-    hasChannelQuality(nameText) &&
-    !isStrongMovieGroup(groupText) &&
-    !isStrongSeriesGroup(groupText)
-  ) {
-    return true;
-  }
-
-  if (
-    isStrongLiveGroup(groupText) &&
-    (hasChannelQuality(nameText) ||
-      safeText(tvgIdText) ||
-      hasKnownLinearChannelName(nameText))
-  ) {
-    return true;
-  }
-
-  return false;
+  return /^https?:\/\/[^/]+\/[^/]+\/[^/]+\/\d+(\?.*)?$/i.test(clean);
 }
 
 function inferType(name = "", group = "", url = "", tvgName = "", tvgId = "", logo = "") {
   const nameText = normalizeText(name);
   const groupText = normalizeText(group);
   const tvgNameText = normalizeText(tvgName);
+  const logoText = String(logo || "").toLowerCase();
 
-  // 1) FILME tem prioridade total
-  if (
-    isStrongMovieGroup(groupText) ||
-    hasMovieLikeTitle(nameText) ||
-    hasMovieLikeTitle(tvgNameText) ||
-    normalizeText(url).includes("/movie/") ||
-    normalizeText(url).includes("/vod/") ||
-    looksLikeTmdbLogo(logo)
-  ) {
+  // 1) URL manda primeiro
+  if (looksLikeMovieUrl(url)) {
     return "movie";
   }
 
-  // 2) SÉRIE só com padrão forte real
-  if (
-    hasRealEpisodePattern(nameText) ||
-    hasRealEpisodePattern(tvgNameText) ||
-    normalizeText(url).includes("/series/")
-  ) {
+  if (looksLikeSeriesUrl(url)) {
     return "series";
   }
 
-  // 3) Grupo de série sem episódio forte ainda tende a série
-  if (isStrongSeriesGroup(groupText) && !looksLikeLinearChannel(name, group, tvgName, tvgId)) {
-    return "series";
-  }
-
-  // 4) LIVE só no que for claramente canal linear
-  if (
-    looksLikeLinearChannel(name, group, tvgName, tvgId) ||
-    (looksLikeNumericLiveStream(url) &&
-      !hasVodUrl(url) &&
-      !isStrongMovieGroup(groupText) &&
-      !isStrongSeriesGroup(groupText) &&
-      !looksLikeTmdbLogo(logo))
-  ) {
+  if (looksLikeLiveUrl(url)) {
     return "live";
   }
 
-  // 5) Fallback conservador
-  return "movie";
+  // 2) apoio por padrão forte
+  if (hasRealEpisodePattern(nameText) || hasRealEpisodePattern(tvgNameText)) {
+    return "series";
+  }
+
+  if (logoText.includes("image.tmdb.org")) {
+    return "movie";
+  }
+
+  if (isMovieGroup(groupText)) {
+    return "movie";
+  }
+
+  if (isSeriesGroup(groupText)) {
+    return "series";
+  }
+
+  // 3) fallback final
+  return "live";
 }
 
 function buildCategories(items = []) {
