@@ -27,9 +27,25 @@ function getSeriesStorageId(item = {}) {
 }
 
 function extractSeasonNumber(name = "") {
-  const match = safeText(name).match(/S(\d{1,2})E\d{1,3}/i);
+  const text = safeText(name);
+  const match = text.match(/S(\d{1,2})E\d{1,3}/i);
   if (match?.[1]) return Number(match[1]);
+
+  const matchPt = text.match(/temporada\s*(\d{1,2})/i);
+  if (matchPt?.[1]) return Number(matchPt[1]);
+
   return 1;
+}
+
+function extractEpisodeNumber(name = "") {
+  const text = safeText(name);
+  const match = text.match(/S\d{1,2}E(\d{1,3})/i);
+  if (match?.[1]) return Number(match[1]);
+
+  const matchPt = text.match(/epis[oó]dio\s*(\d{1,3})/i);
+  if (matchPt?.[1]) return Number(matchPt[1]);
+
+  return 0;
 }
 
 function buildSeasons(series) {
@@ -46,9 +62,12 @@ function buildSeasons(series) {
     .map((season) => ({
       seasonNumber: Number(season),
       name: `Temporada ${season}`,
-      episodes: grouped[season].sort((a, b) =>
-        safeText(a?.name).localeCompare(safeText(b?.name))
-      ),
+      episodes: grouped[season].sort((a, b) => {
+        const aEp = extractEpisodeNumber(a?.name || "");
+        const bEp = extractEpisodeNumber(b?.name || "");
+        if (aEp !== bEp) return aEp - bEp;
+        return safeText(a?.name).localeCompare(safeText(b?.name));
+      }),
     }))
     .sort((a, b) => a.seasonNumber - b.seasonNumber);
 }
@@ -128,6 +147,7 @@ export default function SeriesDetailsScreen({
         <View style={styles.right}>
           <View style={styles.titleRow}>
             <Text style={styles.title}>{series?.name || "Série"}</Text>
+
             <TouchableOpacity onPress={toggleFavorite}>
               <Text style={[styles.star, isFavorite && styles.starActive]}>★</Text>
             </TouchableOpacity>
@@ -138,8 +158,17 @@ export default function SeriesDetailsScreen({
           </Text>
 
           <Text style={styles.description}>
-            {series?.description || "Descrição não disponível."}
+            {series?.description ||
+              series?.plot ||
+              series?.desc ||
+              "Descrição não disponível."}
           </Text>
+
+          <View style={styles.seasonsHeader}>
+            <Text style={styles.seasonsHeaderText}>
+              {seasons.length} temporada{seasons.length === 1 ? "" : "s"}
+            </Text>
+          </View>
 
           <FlatList
             data={seasons}
@@ -149,8 +178,14 @@ export default function SeriesDetailsScreen({
                 style={styles.seasonRow}
                 onPress={() => onOpenSeason?.(item)}
               >
-                <Text style={styles.seasonName}>{item.name}</Text>
-                <Text style={styles.seasonCount}>{item.episodes.length} eps</Text>
+                <View>
+                  <Text style={styles.seasonName}>{item.name}</Text>
+                  <Text style={styles.seasonSub}>
+                    {item.episodes.length} episódio{item.episodes.length === 1 ? "" : "s"}
+                  </Text>
+                </View>
+
+                <Text style={styles.seasonArrow}>›</Text>
               </TouchableOpacity>
             )}
             ListEmptyComponent={
@@ -158,6 +193,7 @@ export default function SeriesDetailsScreen({
                 <Text style={styles.emptyText}>Nenhuma temporada encontrada</Text>
               </View>
             }
+            showsVerticalScrollIndicator={false}
           />
         </View>
       </View>
@@ -224,7 +260,7 @@ const styles = StyleSheet.create({
 
   titleRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     marginBottom: 6,
   },
@@ -240,6 +276,7 @@ const styles = StyleSheet.create({
   star: {
     color: "#666",
     fontSize: 18,
+    marginTop: 2,
   },
 
   starActive: {
@@ -258,12 +295,23 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
 
+  seasonsHeader: {
+    marginBottom: 10,
+  },
+
+  seasonsHeaderText: {
+    color: "#35c8ff",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+
   seasonRow: {
-    minHeight: 56,
-    borderRadius: 10,
+    minHeight: 64,
+    borderRadius: 12,
     backgroundColor: "#162033",
     marginBottom: 10,
     paddingHorizontal: 14,
+    paddingVertical: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -272,10 +320,19 @@ const styles = StyleSheet.create({
   seasonName: {
     color: "#fff",
     fontWeight: "800",
+    fontSize: 15,
+    marginBottom: 4,
   },
 
-  seasonCount: {
+  seasonSub: {
     color: "#ffe04f",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  seasonArrow: {
+    color: "#fff",
+    fontSize: 24,
     fontWeight: "800",
   },
 
