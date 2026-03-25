@@ -138,10 +138,7 @@ function isSeriesGroup(groupText = "") {
 
 function looksLikeMovieUrl(url = "") {
   const clean = String(url || "").trim().toLowerCase();
-  return (
-    clean.includes("/movie/") ||
-    /\.(mp4|mkv|avi|mov|m4v|mpg|mpeg)(\?|$)/i.test(clean)
-  );
+  return clean.includes("/movie/");
 }
 
 function looksLikeSeriesUrl(url = "") {
@@ -154,31 +151,34 @@ function looksLikeLiveUrl(url = "") {
   return /^https?:\/\/[^/]+\/[^/]+\/[^/]+\/\d+(\?.*)?$/i.test(clean);
 }
 
+function looksLikeTmdbLogo(logo = "") {
+  return String(logo || "").toLowerCase().includes("image.tmdb.org");
+}
+
 function inferType(name = "", group = "", url = "", tvgName = "", tvgId = "", logo = "") {
   const nameText = normalizeText(name);
   const groupText = normalizeText(group);
   const tvgNameText = normalizeText(tvgName);
-  const logoText = String(logo || "").toLowerCase();
 
-  // 1) URL manda primeiro
-  if (looksLikeMovieUrl(url)) {
-    return "movie";
-  }
-
+  // 1) URL manda primeiro e na ordem certa
   if (looksLikeSeriesUrl(url)) {
     return "series";
+  }
+
+  if (looksLikeMovieUrl(url)) {
+    return "movie";
   }
 
   if (looksLikeLiveUrl(url)) {
     return "live";
   }
 
-  // 2) apoio por padrão forte
+  // 2) Apoio por padrão forte
   if (hasRealEpisodePattern(nameText) || hasRealEpisodePattern(tvgNameText)) {
     return "series";
   }
 
-  if (logoText.includes("image.tmdb.org")) {
+  if (looksLikeTmdbLogo(logo)) {
     return "movie";
   }
 
@@ -190,7 +190,7 @@ function inferType(name = "", group = "", url = "", tvgName = "", tvgId = "", lo
     return "series";
   }
 
-  // 3) fallback final
+  // 3) Fallback final
   return "live";
 }
 
