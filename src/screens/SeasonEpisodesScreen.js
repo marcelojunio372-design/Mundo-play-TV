@@ -20,13 +20,11 @@ export default function SeasonEpisodesScreen({
   season,
   onBack,
 }) {
-  const videoRef = useRef(null);
   const fullscreenVideoRef = useRef(null);
 
   const episodes = useMemo(() => safeArray(season?.episodes), [season]);
 
   const [selectedIndex, setSelectedIndex] = useState(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
 
@@ -35,10 +33,9 @@ export default function SeasonEpisodesScreen({
 
   const sourceUri = selectedEpisode?.url || "";
 
-  const openEpisode = (index, fullscreen = false) => {
+  const openEpisode = (index) => {
     setSelectedIndex(index);
-    setIsPlaying(true);
-    setIsFullscreen(fullscreen);
+    setIsFullscreen(true);
   };
 
   const handleStatus = (status) => {
@@ -48,7 +45,6 @@ export default function SeasonEpisodesScreen({
       const nextIndex = (selectedIndex ?? -1) + 1;
       if (nextIndex < episodes.length) {
         setSelectedIndex(nextIndex);
-        setIsPlaying(true);
       }
     }
 
@@ -65,54 +61,22 @@ export default function SeasonEpisodesScreen({
         </View>
 
         <View style={styles.content}>
-          <View style={styles.playerArea}>
+          <View style={styles.infoArea}>
             <Text style={styles.title}>{series?.name || "Série"}</Text>
             <Text style={styles.meta}>{season?.name || "Temporada"}</Text>
-
-            <TouchableOpacity
-              activeOpacity={0.95}
-              style={styles.playerWrap}
-              onPress={() => {
-                if (selectedIndex !== null && sourceUri) {
-                  setIsPlaying(true);
-                  setIsFullscreen(true);
-                }
-              }}
-            >
-              {isPlaying && sourceUri ? (
-                <>
-                  <Video
-                    ref={videoRef}
-                    key={`episode_${selectedIndex}`}
-                    style={styles.video}
-                    source={{ uri: sourceUri }}
-                    shouldPlay
-                    useNativeControls
-                    resizeMode={ResizeMode.CONTAIN}
-                    onLoadStart={() => setIsBuffering(true)}
-                    onReadyForDisplay={() => setIsBuffering(false)}
-                    onPlaybackStatusUpdate={handleStatus}
-                    onError={() => setIsBuffering(false)}
-                  />
-                  {isBuffering && (
-                    <View style={styles.overlay} pointerEvents="none">
-                      <ActivityIndicator size="large" color="#35c8ff" />
-                    </View>
-                  )}
-                </>
-              ) : (
-                <View style={styles.emptyPlayer}>
-                  <Text style={styles.emptyPlayerText}>Selecione um episódio</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-
-            <Text style={styles.episodeDesc}>
-              {selectedEpisode?.description ||
-                selectedEpisode?.plot ||
-                selectedEpisode?.desc ||
-                "Toque no player para abrir em tela cheia."}
+            <Text style={styles.countText}>
+              {episodes.length} episódios
             </Text>
+
+            <Text style={styles.helpText}>
+              Toque em um episódio para abrir direto em tela cheia.
+            </Text>
+
+            {selectedEpisode ? (
+              <Text style={styles.selectedText}>
+                Último selecionado: {selectedEpisode?.name || "-"}
+              </Text>
+            ) : null}
           </View>
 
           <View style={styles.listArea}>
@@ -149,16 +113,27 @@ export default function SeasonEpisodesScreen({
       >
         <View style={styles.fullscreenWrap}>
           {sourceUri ? (
-            <Video
-              ref={fullscreenVideoRef}
-              key={`episode_full_${selectedIndex}`}
-              style={styles.fullscreenVideo}
-              source={{ uri: sourceUri }}
-              shouldPlay
-              useNativeControls
-              resizeMode={ResizeMode.CONTAIN}
-              onPlaybackStatusUpdate={handleStatus}
-            />
+            <>
+              <Video
+                ref={fullscreenVideoRef}
+                key={`episode_full_${selectedIndex}`}
+                style={styles.fullscreenVideo}
+                source={{ uri: sourceUri }}
+                shouldPlay
+                useNativeControls
+                resizeMode={ResizeMode.COVER}
+                onLoadStart={() => setIsBuffering(true)}
+                onReadyForDisplay={() => setIsBuffering(false)}
+                onPlaybackStatusUpdate={handleStatus}
+                onError={() => setIsBuffering(false)}
+              />
+
+              {isBuffering && (
+                <View style={styles.overlay} pointerEvents="none">
+                  <ActivityIndicator size="large" color="#35c8ff" />
+                </View>
+              )}
+            </>
           ) : null}
 
           <TouchableOpacity
@@ -197,13 +172,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
   },
 
-  playerArea: {
+  infoArea: {
     flex: 1,
     padding: 12,
   },
 
   listArea: {
-    width: 170,
+    width: 190,
     borderLeftWidth: 1,
     borderLeftColor: "rgba(255,255,255,0.08)",
     padding: 10,
@@ -221,42 +196,23 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  playerWrap: {
-    flex: 1,
-    minHeight: 220,
-    backgroundColor: "#000",
-    borderRadius: 10,
-    overflow: "hidden",
+  countText: {
+    color: "#ffe04f",
+    fontSize: 14,
+    fontWeight: "800",
+    marginBottom: 12,
   },
 
-  video: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: "#000",
-  },
-
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  emptyPlayer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  emptyPlayerText: {
-    color: "#fff",
-  },
-
-  episodeDesc: {
+  helpText: {
     color: "#d6dce5",
     fontSize: 12,
     lineHeight: 18,
-    marginTop: 12,
+    marginBottom: 12,
+  },
+
+  selectedText: {
+    color: "#9eb4c9",
+    fontSize: 12,
   },
 
   episodeRow: {
@@ -291,6 +247,13 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     backgroundColor: "#000",
+  },
+
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   closeBtn: {

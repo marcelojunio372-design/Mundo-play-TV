@@ -25,10 +25,8 @@ function getMovieStorageId(item = {}) {
 }
 
 export default function MovieDetailsScreen({ movie, onBack }) {
-  const videoRef = useRef(null);
   const fullscreenVideoRef = useRef(null);
 
-  const [isPlaying, setIsPlaying] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -120,40 +118,12 @@ export default function MovieDetailsScreen({ movie, onBack }) {
             </Text>
 
             <TouchableOpacity
-              activeOpacity={0.95}
-              style={styles.playerWrap}
+              style={styles.playBtn}
               onPress={() => {
-                if (sourceUri) {
-                  setIsPlaying(true);
-                  setIsFullscreen(true);
-                }
+                if (sourceUri) setIsFullscreen(true);
               }}
             >
-              {isPlaying && sourceUri ? (
-                <>
-                  <Video
-                    ref={videoRef}
-                    style={styles.video}
-                    source={{ uri: sourceUri }}
-                    shouldPlay
-                    useNativeControls
-                    resizeMode={ResizeMode.CONTAIN}
-                    onLoadStart={() => setIsBuffering(true)}
-                    onReadyForDisplay={() => setIsBuffering(false)}
-                    onError={() => setIsBuffering(false)}
-                  />
-
-                  {isBuffering && (
-                    <View style={styles.overlay} pointerEvents="none">
-                      <ActivityIndicator size="large" color="#35c8ff" />
-                    </View>
-                  )}
-                </>
-              ) : (
-                <View style={styles.emptyPlayer}>
-                  <Text style={styles.emptyPlayerText}>Toque para reproduzir</Text>
-                </View>
-              )}
+              <Text style={styles.playBtnText}>PLAY</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -167,14 +137,25 @@ export default function MovieDetailsScreen({ movie, onBack }) {
       >
         <View style={styles.fullscreenWrap}>
           {sourceUri ? (
-            <Video
-              ref={fullscreenVideoRef}
-              style={styles.fullscreenVideo}
-              source={{ uri: sourceUri }}
-              shouldPlay
-              useNativeControls
-              resizeMode={ResizeMode.CONTAIN}
-            />
+            <>
+              <Video
+                ref={fullscreenVideoRef}
+                style={styles.fullscreenVideo}
+                source={{ uri: sourceUri }}
+                shouldPlay
+                useNativeControls
+                resizeMode={ResizeMode.COVER}
+                onLoadStart={() => setIsBuffering(true)}
+                onReadyForDisplay={() => setIsBuffering(false)}
+                onError={() => setIsBuffering(false)}
+              />
+
+              {isBuffering && (
+                <View style={styles.overlay} pointerEvents="none">
+                  <ActivityIndicator size="large" color="#35c8ff" />
+                </View>
+              )}
+            </>
           ) : null}
 
           <TouchableOpacity
@@ -279,38 +260,22 @@ const styles = StyleSheet.create({
     color: "#d6dce5",
     fontSize: 12,
     lineHeight: 18,
-    marginBottom: 12,
+    marginBottom: 16,
   },
 
-  playerWrap: {
-    flex: 1,
-    minHeight: 220,
-    backgroundColor: "#000",
+  playBtn: {
+    width: 140,
+    height: 42,
     borderRadius: 10,
-    overflow: "hidden",
-  },
-
-  video: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: "#000",
-  },
-
-  emptyPlayer: {
-    flex: 1,
+    backgroundColor: "#7e5ca8",
     alignItems: "center",
     justifyContent: "center",
   },
 
-  emptyPlayerText: {
+  playBtnText: {
     color: "#fff",
-  },
-
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    alignItems: "center",
-    justifyContent: "center",
+    fontWeight: "900",
+    fontSize: 14,
   },
 
   fullscreenWrap: {
@@ -322,6 +287,13 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     backgroundColor: "#000",
+  },
+
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   closeBtn: {

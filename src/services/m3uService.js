@@ -64,6 +64,42 @@ function extractTvgName(line = "") {
   return extractAttr(line, "tvg-name") || "";
 }
 
+function extractYear(line = "", name = "") {
+  const attrs = [
+    extractAttr(line, "year"),
+    extractAttr(line, "release-date"),
+    extractAttr(line, "release_year"),
+    extractAttr(line, "date"),
+  ].filter(Boolean);
+
+  for (const value of attrs) {
+    const match = String(value).match(/\b(19|20)\d{2}\b/);
+    if (match?.[0]) return match[0];
+  }
+
+  const nameMatch = String(name || "").match(/\((19|20)\d{2}\)/);
+  if (nameMatch?.[0]) {
+    return nameMatch[0].replace(/[()]/g, "");
+  }
+
+  return "";
+}
+
+function extractDescription(line = "") {
+  const candidates = [
+    extractAttr(line, "description"),
+    extractAttr(line, "desc"),
+    extractAttr(line, "plot"),
+    extractAttr(line, "summary"),
+    extractAttr(line, "synopsis"),
+    extractAttr(line, "tmdb-description"),
+  ]
+    .map((item) => safeText(item))
+    .filter(Boolean);
+
+  return candidates[0] || "";
+}
+
 function normalizeText(value = "") {
   return decodeEntities(String(value || ""))
     .normalize("NFD")
@@ -160,7 +196,6 @@ function inferType(name = "", group = "", url = "", tvgName = "", tvgId = "", lo
   const groupText = normalizeText(group);
   const tvgNameText = normalizeText(tvgName);
 
-  // 1) URL manda primeiro e na ordem certa
   if (looksLikeSeriesUrl(url)) {
     return "series";
   }
@@ -173,7 +208,6 @@ function inferType(name = "", group = "", url = "", tvgName = "", tvgId = "", lo
     return "live";
   }
 
-  // 2) Apoio por padrão forte
   if (hasRealEpisodePattern(nameText) || hasRealEpisodePattern(tvgNameText)) {
     return "series";
   }
@@ -190,7 +224,6 @@ function inferType(name = "", group = "", url = "", tvgName = "", tvgId = "", lo
     return "series";
   }
 
-  // 3) Fallback final
   return "live";
 }
 
@@ -255,6 +288,8 @@ export async function loadM3U(url) {
       const logo = extractLogo(currentInfo);
       const tvgId = extractTvgId(currentInfo);
       const tvgName = extractTvgName(currentInfo);
+      const year = extractYear(currentInfo, name);
+      const description = extractDescription(currentInfo);
       const streamUrl = line;
 
       const type = inferType(name, group, streamUrl, tvgName, tvgId, logo);
@@ -268,6 +303,10 @@ export async function loadM3U(url) {
         type,
         tvgId,
         tvgName,
+        year,
+        description,
+        desc: description,
+        plot: description,
       };
 
       if (type === "movie") {
