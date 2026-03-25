@@ -74,6 +74,18 @@ function normalizeText(value = "") {
     .trim();
 }
 
+function parseHeaderInfo(firstLine = "") {
+  const epgUrl =
+    extractAttr(firstLine, "url-tvg") ||
+    extractAttr(firstLine, "x-tvg-url") ||
+    "";
+
+  return {
+    epgUrl,
+    xmltvUrl: epgUrl,
+  };
+}
+
 function hasEpisodePattern(text = "") {
   return (
     /\bs\d{1,2}\s*e\d{1,3}\b/i.test(text) ||
@@ -96,14 +108,18 @@ function hasMoviePattern(text = "") {
   );
 }
 
-function hasLiveNamePattern(text = "") {
+function hasVodUrl(url = "") {
+  const lower = normalizeText(url);
   return (
-    /\b(fhd|hd|sd|uhd|4k)\b/.test(text) ||
-    /\b(tv|canal|channel)\b/.test(text) ||
-    /\b(animal planet|discovery|globo|record|band|sbt|espn|premiere|combate|telecine|hbo|cnn|nick|cartoon|disney|amc|a&e|agro|amazon sat|apple tv)\b/.test(
-      text
-    )
+    lower.includes("/movie/") ||
+    lower.includes("/series/") ||
+    lower.includes("/vod/")
   );
+}
+
+function looksLikePlainNumericStream(url = "") {
+  const clean = String(url || "").trim();
+  return /\/\d+(\?.*)?$/.test(clean);
 }
 
 function isSeriesGroup(groupText = "") {
@@ -139,49 +155,60 @@ function isLiveGroup(groupText = "") {
   return (
     /\babertos\b/.test(groupText) ||
     /\bcanais\b/.test(groupText) ||
+    /\bcanais 24h\b/.test(groupText) ||
+    /\bcanais 4k\b/.test(groupText) ||
     /\besportes\b/.test(groupText) ||
     /\bdocumentarios\b/.test(groupText) ||
-    /\b24h\b/.test(groupText) ||
     /\bnoticias\b/.test(groupText) ||
-    /\binfantil\b/.test(groupText) ||
     /\breligiosos\b/.test(groupText) ||
+    /\binfantil\b/.test(groupText) ||
     /\bglobo\b/.test(groupText) ||
     /\brecord\b/.test(groupText) ||
     /\bband\b/.test(groupText) ||
     /\bsbt\b/.test(groupText) ||
     /\bdiscovery\b/.test(groupText) ||
     /\bespn\b/.test(groupText) ||
-    /\bcanais 4k\b/.test(groupText) ||
-    /\bcanais 24h\b/.test(groupText) ||
     /\bbbb\b/.test(groupText) ||
-    /\bcopa\b/.test(groupText) ||
-    /\bcopinha\b/.test(groupText)
+    /\bcopinha\b/.test(groupText) ||
+    /\bcopa\b/.test(groupText)
   );
 }
 
-function isMixedGroup(groupText = "") {
+function isBlockedFromLive(groupText = "", nameText = "", tvgNameText = "") {
+  const joined = `${groupText} ${nameText} ${tvgNameText}`;
+
   return (
-    groupText.includes("filmes e series") ||
-    groupText.includes("filmes & series") ||
-    groupText.includes("movie and series") ||
-    groupText.includes("movies and series") ||
-    groupText.includes("filme e serie")
+    /\bfilmes\b/.test(joined) ||
+    /\bfilme\b/.test(joined) ||
+    /\bmovies\b/.test(joined) ||
+    /\bmovie\b/.test(joined) ||
+    /\bseries\b/.test(joined) ||
+    /\bserie\b/.test(joined) ||
+    /\btemporadas\b/.test(joined) ||
+    /\bepisodios\b/.test(joined) ||
+    /\bepisodio\b/.test(joined) ||
+    /\bnovelas\b/.test(joined) ||
+    /\banimes\b/.test(joined) ||
+    /\bcoletanea\b/.test(joined) ||
+    /\bcolecao\b/.test(joined) ||
+    /\blancamentos\b/.test(joined) ||
+    /\blancamento\b/.test(joined) ||
+    /\bdublado\b/.test(joined) ||
+    /\blegendado\b/.test(joined) ||
+    /\bdesenhos\b/.test(joined)
   );
 }
 
-function hasVodUrl(url = "") {
-  const lower = normalizeText(url);
+function hasStrongLiveName(nameText = "", tvgNameText = "") {
+  const joined = `${nameText} ${tvgNameText}`;
+
   return (
-    lower.includes("/movie/") ||
-    lower.includes("/series/") ||
-    lower.includes("/vod/") ||
-    /\.(mp4|mkv|avi|mov|m4v|mpg|mpeg|ts)(\?|$)/i.test(url)
+    /\b(fhd|hd|sd|uhd|4k)\b/.test(joined) ||
+    /\b(tv|canal|channel)\b/.test(joined) ||
+    /\b(a&e|animal planet|discovery|globo|record|band|sbt|espn|premiere|combate|telecine|hbo|cnn|nick|cartoon|disney|amc|agro|amazon sat|apple tv)\b/.test(
+      joined
+    )
   );
-}
-
-function looksLikePlainNumericStream(url = "") {
-  const clean = String(url || "").trim();
-  return /\/\d+(\?.*)?$/.test(clean);
 }
 
 function inferType(name = "", group = "", url = "", tvgName = "", tvgId = "") {
@@ -189,71 +216,55 @@ function inferType(name = "", group = "", url = "", tvgName = "", tvgId = "") {
   const groupText = normalizeText(group);
   const tvgNameText = normalizeText(tvgName);
   const tvgIdText = normalizeText(tvgId);
-  const combined = `${nameText} ${groupText} ${tvgNameText} ${tvgIdText}`;
 
-  let seriesScore = 0;
-  let movieScore = 0;
-  let liveScore = 0;
+  const blockedFromLive = isBlockedFromLive(groupText, nameText, tvgNameText);
 
-  // Série
-  if (hasEpisodePattern(nameText)) seriesScore += 10;
-  if (hasEpisodePattern(tvgNameText)) seriesScore += 8;
-  if (isSeriesGroup(groupText) && !isMixedGroup(groupText)) seriesScore += 6;
-  if (normalizeText(url).includes("/series/")) seriesScore += 8;
-
-  // Filme
-  if (hasMoviePattern(nameText)) movieScore += 7;
-  if (hasMoviePattern(tvgNameText)) movieScore += 5;
-  if (isMovieGroup(groupText) && !isMixedGroup(groupText)) movieScore += 6;
-  if (normalizeText(url).includes("/movie/")) movieScore += 8;
-  if (normalizeText(url).includes("/vod/")) movieScore += 7;
-
-  // Live
-  if (safeText(tvgId)) liveScore += 5;
-  if (hasLiveNamePattern(nameText)) liveScore += 8;
-  if (hasLiveNamePattern(tvgNameText)) liveScore += 6;
-  if (isLiveGroup(groupText)) liveScore += 7;
-  if (looksLikePlainNumericStream(url) && !hasVodUrl(url)) liveScore += 5;
-
-  // Grupo misto não decide sozinho
-  if (isMixedGroup(groupText)) {
-    liveScore -= 1;
-    movieScore -= 1;
-    seriesScore -= 1;
-  }
-
-  // Se parece canal linear, reduz chance de filme/série
-  if (hasLiveNamePattern(nameText) || hasLiveNamePattern(tvgNameText)) {
-    movieScore -= 3;
-    seriesScore -= 3;
-  }
-
-  // Se nome parece título puro de VOD, reduz live
-  if (
-    !hasLiveNamePattern(nameText) &&
-    !safeText(tvgId) &&
-    !isLiveGroup(groupText) &&
-    (isMovieGroup(groupText) || hasMoviePattern(nameText) || hasEpisodePattern(nameText))
-  ) {
-    liveScore -= 4;
-  }
-
-  // Se grupo é coletânea/coleção, tender a movie, não live
-  if (/\bcoletanea\b/.test(groupText) || /\bcolecao\b/.test(groupText)) {
-    movieScore += 4;
-    liveScore -= 3;
-  }
-
-  // Prioridade final
-  if (seriesScore >= movieScore && seriesScore > liveScore && seriesScore >= 6) {
+  // 1) série tem prioridade máxima
+  if (hasEpisodePattern(nameText) || hasEpisodePattern(tvgNameText)) {
     return "series";
   }
 
-  if (movieScore > seriesScore && movieScore > liveScore && movieScore >= 6) {
+  if (normalizeText(url).includes("/series/")) {
+    return "series";
+  }
+
+  if (isSeriesGroup(groupText) && !hasStrongLiveName(nameText, tvgNameText)) {
+    return "series";
+  }
+
+  // 2) filme tem segunda prioridade
+  if (normalizeText(url).includes("/movie/") || normalizeText(url).includes("/vod/")) {
+    if (isSeriesGroup(groupText)) return "series";
     return "movie";
   }
 
-  return "live";
+  if (isMovieGroup(groupText) && !hasStrongLiveName(nameText, tvgNameText)) {
+    return "movie";
+  }
+
+  if (hasMoviePattern(nameText) && !hasStrongLiveName(nameText, tvgNameText)) {
+    return "movie";
+  }
+
+  // 3) live só entra se estiver claramente com cara de canal
+  if (!blockedFromLive) {
+    const hasLiveByGroup = isLiveGroup(groupText);
+    const hasLiveByName = hasStrongLiveName(nameText, tvgNameText);
+    const hasLiveById = !!safeText(tvgIdText);
+    const hasLiveByUrl = looksLikePlainNumericStream(url) && !hasVodUrl(url);
+
+    if (
+      hasLiveByGroup ||
+      (hasLiveByName && hasLiveById) ||
+      (hasLiveByName && hasLiveByUrl)
+    ) {
+      return "live";
+    }
+  }
+
+  // 4) fallback conservador:
+  // se não ficou claramente live, joga para movie
+  return "movie";
 }
 
 function buildCategories(items = []) {
@@ -271,18 +282,6 @@ function buildCategories(items = []) {
       name,
       count: grouped[name],
     }));
-}
-
-function parseHeaderInfo(firstLine = "") {
-  const epgUrl =
-    extractAttr(firstLine, "url-tvg") ||
-    extractAttr(firstLine, "x-tvg-url") ||
-    "";
-
-  return {
-    epgUrl,
-    xmltvUrl: epgUrl,
-  };
 }
 
 export async function loadM3U(url) {
