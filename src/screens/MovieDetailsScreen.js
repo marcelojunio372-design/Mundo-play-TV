@@ -1,289 +1,274 @@
 import React, { useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  Image,
+  Modal,
   SafeAreaView,
-  View,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  ImageBackground,
-  Image,
-  Dimensions,
-  Modal,
-  ScrollView,
+  View,
 } from "react-native";
-import { Video, ResizeMode } from "expo-av";
-
-const { width, height } = Dimensions.get("window");
-const isPhone = width < 900;
+import { ResizeMode, Video } from "expo-av";
 
 export default function MovieDetailsScreen({ movie, onBack }) {
   const videoRef = useRef(null);
-  const [showPlayer, setShowPlayer] = useState(false);
-  const [statusText, setStatusText] = useState("");
+  const fullscreenVideoRef = useRef(null);
 
-  if (!movie) return null;
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
 
-  const description =
-    movie.description ||
-    movie.plot ||
-    movie.synopsis ||
-    "Sem descrição na lista.";
-
-  const openPlayer = () => {
-    if (!movie?.url) return;
-    setStatusText("");
-    setShowPlayer(true);
-  };
-
-  const closePlayer = async () => {
-    try {
-      await videoRef.current?.stopAsync?.();
-    } catch (e) {}
-    setShowPlayer(false);
-  };
+  const sourceUri = movie?.url || "";
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ImageBackground
-        source={
-          movie.backdrop
-            ? { uri: movie.backdrop }
-            : movie.cover
-            ? { uri: movie.cover }
-            : movie.logo
-            ? { uri: movie.logo }
-            : undefined
-        }
-        style={styles.bg}
-        imageStyle={styles.bgImage}
-      >
-        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Text style={styles.backText}>←</Text>
-        </TouchableOpacity>
+    <>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.topbar}>
+          <TouchableOpacity onPress={onBack}>
+            <Text style={styles.backText}>Voltar</Text>
+          </TouchableOpacity>
+        </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.overlay}>
-            <Image
-              source={movie.logo ? { uri: movie.logo } : undefined}
-              style={styles.poster}
-            />
-
-            <View style={styles.infoWrap}>
-              <View style={styles.actionBar}>
-                <TouchableOpacity style={styles.actionBtn} onPress={openPlayer}>
-                  <Text style={styles.actionBtnText}>▶ Assistir agora</Text>
-                </TouchableOpacity>
+        <View style={styles.content}>
+          <View style={styles.left}>
+            {movie?.logo ? (
+              <Image source={{ uri: movie.logo }} style={styles.poster} />
+            ) : (
+              <View style={styles.posterFallback}>
+                <Text style={styles.posterFallbackText}>SEM CAPA</Text>
               </View>
+            )}
+          </View>
 
-              <Text style={styles.title}>{movie.name || "Sem nome"}</Text>
+          <View style={styles.right}>
+            <Text style={styles.title}>{movie?.name || "Filme"}</Text>
+            <Text style={styles.meta}>{movie?.group || "Filmes"}</Text>
 
-              <Text style={styles.meta}>
-                {(movie.year || "-") + " • " + (movie.group || "Filmes")}
-              </Text>
+            <View style={styles.playerWrap}>
+              {isPlaying && sourceUri ? (
+                <>
+                  <Video
+                    ref={videoRef}
+                    style={styles.video}
+                    source={{ uri: sourceUri }}
+                    shouldPlay
+                    resizeMode={ResizeMode.CONTAIN}
+                    onLoadStart={() => setIsBuffering(true)}
+                    onReadyForDisplay={() => setIsBuffering(false)}
+                    onError={() => setIsBuffering(false)}
+                  />
 
-              <Text style={styles.label}>Descrição</Text>
-              <Text style={styles.desc}>{description}</Text>
+                  {isBuffering && (
+                    <View style={styles.overlay} pointerEvents="none">
+                      <ActivityIndicator size="large" color="#35c8ff" />
+                    </View>
+                  )}
+                </>
+              ) : (
+                <View style={styles.emptyPlayer}>
+                  <Text style={styles.emptyPlayerText}>Toque em reproduzir</Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.actions}>
+              <TouchableOpacity
+                style={styles.btn}
+                onPress={() => setIsPlaying(true)}
+              >
+                <Text style={styles.btnText}>reproduzir</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.btn}
+                onPress={() => {
+                  if (sourceUri) {
+                    setIsPlaying(true);
+                    setIsFullscreen(true);
+                  }
+                }}
+              >
+                <Text style={styles.btnText}>tela cheia</Text>
+              </TouchableOpacity>
             </View>
           </View>
-        </ScrollView>
-      </ImageBackground>
+        </View>
+      </SafeAreaView>
 
       <Modal
-        visible={showPlayer}
+        visible={isFullscreen}
         animationType="fade"
         transparent={false}
-        onRequestClose={closePlayer}
-        statusBarTranslucent
+        onRequestClose={() => setIsFullscreen(false)}
       >
-        <View style={styles.playerScreen}>
-          <Video
-            ref={videoRef}
-            source={{ uri: movie.url }}
-            style={styles.fullscreenVideo}
-            resizeMode={ResizeMode.CONTAIN}
-            useNativeControls
-            shouldPlay
-            isLooping={false}
-            onLoadStart={() => setStatusText("Carregando vídeo...")}
-            onLoad={() => setStatusText("")}
-            onReadyForDisplay={() => setStatusText("")}
-            onError={(error) => {
-              const msg =
-                typeof error === "string"
-                  ? error
-                  : error?.errorString || "Falha ao reproduzir este vídeo.";
-              setStatusText(msg);
-            }}
-          />
+        <View style={styles.fullscreenWrap}>
+          {sourceUri ? (
+            <Video
+              ref={fullscreenVideoRef}
+              style={styles.fullscreenVideo}
+              source={{ uri: sourceUri }}
+              shouldPlay
+              resizeMode={ResizeMode.CONTAIN}
+            />
+          ) : null}
 
-          <View style={styles.playerTopOverlay}>
-            <TouchableOpacity onPress={closePlayer} style={styles.playerBackBtn}>
-              <Text style={styles.playerBackText}>VOLTAR</Text>
-            </TouchableOpacity>
-          </View>
-
-          {!!statusText && (
-            <View style={styles.statusOverlay}>
-              <Text style={styles.statusText}>{statusText}</Text>
-            </View>
-          )}
+          <TouchableOpacity
+            style={styles.closeBtn}
+            onPress={() => setIsFullscreen(false)}
+          >
+            <Text style={styles.closeBtnText}>Fechar</Text>
+          </TouchableOpacity>
         </View>
       </Modal>
-    </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#080b12",
+    backgroundColor: "#050915",
   },
 
-  bg: {
-    flex: 1,
-  },
-
-  bgImage: {
-    opacity: 0.20,
-  },
-
-  scrollContent: {
-    flexGrow: 1,
-  },
-
-  backBtn: {
-    position: "absolute",
-    top: 18,
-    left: 18,
-    zIndex: 10,
+  topbar: {
+    height: 46,
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.08)",
   },
 
   backText: {
     color: "#fff",
-    fontSize: isPhone ? 22 : 30,
-    fontWeight: "900",
+    fontWeight: "800",
   },
 
-  overlay: {
+  content: {
     flex: 1,
-    flexDirection: isPhone ? "column" : "row",
-    alignItems: isPhone ? "flex-start" : "center",
-    paddingHorizontal: isPhone ? 18 : 60,
-    paddingTop: isPhone ? 60 : 40,
-    paddingBottom: 24,
-    backgroundColor: "rgba(10,8,16,0.62)",
+    flexDirection: "row",
+    padding: 12,
+  },
+
+  left: {
+    width: 140,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  right: {
+    flex: 1,
+    paddingLeft: 12,
   },
 
   poster: {
-    width: isPhone ? 130 : 200,
-    height: isPhone ? 190 : 300,
-    borderRadius: 12,
-    backgroundColor: "#26354b",
-  },
-
-  infoWrap: {
-    flex: 1,
-    marginLeft: isPhone ? 0 : 24,
-    marginTop: isPhone ? 18 : 0,
-    width: "100%",
-    backgroundColor: "rgba(60,36,72,0.55)",
-    padding: isPhone ? 16 : 20,
-    borderRadius: 14,
-  },
-
-  actionBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-
-  actionBtn: {
-    height: isPhone ? 40 : 46,
-    paddingHorizontal: 18,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    justifyContent: "center",
-    marginRight: 12,
+    width: 110,
+    height: 160,
     borderRadius: 10,
+    resizeMode: "cover",
   },
 
-  actionBtnText: {
+  posterFallback: {
+    width: 110,
+    height: 160,
+    borderRadius: 10,
+    backgroundColor: "#203148",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  posterFallbackText: {
     color: "#fff",
-    fontSize: isPhone ? 12 : 16,
-    fontWeight: "700",
+    fontSize: 10,
   },
 
   title: {
     color: "#fff",
-    fontSize: isPhone ? 22 : 34,
+    fontSize: 16,
     fontWeight: "900",
-  },
-
-  meta: {
-    color: "#d9d0de",
-    fontSize: isPhone ? 11 : 16,
-    marginTop: 8,
-  },
-
-  label: {
-    color: "#38d7ff",
-    fontSize: isPhone ? 11 : 14,
-    fontWeight: "800",
-    marginTop: 18,
     marginBottom: 6,
   },
 
-  desc: {
-    color: "#f1edf4",
-    fontSize: isPhone ? 12 : 16,
-    lineHeight: isPhone ? 18 : 24,
+  meta: {
+    color: "#b7c6d6",
+    marginBottom: 12,
   },
 
-  playerScreen: {
+  playerWrap: {
+    flex: 1,
+    minHeight: 220,
+    backgroundColor: "#000",
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+
+  video: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#000",
+  },
+
+  emptyPlayer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  emptyPlayerText: {
+    color: "#fff",
+  },
+
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  actions: {
+    flexDirection: "row",
+    marginTop: 12,
+    justifyContent: "space-between",
+  },
+
+  btn: {
+    width: 120,
+    height: 38,
+    borderRadius: 8,
+    backgroundColor: "#7e5ca8",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  btnText: {
+    color: "#fff",
+    fontWeight: "800",
+    textTransform: "lowercase",
+  },
+
+  fullscreenWrap: {
     flex: 1,
     backgroundColor: "#000",
   },
 
   fullscreenVideo: {
-    ...StyleSheet.absoluteFillObject,
+    width: "100%",
+    height: "100%",
     backgroundColor: "#000",
   },
 
-  playerTopOverlay: {
+  closeBtn: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingTop: isPhone ? 18 : 26,
-    paddingHorizontal: 12,
-    paddingBottom: 8,
-    backgroundColor: "rgba(0,0,0,0.22)",
-  },
-
-  playerBackBtn: {
-    alignSelf: "flex-start",
+    top: 30,
+    right: 20,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: "#102033",
+    backgroundColor: "rgba(0,0,0,0.6)",
   },
 
-  playerBackText: {
-    color: "#38d7ff",
-    fontWeight: "900",
-    fontSize: 12,
-  },
-
-  statusOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.35)",
-    paddingHorizontal: 20,
-  },
-
-  statusText: {
+  closeBtnText: {
     color: "#fff",
-    textAlign: "center",
-    fontSize: isPhone ? 11 : 14,
+    fontWeight: "800",
   },
 });

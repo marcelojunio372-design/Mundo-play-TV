@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -52,7 +52,6 @@ function buildCategories(items = [], favorites = [], recents = []) {
 export default function MoviesScreen({
   session,
   isRefreshingData,
-  onRefreshSession,
   onBack,
   onOpenLive,
   onOpenMovies,
@@ -60,7 +59,6 @@ export default function MoviesScreen({
   onSelectMovie,
 }) {
   const movies = session?.data?.movies || [];
-  const autoRefreshedRef = useRef(false);
 
   const [favoriteIds, setFavoriteIds] = useState([]);
   const [recentIds, setRecentIds] = useState([]);
@@ -75,27 +73,13 @@ export default function MoviesScreen({
           AsyncStorage.getItem(RECENTS_KEY),
         ]);
 
-        if (savedFavorites) {
-          setFavoriteIds(JSON.parse(savedFavorites));
-        }
-
-        if (savedRecents) {
-          setRecentIds(JSON.parse(savedRecents));
-        }
+        if (savedFavorites) setFavoriteIds(JSON.parse(savedFavorites));
+        if (savedRecents) setRecentIds(JSON.parse(savedRecents));
       } catch (e) {}
     }
 
     loadSavedData();
   }, []);
-
-  useEffect(() => {
-    if (movies.length > 0) return;
-    if (!session?.url) return;
-    if (autoRefreshedRef.current) return;
-
-    autoRefreshedRef.current = true;
-    onRefreshSession?.();
-  }, [movies.length, session?.url, onRefreshSession]);
 
   const favoriteMovies = useMemo(() => {
     const favoriteSet = new Set(favoriteIds);
@@ -300,6 +284,10 @@ export default function MoviesScreen({
                   <Text style={styles.emptyText}>Nenhum filme encontrado</Text>
                 </View>
               }
+              removeClippedSubviews
+              initialNumToRender={18}
+              maxToRenderPerBatch={18}
+              windowSize={7}
             />
           )}
         </View>

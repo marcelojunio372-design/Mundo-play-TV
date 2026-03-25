@@ -90,14 +90,11 @@ export default function AppNavigator() {
       setIsRefreshingData(true);
 
       const loginType = String(session?.type || "").toLowerCase();
-      let data = null;
-
       if (loginType === "xtream") {
         return true;
       }
 
-      data = await loadM3U(session.url);
-
+      const data = await loadM3U(session.url);
       const safeData = mergeData(data);
 
       setSession((prev) => {
@@ -137,7 +134,6 @@ export default function AppNavigator() {
       <MoviesScreen
         session={session}
         isRefreshingData={isRefreshingData}
-        onRefreshSession={handleReload}
         onBack={() => setScreen("home")}
         onOpenLive={() => setScreen("live")}
         onOpenMovies={() => setScreen("movies")}
@@ -164,7 +160,6 @@ export default function AppNavigator() {
       <SeriesScreen
         session={session}
         isRefreshingData={isRefreshingData}
-        onRefreshSession={handleReload}
         onBack={() => setScreen("home")}
         onOpenLive={() => setScreen("live")}
         onOpenMovies={() => setScreen("movies")}
@@ -214,7 +209,6 @@ export default function AppNavigator() {
   return (
     <HomeScreen
       session={session}
-      isRefreshingData={isRefreshingData}
       onOpenLive={() => setScreen("live")}
       onOpenMovies={() => setScreen("movies")}
       onOpenSeries={() => setScreen("series")}

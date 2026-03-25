@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -23,8 +23,53 @@ function safeText(value) {
   return String(value).trim();
 }
 
+function normalizeText(value = "") {
+  return safeText(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
 function getSeriesStorageId(item = {}) {
   return safeText(item.id || item.url || item.name);
+}
+
+function getSeriesBaseName(item = {}) {
+  const raw = safeText(item.seriesName || item.name || "Série");
+  return raw
+    .replace(/\s*S\d{1,2}E\d{1,3}\b/gi, "")
+    .replace(/\s*-\s*episodio\s*\d+\b/gi, "")
+    .replace(/\s*episodio\s*\d+\b/gi, "")
+    .trim();
+}
+
+function buildSeriesGroups(items = []) {
+  const map = new Map();
+
+  items.forEach((item) => {
+    const baseName = getSeriesBaseName(item);
+    const key = normalizeText(`${baseName}__${safeText(item.group)}`);
+
+    if (!map.has(key)) {
+      map.set(key, {
+        id: key,
+        name: baseName || safeText(item.name || "Série"),
+        group: safeText(item.group || "OUTROS"),
+        logo: safeText(item.logo || ""),
+        year: safeText(item.year || ""),
+        episodes: [],
+      });
+    }
+
+    const current = map.get(key);
+    current.episodes.push(item);
+
+    if (!current.logo && item.logo) current.logo = item.logo;
+  });
+
+  return Array.from(map.values()).sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
 }
 
 function buildCategories(items = [], favorites = [], recents = []) {
@@ -49,20 +94,20 @@ function buildCategories(items = [], favorites = [], recents = []) {
 export default function SeriesScreen({
   session,
   isRefreshingData,
-  onRefreshSession,
   onBack,
   onOpenLive,
   onOpenMovies,
   onOpenSeries,
   onSelectSeries,
 }) {
-  const series = session?.data?.series || [];
-  const autoRefreshedRef = useRef(false);
+  const rawSeries = session?.data?.series || [];
 
   const [favoriteIds, setFavoriteIds] = useState([]);
   const [recentIds, setRecentIds] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(0);
   const [search, setSearch] = useState("");
+
+  const groupedSeries = useMemo(() => buildSeriesGroups(rawSeries), [rawSeries]);
 
   useEffect(() => {
     async function loadSavedData() {
@@ -72,43 +117,29 @@ export default function SeriesScreen({
           AsyncStorage.getItem(RECENTS_KEY),
         ]);
 
-        if (savedFavorites) {
-          setFavoriteIds(JSON.parse(savedFavorites));
-        }
-
-        if (savedRecents) {
-          setRecentIds(JSON.parse(savedRecents));
-        }
+        if (savedFavorites) setFavoriteIds(JSON.parse(savedFavorites));
+        if (savedRecents) setRecentIds(JSON.parse(savedRecents));
       } catch (e) {}
     }
 
     loadSavedData();
   }, []);
 
-  useEffect(() => {
-    if (series.length > 0) return;
-    if (!session?.url) return;
-    if (autoRefreshedRef.current) return;
-
-    autoRefreshedRef.current = true;
-    onRefreshSession?.();
-  }, [series.length, session?.url, onRefreshSession]);
-
   const favoriteSeries = useMemo(() => {
     const favoriteSet = new Set(favoriteIds);
-    return series.filter((item) => favoriteSet.has(getSeriesStorageId(item)));
-  }, [series, favoriteIds]);
+    return groupedSeries.filter((item) => favoriteSet.has(getSeriesStorageId(item)));
+  }, [groupedSeries, favoriteIds]);
 
   const recentSeries = useMemo(() => {
-    const map = new Map(series.map((item) => [getSeriesStorageId(item), item]));
+    const map = new Map(groupedSeries.map((item) => [getSeriesStorageId(item), item]));
     return recentIds.map((id) => map.get(id)).filter(Boolean);
-  }, [series, recentIds]);
+  }, [groupedSeries, recentIds]);
 
   const categories = useMemo(() => {
-    return buildCategories(series, favoriteSeries, recentSeries);
-  }, [series, favoriteSeries, recentSeries]);
+    return buildCategories(groupedSeries, favoriteSeries, recentSeries);
+  }, [groupedSeries, favoriteSeries, recentSeries]);
 
-  const baseSeries = categories[selectedCategory]?.items || series;
+  const baseSeries = categories[selectedCategory]?.items || groupedSeries;
 
   const visibleSeries = useMemo(() => {
     const term = safeText(search).toLowerCase();
@@ -159,7 +190,10 @@ export default function SeriesScreen({
 
   const handleSelectSeries = async (serie) => {
     await addToRecent(serie);
-    onSelectSeries?.(serie);
+    onSelectSeries?.({
+      ...serie,
+      seasons: serie.episodes || [],
+    });
   };
 
   return (
@@ -248,7 +282,7 @@ export default function SeriesScreen({
             {categories[selectedCategory]?.name || "Tudo"} ({visibleSeries.length})
           </Text>
 
-          {series.length === 0 && isRefreshingData ? (
+          {groupedSeries.length === 0 && isRefreshingData ? (
             <View style={styles.emptyWrap}>
               <Text style={styles.emptyText}>Atualizando séries...</Text>
             </View>
@@ -286,7 +320,9 @@ export default function SeriesScreen({
                       </Text>
 
                       <Text style={styles.cardMeta} numberOfLines={2}>
-                        {(item.year || "-") + " • " + (item.group || "Séries")}
+                        {(item.episodes?.length || 0) +
+                          " eps • " +
+                          (item.group || "Séries")}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -297,6 +333,10 @@ export default function SeriesScreen({
                   <Text style={styles.emptyText}>Nenhuma série encontrada</Text>
                 </View>
               }
+              removeClippedSubviews
+              initialNumToRender={18}
+              maxToRenderPerBatch={18}
+              windowSize={7}
             />
           )}
         </View>

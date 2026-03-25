@@ -12,9 +12,14 @@ function safeArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function getFeaturedItem(movies = [], series = []) {
+  if (movies.length > 0) return movies[0];
+  if (series.length > 0) return series[0];
+  return null;
+}
+
 export default function HomeScreen({
   session,
-  isRefreshingData,
   onOpenLive,
   onOpenMovies,
   onOpenSeries,
@@ -23,17 +28,13 @@ export default function HomeScreen({
 }) {
   const movies = useMemo(() => safeArray(session?.data?.movies), [session]);
   const series = useMemo(() => safeArray(session?.data?.series), [session]);
-  const live = useMemo(() => safeArray(session?.data?.live), [session]);
-
-  const featured = movies[0] || series[0] || live[0] || null;
+  const featured = useMemo(() => getFeaturedItem(movies, series), [movies, series]);
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topbar}>
         <Text style={styles.appTitle}>MUNDO PLAY TV</Text>
-        <Text style={styles.statusText}>
-          {isRefreshingData ? "Recarregando..." : "Conteúdo pronto"}
-        </Text>
+        <Text style={styles.statusText}>Pronto</Text>
       </View>
 
       <View style={styles.content}>
@@ -55,9 +56,7 @@ export default function HomeScreen({
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.sideButtonSmall} onPress={onReload}>
-            <Text style={styles.sideButtonSmallText}>
-              {isRefreshingData ? "ATUALIZANDO..." : "RECARREGAR"}
-            </Text>
+            <Text style={styles.sideButtonSmallText}>ATUALIZAR</Text>
           </TouchableOpacity>
         </View>
 
@@ -81,12 +80,12 @@ export default function HomeScreen({
 
             <Text style={styles.featureDesc}>
               {featured?.group ||
-                "Abra Filmes, Séries ou TV ao Vivo para navegar no conteúdo."}
+                "Abra Filmes ou Séries para ver o destaque do catálogo."}
             </Text>
 
             <TouchableOpacity style={styles.actionButton}>
               <Text style={styles.actionButtonText}>
-                {featured ? "CONTEÚDO PRONTO" : "SEM CONTEÚDO"}
+                {featured ? "CATÁLOGO PRONTO" : "SEM DESTAQUE"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -103,8 +102,8 @@ const styles = StyleSheet.create({
   },
 
   topbar: {
-    height: 40,
-    paddingHorizontal: 8,
+    height: 34,
+    paddingHorizontal: 7,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -114,31 +113,31 @@ const styles = StyleSheet.create({
 
   appTitle: {
     color: "#ffffff",
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "900",
   },
 
   statusText: {
     color: "#35c8ff",
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "700",
   },
 
   content: {
     flex: 1,
     flexDirection: "row",
-    padding: 6,
+    padding: 5,
   },
 
   sidebar: {
-    width: 96,
-    gap: 6,
-    paddingRight: 6,
+    width: 84,
+    gap: 5,
+    paddingRight: 5,
   },
 
   sideButton: {
-    height: 56,
-    borderRadius: 12,
+    height: 48,
+    borderRadius: 10,
     backgroundColor: "#08203a",
     alignItems: "center",
     justifyContent: "center",
@@ -146,13 +145,13 @@ const styles = StyleSheet.create({
 
   sideButtonText: {
     color: "#ffffff",
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "800",
   },
 
   sideButtonSmall: {
-    height: 48,
-    borderRadius: 12,
+    height: 40,
+    borderRadius: 10,
     backgroundColor: "#08203a",
     alignItems: "center",
     justifyContent: "center",
@@ -161,7 +160,7 @@ const styles = StyleSheet.create({
 
   sideButtonSmallText: {
     color: "#ffffff",
-    fontSize: 8,
+    fontSize: 7,
     fontWeight: "800",
     textAlign: "center",
   },
@@ -170,27 +169,27 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     backgroundColor: "#020812",
-    borderRadius: 12,
-    padding: 10,
+    borderRadius: 10,
+    padding: 8,
   },
 
   posterBox: {
-    width: 90,
+    width: 78,
     alignItems: "center",
     justifyContent: "center",
   },
 
   poster: {
-    width: 72,
-    height: 112,
-    borderRadius: 10,
+    width: 62,
+    height: 98,
+    borderRadius: 8,
     resizeMode: "cover",
   },
 
   posterFallback: {
-    width: 72,
-    height: 112,
-    borderRadius: 10,
+    width: 62,
+    height: 98,
+    borderRadius: 8,
     backgroundColor: "#132a45",
     alignItems: "center",
     justifyContent: "center",
@@ -198,7 +197,7 @@ const styles = StyleSheet.create({
 
   posterFallbackText: {
     color: "#35c8ff",
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "900",
     textAlign: "center",
   },
@@ -206,34 +205,34 @@ const styles = StyleSheet.create({
   infoBox: {
     flex: 1,
     justifyContent: "center",
-    paddingLeft: 10,
+    paddingLeft: 8,
   },
 
   featureLabel: {
     color: "#35c8ff",
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "900",
-    marginBottom: 6,
+    marginBottom: 5,
   },
 
   featureTitle: {
     color: "#ffffff",
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "900",
-    marginBottom: 8,
+    marginBottom: 6,
   },
 
   featureDesc: {
     color: "#d8d8d8",
-    fontSize: 10,
-    marginBottom: 10,
+    fontSize: 9,
+    marginBottom: 8,
   },
 
   actionButton: {
-    height: 36,
-    width: 190,
+    height: 30,
+    width: 160,
     maxWidth: "100%",
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 2,
     borderColor: "#35c8ff",
     alignItems: "center",
@@ -242,7 +241,7 @@ const styles = StyleSheet.create({
 
   actionButtonText: {
     color: "#35c8ff",
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "900",
   },
 });
