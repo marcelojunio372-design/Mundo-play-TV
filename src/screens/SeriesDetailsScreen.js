@@ -61,7 +61,7 @@ function buildSeasons(series) {
   return Object.keys(grouped)
     .map((season) => ({
       seasonNumber: Number(season),
-      name: `Temporada ${season}`,
+      name: `Temporada - ${season}`,
       episodes: grouped[season].sort((a, b) => {
         const aEp = extractEpisodeNumber(a?.name || "");
         const bEp = extractEpisodeNumber(b?.name || "");
@@ -79,6 +79,7 @@ export default function SeriesDetailsScreen({
 }) {
   const [isFavorite, setIsFavorite] = useState(false);
   const seasons = useMemo(() => buildSeasons(series), [series]);
+  const selectedSeason = seasons[0] || null;
 
   useEffect(() => {
     async function loadFavorite() {
@@ -127,6 +128,9 @@ export default function SeriesDetailsScreen({
 
   return (
     <SafeAreaView style={styles.container}>
+      {series?.logo ? <Image source={{ uri: series.logo }} style={styles.backdrop} /> : null}
+      <View style={styles.backdropOverlay} />
+
       <View style={styles.topbar}>
         <TouchableOpacity onPress={onBack}>
           <Text style={styles.backText}>Voltar</Text>
@@ -134,7 +138,7 @@ export default function SeriesDetailsScreen({
       </View>
 
       <View style={styles.content}>
-        <View style={styles.left}>
+        <View style={styles.posterCol}>
           {series?.logo ? (
             <Image source={{ uri: series.logo }} style={styles.poster} />
           ) : (
@@ -144,55 +148,105 @@ export default function SeriesDetailsScreen({
           )}
         </View>
 
-        <View style={styles.right}>
+        <View style={styles.infoCol}>
           <View style={styles.titleRow}>
             <Text style={styles.title}>{series?.name || "Série"}</Text>
-
             <TouchableOpacity onPress={toggleFavorite}>
-              <Text style={[styles.star, isFavorite && styles.starActive]}>★</Text>
+              <Text style={[styles.heart, isFavorite && styles.heartActive]}>♥</Text>
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.meta}>
-            {(series?.year || "-") + " • " + (series?.group || "Séries")}
-          </Text>
+          <View style={styles.infoGrid}>
+            <Text style={styles.label}>Dirigido por:</Text>
+            <Text style={styles.value}>{series?.director || "N/A"}</Text>
 
-          <Text style={styles.description}>
-            {series?.description ||
-              series?.plot ||
-              series?.desc ||
-              "Descrição não disponível."}
-          </Text>
+            <Text style={styles.label}>Data de lançamento:</Text>
+            <Text style={styles.value}>{series?.year || "N/A"}</Text>
 
-          <View style={styles.seasonsHeader}>
-            <Text style={styles.seasonsHeaderText}>
-              {seasons.length} temporada{seasons.length === 1 ? "" : "s"}
+            <Text style={styles.label}>Gênero:</Text>
+            <Text style={styles.value}>{series?.group || "Séries"}</Text>
+
+            <Text style={styles.label}>Sinopse:</Text>
+            <Text style={styles.synopsisInline}>
+              {series?.description ||
+                series?.plot ||
+                series?.desc ||
+                "Descrição não disponível."}
             </Text>
           </View>
 
+          <View style={styles.actionsRow}>
+            <TouchableOpacity
+              style={styles.playBtn}
+              onPress={() => {
+                if (selectedSeason) onOpenSeason?.(selectedSeason);
+              }}
+            >
+              <Text style={styles.playBtnText}>Abrir</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.seasonSelector}
+              onPress={() => {
+                if (selectedSeason) onOpenSeason?.(selectedSeason);
+              }}
+            >
+              <Text style={styles.seasonSelectorText}>
+                {selectedSeason?.name || "Temporada - 1"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.tabsRow}>
+            <View style={styles.tabActive}>
+              <Text style={styles.tabActiveText}>
+                EPISÓDIOS ({selectedSeason?.episodes?.length || 0})
+              </Text>
+            </View>
+
+            <View style={styles.tabInactive}>
+              <Text style={styles.tabInactiveText}>Elenco</Text>
+            </View>
+          </View>
+
           <FlatList
-            data={seasons}
-            keyExtractor={(item) => `season_${item.seasonNumber}`}
-            renderItem={({ item }) => (
+            data={safeArray(selectedSeason?.episodes).slice(0, 8)}
+            keyExtractor={(item, index) => item.id || `${item.name}_${index}`}
+            renderItem={({ item, index }) => (
               <TouchableOpacity
-                style={styles.seasonRow}
-                onPress={() => onOpenSeason?.(item)}
+                style={styles.episodePreviewRow}
+                onPress={() => {
+                  if (selectedSeason) onOpenSeason?.(selectedSeason);
+                }}
               >
-                <View>
-                  <Text style={styles.seasonName}>{item.name}</Text>
-                  <Text style={styles.seasonSub}>
-                    {item.episodes.length} episódio{item.episodes.length === 1 ? "" : "s"}
-                  </Text>
+                <View style={styles.episodeThumbWrap}>
+                  {item?.logo ? (
+                    <Image source={{ uri: item.logo }} style={styles.episodeThumb} />
+                  ) : (
+                    <View style={styles.episodeThumbFallback} />
+                  )}
                 </View>
 
-                <Text style={styles.seasonArrow}>›</Text>
+                <View style={styles.episodeInfo}>
+                  <Text style={styles.episodeTitle} numberOfLines={2}>
+                    {item.name}
+                  </Text>
+
+                  <Text style={styles.episodeMeta}>
+                    {extractEpisodeNumber(item.name || "") > 0
+                      ? `Episódio ${extractEpisodeNumber(item.name || "")}`
+                      : `Item ${index + 1}`}
+                  </Text>
+
+                  <Text style={styles.episodeDesc} numberOfLines={3}>
+                    {item?.description ||
+                      item?.plot ||
+                      item?.desc ||
+                      "Toque para abrir a temporada e reproduzir."}
+                  </Text>
+                </View>
               </TouchableOpacity>
             )}
-            ListEmptyComponent={
-              <View style={styles.emptyWrap}>
-                <Text style={styles.emptyText}>Nenhuma temporada encontrada</Text>
-              </View>
-            }
             showsVerticalScrollIndicator={false}
           />
         </View>
@@ -204,7 +258,18 @@ export default function SeriesDetailsScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#050915",
+    backgroundColor: "#120b24",
+  },
+
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    resizeMode: "cover",
+    opacity: 0.22,
+  },
+
+  backdropOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(18,11,36,0.82)",
   },
 
   topbar: {
@@ -226,29 +291,29 @@ const styles = StyleSheet.create({
     padding: 14,
   },
 
-  left: {
-    width: 140,
+  posterCol: {
+    width: 170,
     alignItems: "center",
     justifyContent: "flex-start",
   },
 
-  right: {
+  infoCol: {
     flex: 1,
-    paddingLeft: 12,
+    paddingLeft: 14,
   },
 
   poster: {
-    width: 110,
-    height: 160,
+    width: 140,
+    height: 200,
     borderRadius: 10,
     resizeMode: "cover",
   },
 
   posterFallback: {
-    width: 110,
-    height: 160,
+    width: 140,
+    height: 200,
     borderRadius: 10,
-    backgroundColor: "#203148",
+    backgroundColor: "#2a3550",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -262,86 +327,174 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    marginBottom: 6,
+    marginBottom: 10,
   },
 
   title: {
     color: "#fff",
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: "900",
     flex: 1,
-    marginRight: 10,
+    marginRight: 12,
   },
 
-  star: {
-    color: "#666",
-    fontSize: 18,
-    marginTop: 2,
+  heart: {
+    color: "#ddd",
+    fontSize: 26,
   },
 
-  starActive: {
-    color: "#ffe04f",
+  heartActive: {
+    color: "#ff6fa8",
   },
 
-  meta: {
-    color: "#b7c6d6",
-    marginBottom: 10,
+  infoGrid: {
+    marginBottom: 16,
   },
 
-  description: {
-    color: "#d6dce5",
-    fontSize: 12,
-    lineHeight: 18,
-    marginBottom: 14,
-  },
-
-  seasonsHeader: {
-    marginBottom: 10,
-  },
-
-  seasonsHeaderText: {
-    color: "#35c8ff",
-    fontSize: 13,
-    fontWeight: "800",
-  },
-
-  seasonRow: {
-    minHeight: 64,
-    borderRadius: 12,
-    backgroundColor: "#162033",
-    marginBottom: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-
-  seasonName: {
-    color: "#fff",
-    fontWeight: "800",
+  label: {
+    color: "#f1f1f1",
     fontSize: 15,
+    fontWeight: "800",
     marginBottom: 4,
   },
 
-  seasonSub: {
-    color: "#ffe04f",
-    fontSize: 12,
-    fontWeight: "700",
+  value: {
+    color: "#e7e1ff",
+    fontSize: 15,
+    marginBottom: 10,
   },
 
-  seasonArrow: {
-    color: "#fff",
-    fontSize: 24,
-    fontWeight: "800",
+  synopsisInline: {
+    color: "#ffffff",
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 10,
   },
 
-  emptyWrap: {
-    paddingVertical: 24,
+  actionsRow: {
+    flexDirection: "row",
     alignItems: "center",
+    marginBottom: 16,
   },
 
-  emptyText: {
+  playBtn: {
+    width: 160,
+    height: 42,
+    borderRadius: 8,
+    backgroundColor: "#86f0ff",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+
+  playBtnText: {
+    color: "#101010",
+    fontWeight: "900",
+    fontSize: 15,
+  },
+
+  seasonSelector: {
+    width: 190,
+    height: 42,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+
+  seasonSelectorText: {
     color: "#fff",
+    fontWeight: "800",
+    fontSize: 14,
+  },
+
+  tabsRow: {
+    flexDirection: "row",
+    marginBottom: 12,
+  },
+
+  tabActive: {
+    minWidth: 170,
+    height: 38,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+
+  tabInactive: {
+    minWidth: 120,
+    height: 38,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  tabActiveText: {
+    color: "#fff",
+    fontWeight: "900",
+    fontSize: 14,
+  },
+
+  tabInactiveText: {
+    color: "#ddd",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+
+  episodePreviewRow: {
+    flexDirection: "row",
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+  },
+
+  episodeThumbWrap: {
+    width: 160,
+    marginRight: 12,
+  },
+
+  episodeThumb: {
+    width: 160,
+    height: 90,
+    borderRadius: 8,
+    resizeMode: "cover",
+  },
+
+  episodeThumbFallback: {
+    width: 160,
+    height: 90,
+    borderRadius: 8,
+    backgroundColor: "#23304a",
+  },
+
+  episodeInfo: {
+    flex: 1,
+    justifyContent: "center",
+  },
+
+  episodeTitle: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "800",
+    marginBottom: 6,
+  },
+
+  episodeMeta: {
+    color: "#d8cdfd",
+    fontSize: 13,
+    marginBottom: 6,
+  },
+
+  episodeDesc: {
+    color: "#f0f0f0",
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

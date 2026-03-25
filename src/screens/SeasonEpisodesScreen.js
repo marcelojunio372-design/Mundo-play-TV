@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Modal,
   SafeAreaView,
   StyleSheet,
@@ -77,6 +78,9 @@ export default function SeasonEpisodesScreen({
   return (
     <>
       <SafeAreaView style={styles.container}>
+        {series?.logo ? <Image source={{ uri: series.logo }} style={styles.backdrop} /> : null}
+        <View style={styles.backdropOverlay} />
+
         <View style={styles.topbar}>
           <TouchableOpacity onPress={onBack}>
             <Text style={styles.backText}>Voltar</Text>
@@ -88,14 +92,12 @@ export default function SeasonEpisodesScreen({
             <Text style={styles.seriesTitle}>{series?.name || "Série"}</Text>
             <Text style={styles.seasonTitle}>{season?.name || "Temporada"}</Text>
 
-            <View style={styles.counterBox}>
-              <Text style={styles.counterText}>
-                {episodes.length} episódio{episodes.length === 1 ? "" : "s"}
-              </Text>
-            </View>
+            <Text style={styles.counterText}>
+              {episodes.length} episódio{episodes.length === 1 ? "" : "s"}
+            </Text>
 
             <Text style={styles.helpText}>
-              Toque em um episódio para abrir o play.
+              Toque em um episódio para abrir direto em tela cheia.
             </Text>
 
             {selectedEpisode ? (
@@ -121,10 +123,12 @@ export default function SeasonEpisodesScreen({
                     style={[styles.episodeRow, active && styles.episodeRowActive]}
                     onPress={() => openEpisode(index)}
                   >
-                    <View style={styles.episodeBadge}>
-                      <Text style={styles.episodeBadgeText}>
-                        {episodeNumber > 0 ? episodeNumber : index + 1}
-                      </Text>
+                    <View style={styles.episodeThumbWrap}>
+                      {item?.logo ? (
+                        <Image source={{ uri: item.logo }} style={styles.episodeThumb} />
+                      ) : (
+                        <View style={styles.episodeThumbFallback} />
+                      )}
                     </View>
 
                     <View style={styles.episodeInfo}>
@@ -136,6 +140,17 @@ export default function SeasonEpisodesScreen({
                         numberOfLines={2}
                       >
                         {item.name}
+                      </Text>
+
+                      <Text style={styles.episodeMeta}>
+                        {episodeNumber > 0 ? `Episódio ${episodeNumber}` : `Item ${index + 1}`}
+                      </Text>
+
+                      <Text style={styles.episodeDesc} numberOfLines={3}>
+                        {item?.description ||
+                          item?.plot ||
+                          item?.desc ||
+                          "Toque para reproduzir."}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -193,7 +208,18 @@ export default function SeasonEpisodesScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#050915",
+    backgroundColor: "#120b24",
+  },
+
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    resizeMode: "cover",
+    opacity: 0.18,
+  },
+
+  backdropOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(18,11,36,0.84)",
   },
 
   topbar: {
@@ -220,7 +246,7 @@ const styles = StyleSheet.create({
   },
 
   rightPanel: {
-    width: 220,
+    width: 420,
     borderLeftWidth: 1,
     borderLeftColor: "rgba(255,255,255,0.08)",
     padding: 10,
@@ -228,37 +254,34 @@ const styles = StyleSheet.create({
 
   seriesTitle: {
     color: "#fff",
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: "900",
     marginBottom: 4,
   },
 
   seasonTitle: {
-    color: "#b7c6d6",
-    fontSize: 14,
-    marginBottom: 12,
-  },
-
-  counterBox: {
-    marginBottom: 12,
+    color: "#d4c8f8",
+    fontSize: 16,
+    marginBottom: 14,
   },
 
   counterText: {
     color: "#ffe04f",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "900",
+    marginBottom: 14,
   },
 
   helpText: {
-    color: "#d6dce5",
-    fontSize: 13,
+    color: "#f0f0f0",
+    fontSize: 14,
     lineHeight: 20,
-    marginBottom: 16,
+    marginBottom: 18,
   },
 
   selectedBox: {
     borderRadius: 12,
-    backgroundColor: "#162033",
+    backgroundColor: "rgba(255,255,255,0.08)",
     padding: 12,
   },
 
@@ -271,54 +294,68 @@ const styles = StyleSheet.create({
 
   selectedName: {
     color: "#fff",
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
   },
 
   episodeRow: {
-    minHeight: 72,
+    minHeight: 118,
     borderRadius: 12,
-    backgroundColor: "#162033",
-    marginBottom: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    marginBottom: 10,
+    padding: 10,
     flexDirection: "row",
-    alignItems: "center",
   },
 
   episodeRowActive: {
-    backgroundColor: "#2a3550",
+    backgroundColor: "rgba(126,92,168,0.45)",
   },
 
-  episodeBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "#7e5ca8",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 10,
+  episodeThumbWrap: {
+    width: 150,
+    marginRight: 12,
   },
 
-  episodeBadgeText: {
-    color: "#fff",
-    fontWeight: "900",
-    fontSize: 12,
+  episodeThumb: {
+    width: 150,
+    height: 84,
+    borderRadius: 8,
+    resizeMode: "cover",
+  },
+
+  episodeThumbFallback: {
+    width: 150,
+    height: 84,
+    borderRadius: 8,
+    backgroundColor: "#23304a",
   },
 
   episodeInfo: {
     flex: 1,
+    justifyContent: "center",
   },
 
   episodeName: {
     color: "#fff",
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 16,
+    fontWeight: "800",
+    marginBottom: 6,
   },
 
   episodeNameActive: {
     color: "#ffe04f",
-    fontWeight: "800",
+  },
+
+  episodeMeta: {
+    color: "#d8cdfd",
+    fontSize: 13,
+    marginBottom: 6,
+  },
+
+  episodeDesc: {
+    color: "#f3f3f3",
+    fontSize: 13,
+    lineHeight: 18,
   },
 
   fullscreenWrap: {

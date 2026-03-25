@@ -24,6 +24,10 @@ function getMovieStorageId(item = {}) {
   return safeText(item.id || item.url || item.name);
 }
 
+function buildBackdrop(movie) {
+  return movie?.logo ? { uri: movie.logo } : null;
+}
+
 export default function MovieDetailsScreen({ movie, onBack }) {
   const fullscreenVideoRef = useRef(null);
 
@@ -32,6 +36,7 @@ export default function MovieDetailsScreen({ movie, onBack }) {
   const [isFavorite, setIsFavorite] = useState(false);
 
   const sourceUri = movie?.url || "";
+  const backdrop = buildBackdrop(movie);
 
   useEffect(() => {
     async function loadFavorite() {
@@ -81,6 +86,9 @@ export default function MovieDetailsScreen({ movie, onBack }) {
   return (
     <>
       <SafeAreaView style={styles.container}>
+        {backdrop ? <Image source={backdrop} style={styles.backdrop} /> : null}
+        <View style={styles.backdropOverlay} />
+
         <View style={styles.topbar}>
           <TouchableOpacity onPress={onBack}>
             <Text style={styles.backText}>Voltar</Text>
@@ -101,16 +109,31 @@ export default function MovieDetailsScreen({ movie, onBack }) {
           <View style={styles.right}>
             <View style={styles.titleRow}>
               <Text style={styles.title}>{movie?.name || "Filme"}</Text>
+
               <TouchableOpacity onPress={toggleFavorite}>
-                <Text style={[styles.star, isFavorite && styles.starActive]}>★</Text>
+                <Text style={[styles.heart, isFavorite && styles.heartActive]}>♥</Text>
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.metaLine}>
-              {(movie?.year || "-") + " • " + (movie?.group || "Filmes")}
-            </Text>
+            <View style={styles.infoGrid}>
+              <Text style={styles.label}>Dirigido por:</Text>
+              <Text style={styles.value}>{movie?.director || "N/A"}</Text>
 
-            <Text style={styles.description}>
+              <Text style={styles.label}>Data de lançamento:</Text>
+              <Text style={styles.value}>{movie?.year || "N/A"}</Text>
+
+              <Text style={styles.label}>Duração:</Text>
+              <Text style={styles.value}>{movie?.duration || "N/A"}</Text>
+
+              <Text style={styles.label}>Gênero:</Text>
+              <Text style={styles.value}>{movie?.group || "Filmes"}</Text>
+
+              <Text style={styles.label}>Elenco:</Text>
+              <Text style={styles.value}>{movie?.cast || "N/A"}</Text>
+            </View>
+
+            <Text style={styles.synopsisLabel}>Sinopse:</Text>
+            <Text style={styles.synopsisText}>
               {movie?.description ||
                 movie?.plot ||
                 movie?.desc ||
@@ -176,6 +199,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#050915",
   },
 
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    resizeMode: "cover",
+    opacity: 0.22,
+  },
+
+  backdropOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(5,9,21,0.78)",
+  },
+
   topbar: {
     height: 46,
     justifyContent: "center",
@@ -192,11 +226,11 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     flexDirection: "row",
-    padding: 12,
+    padding: 14,
   },
 
   left: {
-    width: 140,
+    width: 160,
     alignItems: "center",
     justifyContent: "flex-start",
   },
@@ -207,15 +241,15 @@ const styles = StyleSheet.create({
   },
 
   poster: {
-    width: 110,
-    height: 160,
+    width: 120,
+    height: 180,
     borderRadius: 10,
     resizeMode: "cover",
   },
 
   posterFallback: {
-    width: 110,
-    height: 160,
+    width: 120,
+    height: 180,
     borderRadius: 10,
     backgroundColor: "#203148",
     alignItems: "center",
@@ -229,43 +263,63 @@ const styles = StyleSheet.create({
 
   titleRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
-    marginBottom: 6,
+    marginBottom: 14,
   },
 
   title: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: "900",
     flex: 1,
-    marginRight: 10,
+    marginRight: 12,
   },
 
-  star: {
-    color: "#666",
-    fontSize: 18,
+  heart: {
+    color: "#ddd",
+    fontSize: 26,
+    marginTop: -2,
   },
 
-  starActive: {
-    color: "#ffe04f",
+  heartActive: {
+    color: "#ff6fa8",
   },
 
-  metaLine: {
-    color: "#b7c6d6",
+  infoGrid: {
+    marginBottom: 14,
+  },
+
+  label: {
+    color: "#e7e7e7",
+    fontSize: 14,
+    fontWeight: "800",
+    marginBottom: 2,
+  },
+
+  value: {
+    color: "#d0d9e7",
+    fontSize: 14,
     marginBottom: 10,
   },
 
-  description: {
-    color: "#d6dce5",
-    fontSize: 12,
-    lineHeight: 18,
-    marginBottom: 16,
+  synopsisLabel: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "900",
+    marginBottom: 6,
+  },
+
+  synopsisText: {
+    color: "#f1f1f1",
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 18,
   },
 
   playBtn: {
-    width: 140,
-    height: 42,
+    width: 180,
+    height: 44,
     borderRadius: 10,
     backgroundColor: "#7e5ca8",
     alignItems: "center",
@@ -275,7 +329,7 @@ const styles = StyleSheet.create({
   playBtnText: {
     color: "#fff",
     fontWeight: "900",
-    fontSize: 14,
+    fontSize: 15,
   },
 
   fullscreenWrap: {
