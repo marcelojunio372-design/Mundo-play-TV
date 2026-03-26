@@ -118,7 +118,7 @@ export default function SeriesDetailsScreen({ series, onBack }) {
         </View>
 
         <View style={styles.content}>
-          {/* CAPA + INFO */}
+          {/* HEADER */}
           <View style={styles.header}>
             <Image source={{ uri: series?.logo }} style={styles.poster} />
 
@@ -126,8 +126,13 @@ export default function SeriesDetailsScreen({ series, onBack }) {
               <Text style={styles.title}>{series?.name}</Text>
 
               <Text style={styles.meta}>
-                {(series?.year || "-") + " • " + (series?.group || "Séries")}
+                {(series?.year || "-")} • {series?.group || "Séries"}
               </Text>
+
+              <Text style={styles.meta}>Diretor: {series?.director || "N/A"}</Text>
+              <Text style={styles.meta}>Duração: {series?.duration || "N/A"}</Text>
+              <Text style={styles.meta}>Gênero: {series?.genre || "N/A"}</Text>
+              <Text style={styles.meta}>Elenco: {series?.cast || "N/A"}</Text>
 
               <Text style={styles.description}>
                 {series?.description || "Descrição não disponível."}
@@ -233,14 +238,18 @@ const styles = StyleSheet.create({
 
   title: { color: "#fff", fontSize: 16, fontWeight: "900" },
 
-  meta: { color: "#aaa", marginVertical: 6 },
+  meta: { color: "#aaa", fontSize: 11, marginTop: 2 },
 
-  description: { color: "#ccc", fontSize: 12 },
+  description: {
+    color: "#ccc",
+    fontSize: 11,
+    marginTop: 6,
+  },
 
   seasonRow: { flexDirection: "row", marginVertical: 10 },
 
   seasonBtn: {
-    padding: 8,
+    padding: 6,
     backgroundColor: "#222",
     borderRadius: 6,
     marginRight: 6,
@@ -248,26 +257,26 @@ const styles = StyleSheet.create({
 
   seasonBtnActive: { backgroundColor: "#7e5ca8" },
 
-  seasonText: { color: "#fff", fontSize: 12 },
+  seasonText: { color: "#fff", fontSize: 11 },
 
   episodeCard: {
     flexDirection: "row",
     backgroundColor: "#162033",
-    marginBottom: 8,
+    marginBottom: 6,
     borderRadius: 8,
     padding: 6,
   },
 
   thumb: {
-    width: 90,
-    height: 60,
+    width: 80,
+    height: 50,
     borderRadius: 6,
     marginRight: 8,
   },
 
-  epTitle: { color: "#fff", fontSize: 12 },
+  epTitle: { color: "#fff", fontSize: 11 },
 
-  epSub: { color: "#aaa", fontSize: 10 },
+  epSub: { color: "#aaa", fontSize: 9 },
 
   fullscreen: { flex: 1, backgroundColor: "#000" },
 
