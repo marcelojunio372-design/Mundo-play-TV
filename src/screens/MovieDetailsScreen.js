@@ -202,16 +202,16 @@ const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     resizeMode: "cover",
-    opacity: 0.18,
+    opacity: 0.14,
   },
 
   backdropOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(5,9,21,0.82)",
+    backgroundColor: "rgba(5,9,21,0.86)",
   },
 
   topbar: {
-    height: 42,
+    height: 40,
     justifyContent: "center",
     paddingHorizontal: 12,
     borderBottomWidth: 1,
@@ -221,38 +221,38 @@ const styles = StyleSheet.create({
   backText: {
     color: "#fff",
     fontWeight: "800",
-    fontSize: 14,
+    fontSize: 13,
   },
 
   content: {
     flex: 1,
     flexDirection: "row",
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 12,
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 10,
   },
 
   left: {
-    width: 118,
+    width: 94,
     alignItems: "center",
     justifyContent: "flex-start",
   },
 
   right: {
     flex: 1,
-    paddingLeft: 10,
+    paddingLeft: 8,
   },
 
   poster: {
-    width: 92,
-    height: 138,
+    width: 72,
+    height: 104,
     borderRadius: 8,
     resizeMode: "cover",
   },
 
   posterFallback: {
-    width: 92,
-    height: 138,
+    width: 72,
+    height: 104,
     borderRadius: 8,
     backgroundColor: "#203148",
     alignItems: "center",
@@ -261,27 +261,27 @@ const styles = StyleSheet.create({
 
   posterFallbackText: {
     color: "#fff",
-    fontSize: 9,
+    fontSize: 8,
   },
 
   titleRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    marginBottom: 10,
+    marginBottom: 8,
   },
 
   title: {
     color: "#fff",
-    fontSize: 17,
+    fontSize: 14,
     fontWeight: "900",
     flex: 1,
-    marginRight: 10,
+    marginRight: 8,
   },
 
   heart: {
     color: "#ddd",
-    fontSize: 22,
+    fontSize: 18,
     marginTop: -1,
   },
 
@@ -290,40 +290,40 @@ const styles = StyleSheet.create({
   },
 
   infoGrid: {
-    marginBottom: 10,
+    marginBottom: 8,
   },
 
   label: {
     color: "#e7e7e7",
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "800",
     marginBottom: 1,
   },
 
   value: {
     color: "#d0d9e7",
-    fontSize: 12,
-    marginBottom: 7,
+    fontSize: 10,
+    marginBottom: 5,
   },
 
   synopsisLabel: {
     color: "#ffffff",
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "900",
-    marginBottom: 4,
+    marginBottom: 3,
   },
 
   synopsisText: {
     color: "#f1f1f1",
-    fontSize: 12,
-    lineHeight: 17,
-    marginBottom: 14,
+    fontSize: 10,
+    lineHeight: 14,
+    marginBottom: 10,
   },
 
   playBtn: {
-    width: 150,
-    height: 38,
-    borderRadius: 9,
+    width: 108,
+    height: 28,
+    borderRadius: 8,
     backgroundColor: "#7e5ca8",
     alignItems: "center",
     justifyContent: "center",
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
   playBtnText: {
     color: "#fff",
     fontWeight: "900",
-    fontSize: 14,
+    fontSize: 12,
   },
 
   fullscreenWrap: {

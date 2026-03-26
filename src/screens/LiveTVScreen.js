@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
-  InteractionManager,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -13,12 +12,12 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ResizeMode, Video } from "expo-av";
-import { loadEPG, findNowAndNextForChannel } from "../services/epgService";
 
 const PLAYER_TIMEOUT_MS = 12000;
 const LIVE_FAVORITES_KEY = "mundoplaytv_live_favorites";
 const LIVE_RECENTS_KEY = "mundoplaytv_live_recents";
-const INITIAL_CHANNELS = 120;
+const INITIAL_CHANNELS = 80;
+const LOAD_MORE_STEP = 80;
 
 function safeArray(value) {
   return Array.isArray(value) ? value : [];
@@ -66,42 +65,9 @@ function buildCategories(items = [], favorites = [], recents = []) {
   ];
 }
 
-function formatClock(value) {
-  if (!(value instanceof Date) || Number.isNaN(value.getTime())) return "";
-  return value.toLocaleTimeString("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function getEpgRows(channel) {
-  const nowProgram = channel?.nowProgram || null;
-  const nextProgram = channel?.nextProgram || null;
-
-  if (nowProgram || nextProgram) {
-    const rows = [];
-
-    if (nowProgram) {
-      rows.push({
-        key: "now",
-        time: `${formatClock(nowProgram.start)} ~ ${formatClock(nowProgram.stop)}`,
-        title: safeText(nowProgram.title || "Agora"),
-      });
-    }
-
-    if (nextProgram) {
-      rows.push({
-        key: "next",
-        time: `${formatClock(nextProgram.start)} ~ ${formatClock(nextProgram.stop)}`,
-        title: safeText(nextProgram.title || "Próximo"),
-      });
-    }
-
-    return rows;
-  }
-
+function getEpgRows() {
   return [
-    { key: "f1", time: "--:-- ~ --:--", title: "EPG ainda não carregado" },
+    { key: "f1", time: "--:-- ~ --:--", title: "EPG temporariamente leve" },
     { key: "f2", time: "--:-- ~ --:--", title: "Selecione um canal para reproduzir" },
   ];
 }
@@ -123,7 +89,6 @@ export default function LiveTVScreen({
 
   const [favoriteIds, setFavoriteIds] = useState([]);
   const [recentIds, setRecentIds] = useState([]);
-  const [epgItems, setEpgItems] = useState([]);
   const [selectedCategoryKey, setSelectedCategoryKey] = useState("all");
   const [search, setSearch] = useState("");
   const [selectedChannelId, setSelectedChannelId] = useState(null);
@@ -149,27 +114,6 @@ export default function LiveTVScreen({
 
     loadSavedData();
   }, []);
-
-  useEffect(() => {
-    let mounted = true;
-    const task = InteractionManager.runAfterInteractions(async () => {
-      try {
-        const items = await loadEPG(session);
-        if (mounted) {
-          setEpgItems(Array.isArray(items) ? items : []);
-        }
-      } catch (e) {
-        if (mounted) {
-          setEpgItems([]);
-        }
-      }
-    });
-
-    return () => {
-      mounted = false;
-      if (task?.cancel) task.cancel();
-    };
-  }, [session]);
 
   useEffect(() => {
     return () => {
@@ -202,26 +146,8 @@ export default function LiveTVScreen({
   }, [selectedCategoryKey, search]);
 
   const selectedCategoryItems = useMemo(() => {
-    const baseItems = safeArray(selectedCategory?.items);
-
-    if (!epgItems.length) return baseItems;
-
-    return baseItems.map((item) => {
-      const { nowProgram, nextProgram } = findNowAndNextForChannel(
-        epgItems,
-        item?.name || "",
-        item?.group || "",
-        item?.tvgId || "",
-        item?.tvgName || ""
-      );
-
-      return {
-        ...item,
-        nowProgram,
-        nextProgram,
-      };
-    });
-  }, [selectedCategory, epgItems]);
+    return safeArray(selectedCategory?.items);
+  }, [selectedCategory]);
 
   const filteredChannels = useMemo(() => {
     const source = selectedCategoryItems;
@@ -254,7 +180,7 @@ export default function LiveTVScreen({
     );
   }, [filteredChannels, selectedCategoryItems, allChannels, selectedChannelId]);
 
-  const epgRows = useMemo(() => getEpgRows(selectedChannel), [selectedChannel]);
+  const epgRows = useMemo(() => getEpgRows(), []);
 
   const persistFavorites = async (ids) => {
     try {
@@ -361,7 +287,7 @@ export default function LiveTVScreen({
 
   const handleEndReached = () => {
     if (visibleLimit < filteredChannels.length) {
-      setVisibleLimit((prev) => prev + 120);
+      setVisibleLimit((prev) => prev + LOAD_MORE_STEP);
     }
   };
 
@@ -465,9 +391,9 @@ export default function LiveTVScreen({
             keyExtractor={(item) => item.key}
             renderItem={renderCategoryItem}
             showsVerticalScrollIndicator={false}
-            initialNumToRender={14}
-            maxToRenderPerBatch={14}
-            windowSize={8}
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            windowSize={5}
             removeClippedSubviews
           />
         </View>
@@ -478,12 +404,12 @@ export default function LiveTVScreen({
             keyExtractor={(item, index) => String(item?.id || `ch_${index}`)}
             renderItem={renderChannelItem}
             showsVerticalScrollIndicator={false}
-            initialNumToRender={20}
-            maxToRenderPerBatch={20}
-            windowSize={8}
+            initialNumToRender={8}
+            maxToRenderPerBatch={8}
+            windowSize={5}
             removeClippedSubviews
             onEndReached={handleEndReached}
-            onEndReachedThreshold={0.4}
+            onEndReachedThreshold={0.3}
           />
         </View>
 
