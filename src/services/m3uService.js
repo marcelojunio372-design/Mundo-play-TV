@@ -29,6 +29,14 @@ function extractAttr(line = "", attr = "") {
   return "";
 }
 
+function firstNonEmpty(values = []) {
+  for (const value of values) {
+    const text = safeText(value);
+    if (text) return text;
+  }
+  return "";
+}
+
 function extractGroup(line = "") {
   const group = extractAttr(line, "group-title");
   return group ? group.trim() : "OUTROS";
@@ -53,7 +61,15 @@ function extractName(line = "") {
 }
 
 function extractLogo(line = "") {
-  return extractAttr(line, "tvg-logo") || extractAttr(line, "logo") || "";
+  return firstNonEmpty([
+    extractAttr(line, "tvg-logo"),
+    extractAttr(line, "logo"),
+    extractAttr(line, "cover"),
+    extractAttr(line, "poster"),
+    extractAttr(line, "thumb"),
+    extractAttr(line, "thumbnail"),
+    extractAttr(line, "image"),
+  ]);
 }
 
 function extractTvgId(line = "") {
@@ -70,6 +86,8 @@ function extractYear(line = "", name = "") {
     extractAttr(line, "release-date"),
     extractAttr(line, "release_year"),
     extractAttr(line, "date"),
+    extractAttr(line, "tmdb-year"),
+    extractAttr(line, "released"),
   ].filter(Boolean);
 
   for (const value of attrs) {
@@ -93,11 +111,56 @@ function extractDescription(line = "") {
     extractAttr(line, "summary"),
     extractAttr(line, "synopsis"),
     extractAttr(line, "tmdb-description"),
+    extractAttr(line, "overview"),
   ]
     .map((item) => safeText(item))
     .filter(Boolean);
 
   return candidates[0] || "";
+}
+
+function extractDirector(line = "") {
+  return firstNonEmpty([
+    extractAttr(line, "director"),
+    extractAttr(line, "directors"),
+    extractAttr(line, "tmdb-director"),
+    extractAttr(line, "vod-director"),
+  ]);
+}
+
+function extractDuration(line = "", name = "") {
+  const attrValue = firstNonEmpty([
+    extractAttr(line, "duration"),
+    extractAttr(line, "runtime"),
+    extractAttr(line, "tmdb-runtime"),
+    extractAttr(line, "length"),
+  ]);
+
+  if (attrValue) return attrValue;
+
+  const nameMatch = String(name || "").match(/\b(\d{2,3})\s*min\b/i);
+  if (nameMatch?.[0]) return nameMatch[0];
+
+  return "";
+}
+
+function extractGenre(line = "", group = "") {
+  return firstNonEmpty([
+    extractAttr(line, "genre"),
+    extractAttr(line, "genres"),
+    extractAttr(line, "category"),
+    safeText(group),
+  ]);
+}
+
+function extractCast(line = "") {
+  return firstNonEmpty([
+    extractAttr(line, "cast"),
+    extractAttr(line, "actors"),
+    extractAttr(line, "actor"),
+    extractAttr(line, "starring"),
+    extractAttr(line, "tmdb-cast"),
+  ]);
 }
 
 function normalizeText(value = "") {
@@ -290,6 +353,10 @@ export async function loadM3U(url) {
       const tvgName = extractTvgName(currentInfo);
       const year = extractYear(currentInfo, name);
       const description = extractDescription(currentInfo);
+      const director = extractDirector(currentInfo);
+      const duration = extractDuration(currentInfo, name);
+      const genre = extractGenre(currentInfo, group);
+      const cast = extractCast(currentInfo);
       const streamUrl = line;
 
       const type = inferType(name, group, streamUrl, tvgName, tvgId, logo);
@@ -307,6 +374,10 @@ export async function loadM3U(url) {
         description,
         desc: description,
         plot: description,
+        director,
+        duration,
+        genre,
+        cast,
       };
 
       if (type === "movie") {

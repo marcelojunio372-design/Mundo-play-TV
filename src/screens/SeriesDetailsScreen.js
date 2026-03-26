@@ -3,12 +3,12 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  Modal,
   SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  Modal,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ResizeMode, Video } from "expo-av";
@@ -26,7 +26,7 @@ function getSeriesStorageId(item = {}) {
 }
 
 function extractSeasonEpisode(name = "") {
-  const match = name.match(/S(\d{1,2})E(\d{1,3})/i);
+  const match = String(name || "").match(/S(\d{1,2})E(\d{1,3})/i);
   if (match) {
     return {
       season: Number(match[1]),
@@ -62,9 +62,9 @@ export default function SeriesDetailsScreen({ series, onBack }) {
 
   const [selectedSeason, setSelectedSeason] = useState(1);
   const [selectedEpisodeIndex, setSelectedEpisodeIndex] = useState(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
 
   const currentSeason = seasons.find((s) => s.seasonNumber === selectedSeason);
   const episodes = currentSeason?.episodes || [];
@@ -73,6 +73,18 @@ export default function SeriesDetailsScreen({ series, onBack }) {
     selectedEpisodeIndex !== null ? episodes[selectedEpisodeIndex] : null;
 
   const sourceUri = selectedEpisode?.url || "";
+
+  useEffect(() => {
+    async function loadFavorite() {
+      try {
+        const raw = await AsyncStorage.getItem(FAVORITES_KEY);
+        const ids = raw ? JSON.parse(raw) : [];
+        setIsFavorite(ids.includes(getSeriesStorageId(series)));
+      } catch (e) {}
+    }
+
+    loadFavorite();
+  }, [series]);
 
   useEffect(() => {
     async function addRecent() {
@@ -88,6 +100,25 @@ export default function SeriesDetailsScreen({ series, onBack }) {
     if (series) addRecent();
   }, [series]);
 
+  const toggleFavorite = async () => {
+    try {
+      const raw = await AsyncStorage.getItem(FAVORITES_KEY);
+      const ids = raw ? JSON.parse(raw) : [];
+      const id = getSeriesStorageId(series);
+
+      let updated = [];
+      if (ids.includes(id)) {
+        updated = ids.filter((item) => item !== id);
+        setIsFavorite(false);
+      } else {
+        updated = [id, ...ids];
+        setIsFavorite(true);
+      }
+
+      await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
+    } catch (e) {}
+  };
+
   const handleStatus = (status) => {
     if (!status || !status.isLoaded) return;
 
@@ -95,16 +126,14 @@ export default function SeriesDetailsScreen({ series, onBack }) {
       const next = (selectedEpisodeIndex ?? -1) + 1;
       if (next < episodes.length) {
         setSelectedEpisodeIndex(next);
-        setIsPlaying(true);
       }
     }
 
-    setIsBuffering(status.isBuffering);
+    setIsBuffering(!!status.isBuffering);
   };
 
   const openEpisode = (index) => {
     setSelectedEpisodeIndex(index);
-    setIsPlaying(true);
     setIsFullscreen(true);
   };
 
@@ -118,29 +147,33 @@ export default function SeriesDetailsScreen({ series, onBack }) {
         </View>
 
         <View style={styles.content}>
-          {/* HEADER */}
           <View style={styles.header}>
             <Image source={{ uri: series?.logo }} style={styles.poster} />
 
             <View style={styles.info}>
-              <Text style={styles.title}>{series?.name}</Text>
+              <View style={styles.titleRow}>
+                <Text style={styles.title}>{series?.name}</Text>
+
+                <TouchableOpacity onPress={toggleFavorite}>
+                  <Text style={[styles.heart, isFavorite && styles.heartActive]}>♥</Text>
+                </TouchableOpacity>
+              </View>
 
               <Text style={styles.meta}>
-                {(series?.year || "-")} • {series?.group || "Séries"}
+                {(series?.year || "N/A")} • {series?.group || "Séries"}
               </Text>
 
               <Text style={styles.meta}>Diretor: {series?.director || "N/A"}</Text>
               <Text style={styles.meta}>Duração: {series?.duration || "N/A"}</Text>
-              <Text style={styles.meta}>Gênero: {series?.genre || "N/A"}</Text>
+              <Text style={styles.meta}>Gênero: {series?.genre || series?.group || "N/A"}</Text>
               <Text style={styles.meta}>Elenco: {series?.cast || "N/A"}</Text>
 
               <Text style={styles.description}>
-                {series?.description || "Descrição não disponível."}
+                {series?.description || series?.desc || series?.plot || "Descrição não disponível."}
               </Text>
             </View>
           </View>
 
-          {/* TEMPORADAS */}
           <View style={styles.seasonRow}>
             {seasons.map((s) => {
               const active = s.seasonNumber === selectedSeason;
@@ -156,7 +189,6 @@ export default function SeriesDetailsScreen({ series, onBack }) {
             })}
           </View>
 
-          {/* EPISÓDIOS */}
           <FlatList
             data={episodes}
             keyExtractor={(item, index) => item.id || `${index}`}
@@ -167,9 +199,11 @@ export default function SeriesDetailsScreen({ series, onBack }) {
               >
                 <Image source={{ uri: item.logo }} style={styles.thumb} />
 
-                <View style={{ flex: 1 }}>
+                <View style={styles.episodeInfo}>
                   <Text style={styles.epTitle}>{item.name}</Text>
-                  <Text style={styles.epSub}>Toque para reproduzir</Text>
+                  <Text style={styles.epSub}>
+                    {item?.description || item?.desc || item?.plot || "Toque para reproduzir"}
+                  </Text>
                 </View>
               </TouchableOpacity>
             )}
@@ -177,8 +211,7 @@ export default function SeriesDetailsScreen({ series, onBack }) {
         </View>
       </SafeAreaView>
 
-      {/* PLAYER */}
-      <Modal visible={isFullscreen} animationType="fade">
+      <Modal visible={isFullscreen} animationType="fade" transparent={false}>
         <View style={styles.fullscreen}>
           {sourceUri ? (
             <>
@@ -188,15 +221,18 @@ export default function SeriesDetailsScreen({ series, onBack }) {
                 source={{ uri: sourceUri }}
                 style={styles.video}
                 shouldPlay
-                resizeMode={ResizeMode.CONTAIN}
+                resizeMode={ResizeMode.COVER}
                 useNativeControls
                 onPlaybackStatusUpdate={handleStatus}
                 onLoadStart={() => setIsBuffering(true)}
                 onReadyForDisplay={() => setIsBuffering(false)}
+                onError={() => setIsBuffering(false)}
               />
 
               {isBuffering && (
-                <ActivityIndicator size="large" color="#35c8ff" />
+                <View style={styles.overlay} pointerEvents="none">
+                  <ActivityIndicator size="large" color="#35c8ff" />
+                </View>
               )}
             </>
           ) : null}
@@ -236,7 +272,29 @@ const styles = StyleSheet.create({
 
   info: { flex: 1, marginLeft: 10 },
 
-  title: { color: "#fff", fontSize: 16, fontWeight: "900" },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    marginBottom: 2,
+  },
+
+  title: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "900",
+    flex: 1,
+    marginRight: 8,
+  },
+
+  heart: {
+    color: "#bbb",
+    fontSize: 18,
+  },
+
+  heartActive: {
+    color: "#ff6fa8",
+  },
 
   meta: { color: "#aaa", fontSize: 11, marginTop: 2 },
 
@@ -246,13 +304,19 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
 
-  seasonRow: { flexDirection: "row", marginVertical: 10 },
+  seasonRow: {
+    flexDirection: "row",
+    marginVertical: 10,
+    flexWrap: "wrap",
+  },
 
   seasonBtn: {
-    padding: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
     backgroundColor: "#222",
     borderRadius: 6,
     marginRight: 6,
+    marginBottom: 6,
   },
 
   seasonBtnActive: { backgroundColor: "#7e5ca8" },
@@ -274,7 +338,12 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
 
-  epTitle: { color: "#fff", fontSize: 11 },
+  episodeInfo: {
+    flex: 1,
+    justifyContent: "center",
+  },
+
+  epTitle: { color: "#fff", fontSize: 11, marginBottom: 2 },
 
   epSub: { color: "#aaa", fontSize: 9 },
 
@@ -282,13 +351,22 @@ const styles = StyleSheet.create({
 
   video: { width: "100%", height: "100%" },
 
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.25)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   closeBtn: {
     position: "absolute",
     top: 30,
     right: 20,
-    backgroundColor: "#000",
-    padding: 10,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
 
-  closeText: { color: "#fff" },
+  closeText: { color: "#fff", fontWeight: "800" },
 });
