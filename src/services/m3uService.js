@@ -67,7 +67,6 @@ function extractLogo(line = "") {
     extractAttr(line, "cover"),
     extractAttr(line, "poster"),
     extractAttr(line, "thumb"),
-    extractAttr(line, "thumbnail"),
     extractAttr(line, "image"),
   ]);
 }
@@ -86,8 +85,6 @@ function extractYear(line = "", name = "") {
     extractAttr(line, "release-date"),
     extractAttr(line, "release_year"),
     extractAttr(line, "date"),
-    extractAttr(line, "tmdb-year"),
-    extractAttr(line, "released"),
   ].filter(Boolean);
 
   for (const value of attrs) {
@@ -104,27 +101,20 @@ function extractYear(line = "", name = "") {
 }
 
 function extractDescription(line = "") {
-  const candidates = [
+  return firstNonEmpty([
     extractAttr(line, "description"),
     extractAttr(line, "desc"),
     extractAttr(line, "plot"),
     extractAttr(line, "summary"),
     extractAttr(line, "synopsis"),
-    extractAttr(line, "tmdb-description"),
     extractAttr(line, "overview"),
-  ]
-    .map((item) => safeText(item))
-    .filter(Boolean);
-
-  return candidates[0] || "";
+  ]);
 }
 
 function extractDirector(line = "") {
   return firstNonEmpty([
     extractAttr(line, "director"),
     extractAttr(line, "directors"),
-    extractAttr(line, "tmdb-director"),
-    extractAttr(line, "vod-director"),
   ]);
 }
 
@@ -132,7 +122,6 @@ function extractDuration(line = "", name = "") {
   const attrValue = firstNonEmpty([
     extractAttr(line, "duration"),
     extractAttr(line, "runtime"),
-    extractAttr(line, "tmdb-runtime"),
     extractAttr(line, "length"),
   ]);
 
@@ -144,22 +133,12 @@ function extractDuration(line = "", name = "") {
   return "";
 }
 
-function extractGenre(line = "", group = "") {
-  return firstNonEmpty([
-    extractAttr(line, "genre"),
-    extractAttr(line, "genres"),
-    extractAttr(line, "category"),
-    safeText(group),
-  ]);
-}
-
 function extractCast(line = "") {
   return firstNonEmpty([
     extractAttr(line, "cast"),
     extractAttr(line, "actors"),
     extractAttr(line, "actor"),
     extractAttr(line, "starring"),
-    extractAttr(line, "tmdb-cast"),
   ]);
 }
 
@@ -203,12 +182,10 @@ function isMovieGroup(groupText = "") {
     /\bmovie\b/.test(groupText) ||
     /\bespecial\b/.test(groupText) ||
     /\bcoletanea\b/.test(groupText) ||
-    /\bcoletania\b/.test(groupText) ||
     /\bcolecao\b/.test(groupText) ||
     /\blancamentos\b/.test(groupText) ||
     /\blancamento\b/.test(groupText) ||
     /\blegendados\b/.test(groupText) ||
-    /\blegendado\b/.test(groupText) ||
     /\bdublado\b/.test(groupText) ||
     /\bdrama\b/.test(groupText) ||
     /\bacao\b/.test(groupText) ||
@@ -254,7 +231,7 @@ function looksLikeTmdbLogo(logo = "") {
   return String(logo || "").toLowerCase().includes("image.tmdb.org");
 }
 
-function inferType(name = "", group = "", url = "", tvgName = "", tvgId = "", logo = "") {
+function inferType(name = "", group = "", url = "", tvgName = "", logo = "") {
   const nameText = normalizeText(name);
   const groupText = normalizeText(group);
   const tvgNameText = normalizeText(tvgName);
@@ -355,11 +332,10 @@ export async function loadM3U(url) {
       const description = extractDescription(currentInfo);
       const director = extractDirector(currentInfo);
       const duration = extractDuration(currentInfo, name);
-      const genre = extractGenre(currentInfo, group);
       const cast = extractCast(currentInfo);
       const streamUrl = line;
 
-      const type = inferType(name, group, streamUrl, tvgName, tvgId, logo);
+      const type = inferType(name, group, streamUrl, tvgName, logo);
 
       const item = {
         id: `${type}_${i}_${name}`.replace(/\s+/g, "_"),
@@ -376,8 +352,8 @@ export async function loadM3U(url) {
         plot: description,
         director,
         duration,
-        genre,
         cast,
+        genre: group,
       };
 
       if (type === "movie") {
