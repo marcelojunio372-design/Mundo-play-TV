@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  InteractionManager,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -17,6 +18,7 @@ import { loadEPG, findNowAndNextForChannel } from "../services/epgService";
 const PLAYER_TIMEOUT_MS = 12000;
 const LIVE_FAVORITES_KEY = "mundoplaytv_live_favorites";
 const LIVE_RECENTS_KEY = "mundoplaytv_live_recents";
+const INITIAL_CHANNELS = 120;
 
 function safeArray(value) {
   return Array.isArray(value) ? value : [];
@@ -130,6 +132,7 @@ export default function LiveTVScreen({
   const [isBuffering, setIsBuffering] = useState(false);
   const [playerError, setPlayerError] = useState("");
   const [hasStartedPlayback, setHasStartedPlayback] = useState(false);
+  const [visibleLimit, setVisibleLimit] = useState(INITIAL_CHANNELS);
 
   useEffect(() => {
     async function loadSavedData() {
@@ -149,8 +152,7 @@ export default function LiveTVScreen({
 
   useEffect(() => {
     let mounted = true;
-
-    async function loadRealEPG() {
+    const task = InteractionManager.runAfterInteractions(async () => {
       try {
         const items = await loadEPG(session);
         if (mounted) {
@@ -161,12 +163,11 @@ export default function LiveTVScreen({
           setEpgItems([]);
         }
       }
-    }
-
-    loadRealEPG();
+    });
 
     return () => {
       mounted = false;
+      if (task?.cancel) task.cancel();
     };
   }, [session]);
 
@@ -196,8 +197,16 @@ export default function LiveTVScreen({
     return categories.find((c) => c.key === selectedCategoryKey) || categories[0];
   }, [categories, selectedCategoryKey]);
 
+  useEffect(() => {
+    setVisibleLimit(INITIAL_CHANNELS);
+  }, [selectedCategoryKey, search]);
+
   const selectedCategoryItems = useMemo(() => {
-    return safeArray(selectedCategory?.items).map((item) => {
+    const baseItems = safeArray(selectedCategory?.items);
+
+    if (!epgItems.length) return baseItems;
+
+    return baseItems.map((item) => {
       const { nowProgram, nextProgram } = findNowAndNextForChannel(
         epgItems,
         item?.name || "",
@@ -214,7 +223,7 @@ export default function LiveTVScreen({
     });
   }, [selectedCategory, epgItems]);
 
-  const visibleChannels = useMemo(() => {
+  const filteredChannels = useMemo(() => {
     const source = selectedCategoryItems;
     const term = normalizeText(search);
 
@@ -232,14 +241,18 @@ export default function LiveTVScreen({
     });
   }, [selectedCategoryItems, search]);
 
+  const visibleChannels = useMemo(() => {
+    return filteredChannels.slice(0, visibleLimit);
+  }, [filteredChannels, visibleLimit]);
+
   const selectedChannel = useMemo(() => {
     return (
-      visibleChannels.find((item) => item.id === selectedChannelId) ||
+      filteredChannels.find((item) => item.id === selectedChannelId) ||
       selectedCategoryItems.find((item) => item.id === selectedChannelId) ||
       allChannels.find((item) => item.id === selectedChannelId) ||
       null
     );
-  }, [visibleChannels, selectedCategoryItems, allChannels, selectedChannelId]);
+  }, [filteredChannels, selectedCategoryItems, allChannels, selectedChannelId]);
 
   const epgRows = useMemo(() => getEpgRows(selectedChannel), [selectedChannel]);
 
@@ -346,6 +359,12 @@ export default function LiveTVScreen({
     } catch (e) {}
   };
 
+  const handleEndReached = () => {
+    if (visibleLimit < filteredChannels.length) {
+      setVisibleLimit((prev) => prev + 120);
+    }
+  };
+
   const renderCategoryItem = ({ item }) => {
     const active = item.key === selectedCategoryKey;
 
@@ -446,7 +465,9 @@ export default function LiveTVScreen({
             keyExtractor={(item) => item.key}
             renderItem={renderCategoryItem}
             showsVerticalScrollIndicator={false}
-            initialNumToRender={16}
+            initialNumToRender={14}
+            maxToRenderPerBatch={14}
+            windowSize={8}
             removeClippedSubviews
           />
         </View>
@@ -458,7 +479,11 @@ export default function LiveTVScreen({
             renderItem={renderChannelItem}
             showsVerticalScrollIndicator={false}
             initialNumToRender={20}
+            maxToRenderPerBatch={20}
+            windowSize={8}
             removeClippedSubviews
+            onEndReached={handleEndReached}
+            onEndReachedThreshold={0.4}
           />
         </View>
 

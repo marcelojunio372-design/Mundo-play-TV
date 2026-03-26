@@ -202,18 +202,18 @@ const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     resizeMode: "cover",
-    opacity: 0.22,
+    opacity: 0.18,
   },
 
   backdropOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(5,9,21,0.78)",
+    backgroundColor: "rgba(5,9,21,0.82)",
   },
 
   topbar: {
-    height: 46,
+    height: 42,
     justifyContent: "center",
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
   },
@@ -221,36 +221,39 @@ const styles = StyleSheet.create({
   backText: {
     color: "#fff",
     fontWeight: "800",
+    fontSize: 14,
   },
 
   content: {
     flex: 1,
     flexDirection: "row",
-    padding: 14,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 12,
   },
 
   left: {
-    width: 160,
+    width: 118,
     alignItems: "center",
     justifyContent: "flex-start",
   },
 
   right: {
     flex: 1,
-    paddingLeft: 12,
+    paddingLeft: 10,
   },
 
   poster: {
-    width: 120,
-    height: 180,
-    borderRadius: 10,
+    width: 92,
+    height: 138,
+    borderRadius: 8,
     resizeMode: "cover",
   },
 
   posterFallback: {
-    width: 120,
-    height: 180,
-    borderRadius: 10,
+    width: 92,
+    height: 138,
+    borderRadius: 8,
     backgroundColor: "#203148",
     alignItems: "center",
     justifyContent: "center",
@@ -258,28 +261,28 @@ const styles = StyleSheet.create({
 
   posterFallbackText: {
     color: "#fff",
-    fontSize: 10,
+    fontSize: 9,
   },
 
   titleRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    marginBottom: 14,
+    marginBottom: 10,
   },
 
   title: {
     color: "#fff",
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: "900",
     flex: 1,
-    marginRight: 12,
+    marginRight: 10,
   },
 
   heart: {
     color: "#ddd",
-    fontSize: 26,
-    marginTop: -2,
+    fontSize: 22,
+    marginTop: -1,
   },
 
   heartActive: {
@@ -287,40 +290,40 @@ const styles = StyleSheet.create({
   },
 
   infoGrid: {
-    marginBottom: 14,
+    marginBottom: 10,
   },
 
   label: {
     color: "#e7e7e7",
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "800",
-    marginBottom: 2,
+    marginBottom: 1,
   },
 
   value: {
     color: "#d0d9e7",
-    fontSize: 14,
-    marginBottom: 10,
+    fontSize: 12,
+    marginBottom: 7,
   },
 
   synopsisLabel: {
     color: "#ffffff",
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: "900",
-    marginBottom: 6,
+    marginBottom: 4,
   },
 
   synopsisText: {
     color: "#f1f1f1",
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 18,
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 14,
   },
 
   playBtn: {
-    width: 180,
-    height: 44,
-    borderRadius: 10,
+    width: 150,
+    height: 38,
+    borderRadius: 9,
     backgroundColor: "#7e5ca8",
     alignItems: "center",
     justifyContent: "center",
@@ -329,7 +332,7 @@ const styles = StyleSheet.create({
   playBtnText: {
     color: "#fff",
     fontWeight: "900",
-    fontSize: 15,
+    fontSize: 14,
   },
 
   fullscreenWrap: {
