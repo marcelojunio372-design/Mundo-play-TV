@@ -269,108 +269,6 @@ function buildCategories(items = []) {
     }));
 }
 
-function extractSeasonEpisode(name = "") {
-  const match = String(name || "").match(/S(\d{1,2})E(\d{1,3})/i);
-  if (match) {
-    return {
-      season: Number(match[1]),
-      episode: Number(match[2]),
-    };
-  }
-  return { season: 1, episode: 0 };
-}
-
-function buildSeriesCollections(seriesItems = []) {
-  if (!Array.isArray(seriesItems) || seriesItems.length === 0) return [];
-
-  const grouped = new Map();
-
-  seriesItems.forEach((item) => {
-    try {
-      const rawName = safeText(item?.name);
-      if (!rawName) return;
-
-      const baseName =
-        rawName.replace(/\s*S\d{1,2}E\d{1,3}.*$/i, "").trim() || rawName;
-
-      const key = `${normalizeText(baseName)}__${normalizeText(item?.group)}`;
-
-      if (!grouped.has(key)) {
-        grouped.set(key, {
-          id: `series_group_${grouped.size + 1}_${baseName}`.replace(/\s+/g, "_"),
-          name: baseName,
-          group: safeText(item?.group || "SÉRIES"),
-          logo: safeText(item?.logo),
-          type: "series",
-          year: safeText(item?.year),
-          description: safeText(item?.description || item?.desc || item?.plot),
-          desc: safeText(item?.description || item?.desc || item?.plot),
-          plot: safeText(item?.description || item?.desc || item?.plot),
-          director: safeText(item?.director),
-          duration: safeText(item?.duration),
-          cast: safeText(item?.cast),
-          genre: safeText(item?.genre || item?.group),
-          episodes: [],
-          seasons: [],
-        });
-      }
-
-      const series = grouped.get(key);
-      series.episodes.push(item);
-
-      if (!series.logo && item?.logo) series.logo = item.logo;
-      if (!series.year && item?.year) series.year = item.year;
-
-      const itemDesc = safeText(item?.description || item?.desc || item?.plot);
-      if (!series.description && itemDesc) {
-        series.description = itemDesc;
-        series.desc = itemDesc;
-        series.plot = itemDesc;
-      }
-
-      if (!series.director && item?.director) series.director = item.director;
-      if (!series.duration && item?.duration) series.duration = item.duration;
-      if (!series.cast && item?.cast) series.cast = item.cast;
-    } catch (e) {}
-  });
-
-  return Array.from(grouped.values()).map((series) => {
-    const seasonMap = new Map();
-
-    safeArray(series.episodes).forEach((ep) => {
-      const info = extractSeasonEpisode(ep?.name || "");
-      const seasonNumber = Number(info?.season || 1) || 1;
-
-      if (!seasonMap.has(seasonNumber)) {
-        seasonMap.set(seasonNumber, {
-          seasonNumber,
-          name: `Temporada ${seasonNumber}`,
-          episodes: [],
-        });
-      }
-
-      seasonMap.get(seasonNumber).episodes.push(ep);
-    });
-
-    series.seasons = Array.from(seasonMap.values()).sort(
-      (a, b) => a.seasonNumber - b.seasonNumber
-    );
-
-    series.episodes.sort((a, b) => {
-      const aInfo = extractSeasonEpisode(a?.name || "");
-      const bInfo = extractSeasonEpisode(b?.name || "");
-      if (aInfo.season !== bInfo.season) return aInfo.season - bInfo.season;
-      return aInfo.episode - bInfo.episode;
-    });
-
-    return series;
-  });
-}
-
-function safeArray(value) {
-  return Array.isArray(value) ? value : [];
-}
-
 export async function loadM3U(url) {
   const response = await fetch(url, {
     headers: {
@@ -397,7 +295,7 @@ export async function loadM3U(url) {
 
   const live = [];
   const movies = [];
-  const rawSeriesEpisodes = [];
+  const series = [];
 
   let currentInfo = null;
 
@@ -447,7 +345,7 @@ export async function loadM3U(url) {
         if (type === "movie") {
           movies.push(item);
         } else if (type === "series") {
-          rawSeriesEpisodes.push(item);
+          series.push(item);
         } else {
           live.push(item);
         }
@@ -455,14 +353,6 @@ export async function loadM3U(url) {
 
       currentInfo = null;
     }
-  }
-
-  let series = [];
-
-  try {
-    series = buildSeriesCollections(rawSeriesEpisodes);
-  } catch (e) {
-    series = [];
   }
 
   return {
