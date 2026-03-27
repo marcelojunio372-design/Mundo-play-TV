@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -24,19 +24,13 @@ function getMovieStorageId(item = {}) {
   return safeText(item.id || item.url || item.name);
 }
 
-function buildBackdrop(movie) {
-  return movie?.logo ? { uri: movie.logo } : null;
-}
-
 export default function MovieDetailsScreen({ movie, onBack }) {
-  const fullscreenVideoRef = useRef(null);
-
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
 
   const sourceUri = movie?.url || "";
-  const backdrop = buildBackdrop(movie);
+  const description = safeText(movie?.description || movie?.desc || movie?.plot);
 
   useEffect(() => {
     async function loadFavorite() {
@@ -71,6 +65,7 @@ export default function MovieDetailsScreen({ movie, onBack }) {
       const id = getMovieStorageId(movie);
 
       let updated = [];
+
       if (ids.includes(id)) {
         updated = ids.filter((item) => item !== id);
         setIsFavorite(false);
@@ -86,7 +81,7 @@ export default function MovieDetailsScreen({ movie, onBack }) {
   return (
     <>
       <SafeAreaView style={styles.container}>
-        {backdrop ? <Image source={backdrop} style={styles.backdrop} /> : null}
+        {movie?.logo ? <Image source={{ uri: movie.logo }} style={styles.backdrop} /> : null}
         <View style={styles.backdropOverlay} />
 
         <View style={styles.topbar}>
@@ -115,29 +110,15 @@ export default function MovieDetailsScreen({ movie, onBack }) {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.infoGrid}>
-              <Text style={styles.label}>Dirigido por:</Text>
-              <Text style={styles.value}>{movie?.director || "N/A"}</Text>
-
-              <Text style={styles.label}>Data de lançamento:</Text>
-              <Text style={styles.value}>{movie?.year || "N/A"}</Text>
-
-              <Text style={styles.label}>Duração:</Text>
-              <Text style={styles.value}>{movie?.duration || "N/A"}</Text>
-
-              <Text style={styles.label}>Gênero:</Text>
-              <Text style={styles.value}>{movie?.group || "Filmes"}</Text>
-
-              <Text style={styles.label}>Elenco:</Text>
-              <Text style={styles.value}>{movie?.cast || "N/A"}</Text>
-            </View>
+            <Text style={styles.meta}>Dirigido por: {movie?.director || "N/A"}</Text>
+            <Text style={styles.meta}>Data de lançamento: {movie?.year || "N/A"}</Text>
+            <Text style={styles.meta}>Duração: {movie?.duration || "N/A"}</Text>
+            <Text style={styles.meta}>Gênero: {movie?.genre || movie?.group || "N/A"}</Text>
+            <Text style={styles.meta}>Elenco: {movie?.cast || "N/A"}</Text>
 
             <Text style={styles.synopsisLabel}>Sinopse:</Text>
             <Text style={styles.synopsisText}>
-              {movie?.description ||
-                movie?.plot ||
-                movie?.desc ||
-                "Descrição não disponível."}
+              {description || "Descrição não disponível."}
             </Text>
 
             <TouchableOpacity
@@ -162,7 +143,6 @@ export default function MovieDetailsScreen({ movie, onBack }) {
           {sourceUri ? (
             <>
               <Video
-                ref={fullscreenVideoRef}
                 style={styles.fullscreenVideo}
                 source={{ uri: sourceUri }}
                 shouldPlay
@@ -289,18 +269,7 @@ const styles = StyleSheet.create({
     color: "#ff6fa8",
   },
 
-  infoGrid: {
-    marginBottom: 8,
-  },
-
-  label: {
-    color: "#e7e7e7",
-    fontSize: 10,
-    fontWeight: "800",
-    marginBottom: 1,
-  },
-
-  value: {
+  meta: {
     color: "#d0d9e7",
     fontSize: 10,
     marginBottom: 5,
@@ -311,6 +280,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "900",
     marginBottom: 3,
+    marginTop: 4,
   },
 
   synopsisText: {

@@ -129,30 +129,6 @@ function buildXmltvUrlFromSession(session) {
 
   if (directUrl) return directUrl;
 
-  const server =
-    safeText(session?.server) ||
-    safeText(session?.serverUrl) ||
-    safeText(session?.data?.server) ||
-    safeText(session?.data?.serverUrl);
-
-  const username =
-    safeText(session?.username) ||
-    safeText(session?.user) ||
-    safeText(session?.data?.username) ||
-    safeText(session?.data?.user);
-
-  const password =
-    safeText(session?.password) ||
-    safeText(session?.pass) ||
-    safeText(session?.data?.password) ||
-    safeText(session?.data?.pass);
-
-  if (server && username && password) {
-    return `${server.replace(/\/+$/, "")}/xmltv.php?username=${encodeURIComponent(
-      username
-    )}&password=${encodeURIComponent(password)}`;
-  }
-
   const sessionUrl =
     safeText(session?.url) ||
     safeText(session?.playlistUrl) ||
@@ -179,35 +155,8 @@ function buildXmltvUrlFromSession(session) {
 function buildCandidateUrls(session) {
   const list = [];
   const xmltvUrl = buildXmltvUrlFromSession(session);
-  const sessionUrl =
-    safeText(session?.url) ||
-    safeText(session?.playlistUrl) ||
-    safeText(session?.data?.url) ||
-    safeText(session?.data?.playlistUrl);
 
   if (xmltvUrl) list.push(xmltvUrl);
-
-  if (sessionUrl) {
-    try {
-      const parsed = new URL(sessionUrl);
-      const username =
-        parsed.searchParams.get("username") ||
-        safeText(session?.username) ||
-        safeText(session?.data?.username);
-      const password =
-        parsed.searchParams.get("password") ||
-        safeText(session?.password) ||
-        safeText(session?.data?.password);
-
-      if (username && password) {
-        list.push(
-          `${parsed.origin}/xmltv.php?username=${encodeURIComponent(
-            username
-          )}&password=${encodeURIComponent(password)}`
-        );
-      }
-    } catch (e) {}
-  }
 
   return Array.from(new Set(list.filter(Boolean)));
 }

@@ -3,9 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -20,8 +18,6 @@ import { loadEPG, findNowAndNextForChannel } from "../services/epgService";
 const PLAYER_TIMEOUT_MS = 12000;
 const LIVE_FAVORITES_KEY = "mundoplaytv_live_favorites";
 const LIVE_RECENTS_KEY = "mundoplaytv_live_recents";
-const INITIAL_CHANNELS = 80;
-const LOAD_MORE_STEP = 80;
 
 function safeArray(value) {
   return Array.isArray(value) ? value : [];
@@ -130,14 +126,12 @@ export default function LiveTVScreen({
   const [epgItems, setEpgItems] = useState([]);
   const [selectedCategoryKey, setSelectedCategoryKey] = useState("all");
   const [search, setSearch] = useState("");
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [selectedChannelId, setSelectedChannelId] = useState(null);
   const [playerUri, setPlayerUri] = useState("");
   const [playerReloadKey, setPlayerReloadKey] = useState(1);
   const [isBuffering, setIsBuffering] = useState(false);
   const [playerError, setPlayerError] = useState("");
   const [hasStartedPlayback, setHasStartedPlayback] = useState(false);
-  const [visibleLimit, setVisibleLimit] = useState(INITIAL_CHANNELS);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
@@ -159,20 +153,18 @@ export default function LiveTVScreen({
   useEffect(() => {
     let mounted = true;
 
-    async function loadEpgData() {
+    async function warmup() {
       try {
         const items = await loadEPG(session);
         if (mounted) {
           setEpgItems(Array.isArray(items) ? items : []);
         }
       } catch (e) {
-        if (mounted) {
-          setEpgItems([]);
-        }
+        if (mounted) setEpgItems([]);
       }
     }
 
-    loadEpgData();
+    warmup();
 
     return () => {
       mounted = false;
@@ -205,16 +197,8 @@ export default function LiveTVScreen({
     return categories.find((c) => c.key === selectedCategoryKey) || categories[0];
   }, [categories, selectedCategoryKey]);
 
-  useEffect(() => {
-    setVisibleLimit(INITIAL_CHANNELS);
-  }, [selectedCategoryKey, search]);
-
-  const selectedCategoryItems = useMemo(() => {
-    return safeArray(selectedCategory?.items);
-  }, [selectedCategory]);
-
-  const filteredChannels = useMemo(() => {
-    const source = selectedCategoryItems;
+  const visibleChannels = useMemo(() => {
+    const source = safeArray(selectedCategory?.items);
     const term = normalizeText(search);
 
     if (!term) return source;
@@ -223,26 +207,22 @@ export default function LiveTVScreen({
       const name = normalizeText(item?.name || "");
       const tvgName = normalizeText(item?.tvgName || "");
       const group = normalizeText(item?.group || "");
+
       return (
         name.includes(term) ||
         tvgName.includes(term) ||
         group.includes(term)
       );
     });
-  }, [selectedCategoryItems, search]);
-
-  const visibleChannels = useMemo(() => {
-    return filteredChannels.slice(0, visibleLimit);
-  }, [filteredChannels, visibleLimit]);
+  }, [selectedCategory, search]);
 
   const selectedChannelBase = useMemo(() => {
     return (
-      filteredChannels.find((item) => item.id === selectedChannelId) ||
-      selectedCategoryItems.find((item) => item.id === selectedChannelId) ||
+      visibleChannels.find((item) => item.id === selectedChannelId) ||
       allChannels.find((item) => item.id === selectedChannelId) ||
       null
     );
-  }, [filteredChannels, selectedCategoryItems, allChannels, selectedChannelId]);
+  }, [visibleChannels, allChannels, selectedChannelId]);
 
   const selectedChannel = useMemo(() => {
     if (!selectedChannelBase) return null;
@@ -375,12 +355,6 @@ export default function LiveTVScreen({
     }
   };
 
-  const handleEndReached = () => {
-    if (visibleLimit < filteredChannels.length) {
-      setVisibleLimit((prev) => prev + LOAD_MORE_STEP);
-    }
-  };
-
   const openFullscreen = () => {
     if (!playerUri) return;
     setIsFullscreen(true);
@@ -482,14 +456,17 @@ export default function LiveTVScreen({
             <Text style={styles.topNavText}>Séries</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.searchButton}
-            onPress={() => setIsSearchOpen(true)}
-          >
-            <Text style={styles.searchButtonText}>
-              {search ? `Buscar: ${search}` : "Buscar canal"}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.searchWrap}>
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Buscar canal..."
+              placeholderTextColor="#9bb1c8"
+              style={styles.searchInput}
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+          </View>
         </View>
 
         <View style={styles.layout}>
@@ -499,10 +476,7 @@ export default function LiveTVScreen({
               keyExtractor={(item) => item.key}
               renderItem={renderCategoryItem}
               showsVerticalScrollIndicator={false}
-              initialNumToRender={10}
-              maxToRenderPerBatch={10}
-              windowSize={5}
-              removeClippedSubviews
+              keyboardShouldPersistTaps="always"
             />
           </View>
 
@@ -512,12 +486,7 @@ export default function LiveTVScreen({
               keyExtractor={(item, index) => String(item?.id || `ch_${index}`)}
               renderItem={renderChannelItem}
               showsVerticalScrollIndicator={false}
-              initialNumToRender={8}
-              maxToRenderPerBatch={8}
-              windowSize={5}
-              removeClippedSubviews
-              onEndReached={handleEndReached}
-              onEndReachedThreshold={0.3}
+              keyboardShouldPersistTaps="always"
             />
           </View>
 
@@ -634,57 +603,6 @@ export default function LiveTVScreen({
       </SafeAreaView>
 
       <Modal
-        visible={isSearchOpen}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setIsSearchOpen(false)}
-      >
-        <KeyboardAvoidingView
-          style={styles.searchModalOverlay}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
-          <TouchableOpacity
-            style={styles.searchModalBackdrop}
-            activeOpacity={1}
-            onPress={() => setIsSearchOpen(false)}
-          />
-
-          <View style={styles.searchModalCard}>
-            <Text style={styles.searchModalTitle}>Buscar canal</Text>
-
-            <TextInput
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Digite o nome do canal"
-              placeholderTextColor="#9bb1c8"
-              style={styles.searchModalInput}
-              autoFocus
-              autoCorrect={false}
-              autoCapitalize="none"
-            />
-
-            <View style={styles.searchModalActions}>
-              <TouchableOpacity
-                style={styles.searchModalBtn}
-                onPress={() => {
-                  setSearch("");
-                }}
-              >
-                <Text style={styles.searchModalBtnText}>Limpar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.searchModalBtn}
-                onPress={() => setIsSearchOpen(false)}
-              >
-                <Text style={styles.searchModalBtnText}>Fechar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      <Modal
         visible={isFullscreen}
         animationType="fade"
         transparent={false}
@@ -749,8 +667,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
     backgroundColor: "#050915",
-    zIndex: 20,
-    elevation: 20,
   },
 
   topNavBtn: {
@@ -776,21 +692,22 @@ const styles = StyleSheet.create({
     marginHorizontal: 6,
   },
 
-  searchButton: {
+  searchWrap: {
     marginLeft: 8,
+    width: 130,
     height: 26,
-    minWidth: 130,
-    maxWidth: 180,
     borderWidth: 2,
     borderColor: "#ececec",
     borderRadius: 13,
     justifyContent: "center",
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
   },
 
-  searchButtonText: {
+  searchInput: {
     color: "#ffffff",
-    fontSize: 9,
+    padding: 0,
+    fontSize: 10,
+    height: 22,
   },
 
   layout: {
@@ -1036,66 +953,6 @@ const styles = StyleSheet.create({
     fontSize: 7,
     fontWeight: "700",
     textTransform: "lowercase",
-  },
-
-  searchModalOverlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-
-  searchModalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.45)",
-  },
-
-  searchModalCard: {
-    minHeight: 220,
-    maxHeight: "50%",
-    backgroundColor: "#071122",
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    padding: 16,
-    borderTopWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-
-  searchModalTitle: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "900",
-    marginBottom: 12,
-  },
-
-  searchModalInput: {
-    height: 44,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
-    backgroundColor: "#0d1b2c",
-    color: "#ffffff",
-    paddingHorizontal: 12,
-    fontSize: 14,
-    marginBottom: 14,
-  },
-
-  searchModalActions: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-
-  searchModalBtn: {
-    width: "48%",
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: "#7e5ca8",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  searchModalBtnText: {
-    color: "#ffffff",
-    fontWeight: "800",
-    fontSize: 13,
   },
 
   fullscreenWrap: {

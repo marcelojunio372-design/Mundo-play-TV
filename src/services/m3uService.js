@@ -37,6 +37,16 @@ function firstNonEmpty(values = []) {
   return "";
 }
 
+function normalizeText(value = "") {
+  return decodeEntities(String(value || ""))
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[|[\]()/\\\-_.:,]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function extractGroup(line = "") {
   const group = extractAttr(line, "group-title");
   return group ? group.trim() : "OUTROS";
@@ -85,6 +95,7 @@ function extractYear(line = "", name = "") {
     extractAttr(line, "release-date"),
     extractAttr(line, "release_year"),
     extractAttr(line, "date"),
+    extractAttr(line, "released"),
   ].filter(Boolean);
 
   for (const value of attrs) {
@@ -140,16 +151,6 @@ function extractCast(line = "") {
     extractAttr(line, "actor"),
     extractAttr(line, "starring"),
   ]);
-}
-
-function normalizeText(value = "") {
-  return decodeEntities(String(value || ""))
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[|[\]()/\\\-_.:,]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 function parseHeaderInfo(firstLine = "") {
@@ -236,33 +237,17 @@ function inferType(name = "", group = "", url = "", tvgName = "", logo = "") {
   const groupText = normalizeText(group);
   const tvgNameText = normalizeText(tvgName);
 
-  if (looksLikeSeriesUrl(url)) {
-    return "series";
-  }
-
-  if (looksLikeMovieUrl(url)) {
-    return "movie";
-  }
-
-  if (looksLikeLiveUrl(url)) {
-    return "live";
-  }
+  if (looksLikeSeriesUrl(url)) return "series";
+  if (looksLikeMovieUrl(url)) return "movie";
+  if (looksLikeLiveUrl(url)) return "live";
 
   if (hasRealEpisodePattern(nameText) || hasRealEpisodePattern(tvgNameText)) {
     return "series";
   }
 
-  if (looksLikeTmdbLogo(logo)) {
-    return "movie";
-  }
-
-  if (isMovieGroup(groupText)) {
-    return "movie";
-  }
-
-  if (isSeriesGroup(groupText)) {
-    return "series";
-  }
+  if (looksLikeTmdbLogo(logo)) return "movie";
+  if (isMovieGroup(groupText)) return "movie";
+  if (isSeriesGroup(groupText)) return "series";
 
   return "live";
 }
@@ -282,6 +267,90 @@ function buildCategories(items = []) {
       name,
       count: grouped[name],
     }));
+}
+
+function extractSeasonEpisode(name = "") {
+  const match = String(name || "").match(/S(\d{1,2})E(\d{1,3})/i);
+  if (match) {
+    return {
+      season: Number(match[1]),
+      episode: Number(match[2]),
+    };
+  }
+  return { season: 1, episode: 0 };
+}
+
+function buildSeriesCollections(seriesItems = []) {
+  const grouped = new Map();
+
+  seriesItems.forEach((item) => {
+    const rawName = safeText(item.name);
+    const baseName = rawName.replace(/\s*S\d{1,2}E\d{1,3}.*$/i, "").trim() || rawName;
+    const key = `${normalizeText(baseName)}__${normalizeText(item.group)}`;
+
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        id: `series_group_${grouped.size + 1}_${baseName}`.replace(/\s+/g, "_"),
+        name: baseName,
+        group: item.group,
+        logo: item.logo,
+        type: "series",
+        year: item.year || "",
+        description: item.description || item.desc || item.plot || "",
+        desc: item.description || item.desc || item.plot || "",
+        plot: item.description || item.desc || item.plot || "",
+        director: item.director || "",
+        duration: item.duration || "",
+        cast: item.cast || "",
+        genre: item.genre || item.group || "",
+        episodes: [],
+        seasons: [],
+      });
+    }
+
+    const series = grouped.get(key);
+    series.episodes.push(item);
+
+    if (!series.logo && item.logo) series.logo = item.logo;
+    if (!series.year && item.year) series.year = item.year;
+    if (!series.description && item.description) {
+      series.description = item.description;
+      series.desc = item.description;
+      series.plot = item.description;
+    }
+    if (!series.director && item.director) series.director = item.director;
+    if (!series.duration && item.duration) series.duration = item.duration;
+    if (!series.cast && item.cast) series.cast = item.cast;
+  });
+
+  return Array.from(grouped.values()).map((series) => {
+    const seasonMap = new Map();
+
+    series.episodes.forEach((ep) => {
+      const { season } = extractSeasonEpisode(ep.name || "");
+      if (!seasonMap.has(season)) {
+        seasonMap.set(season, {
+          seasonNumber: season,
+          name: `Temporada ${season}`,
+          episodes: [],
+        });
+      }
+      seasonMap.get(season).episodes.push(ep);
+    });
+
+    series.seasons = Array.from(seasonMap.values()).sort(
+      (a, b) => a.seasonNumber - b.seasonNumber
+    );
+
+    series.episodes.sort((a, b) => {
+      const aInfo = extractSeasonEpisode(a.name || "");
+      const bInfo = extractSeasonEpisode(b.name || "");
+      if (aInfo.season !== bInfo.season) return aInfo.season - bInfo.season;
+      return aInfo.episode - bInfo.episode;
+    });
+
+    return series;
+  });
 }
 
 export async function loadM3U(url) {
@@ -310,7 +379,7 @@ export async function loadM3U(url) {
 
   const live = [];
   const movies = [];
-  const series = [];
+  const rawSeriesEpisodes = [];
 
   let currentInfo = null;
 
@@ -359,7 +428,7 @@ export async function loadM3U(url) {
       if (type === "movie") {
         movies.push(item);
       } else if (type === "series") {
-        series.push(item);
+        rawSeriesEpisodes.push(item);
       } else {
         live.push(item);
       }
@@ -367,6 +436,8 @@ export async function loadM3U(url) {
       currentInfo = null;
     }
   }
+
+  const series = buildSeriesCollections(rawSeriesEpisodes);
 
   return {
     live,

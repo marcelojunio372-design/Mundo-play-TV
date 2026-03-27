@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -25,54 +25,33 @@ function getSeriesStorageId(item = {}) {
   return safeText(item.id || item.url || item.name);
 }
 
-function extractSeasonEpisode(name = "") {
-  const match = String(name || "").match(/S(\d{1,2})E(\d{1,3})/i);
-  if (match) {
-    return {
-      season: Number(match[1]),
-      episode: Number(match[2]),
-    };
-  }
-  return { season: 1, episode: 0 };
-}
-
-function buildSeasons(series) {
-  const items = Array.isArray(series?.episodes) ? series.episodes : [];
-  const grouped = {};
-
-  items.forEach((ep) => {
-    const { season } = extractSeasonEpisode(ep.name || "");
-    if (!grouped[season]) grouped[season] = [];
-    grouped[season].push(ep);
-  });
-
-  return Object.keys(grouped)
-    .map((season) => ({
-      seasonNumber: Number(season),
-      name: `Temporada ${season}`,
-      episodes: grouped[season],
-    }))
-    .sort((a, b) => a.seasonNumber - b.seasonNumber);
-}
-
 export default function SeriesDetailsScreen({ series, onBack }) {
-  const videoRef = useRef(null);
-
-  const seasons = useMemo(() => buildSeasons(series), [series]);
-
-  const [selectedSeason, setSelectedSeason] = useState(1);
+  const [selectedSeasonNumber, setSelectedSeasonNumber] = useState(1);
   const [selectedEpisodeIndex, setSelectedEpisodeIndex] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
 
-  const currentSeason = seasons.find((s) => s.seasonNumber === selectedSeason);
-  const episodes = currentSeason?.episodes || [];
+  const seasons = useMemo(() => {
+    return Array.isArray(series?.seasons) ? series.seasons : [];
+  }, [series]);
 
+  const currentSeason =
+    seasons.find((item) => item.seasonNumber === selectedSeasonNumber) ||
+    seasons[0] ||
+    null;
+
+  const episodes = currentSeason?.episodes || [];
   const selectedEpisode =
     selectedEpisodeIndex !== null ? episodes[selectedEpisodeIndex] : null;
-
   const sourceUri = selectedEpisode?.url || "";
+  const description = safeText(series?.description || series?.desc || series?.plot);
+
+  useEffect(() => {
+    if (seasons.length > 0) {
+      setSelectedSeasonNumber(seasons[0].seasonNumber);
+    }
+  }, [seasons]);
 
   useEffect(() => {
     async function loadFavorite() {
@@ -148,7 +127,13 @@ export default function SeriesDetailsScreen({ series, onBack }) {
 
         <View style={styles.content}>
           <View style={styles.header}>
-            <Image source={{ uri: series?.logo }} style={styles.poster} />
+            {series?.logo ? (
+              <Image source={{ uri: series.logo }} style={styles.poster} />
+            ) : (
+              <View style={styles.posterFallback}>
+                <Text style={styles.posterFallbackText}>SEM CAPA</Text>
+              </View>
+            )}
 
             <View style={styles.info}>
               <View style={styles.titleRow}>
@@ -159,29 +144,30 @@ export default function SeriesDetailsScreen({ series, onBack }) {
                 </TouchableOpacity>
               </View>
 
-              <Text style={styles.meta}>
-                {(series?.year || "N/A")} • {series?.group || "Séries"}
-              </Text>
-
+              <Text style={styles.meta}>Ano: {series?.year || "N/A"}</Text>
               <Text style={styles.meta}>Diretor: {series?.director || "N/A"}</Text>
               <Text style={styles.meta}>Duração: {series?.duration || "N/A"}</Text>
               <Text style={styles.meta}>Gênero: {series?.genre || series?.group || "N/A"}</Text>
               <Text style={styles.meta}>Elenco: {series?.cast || "N/A"}</Text>
 
               <Text style={styles.description}>
-                {series?.description || series?.desc || series?.plot || "Descrição não disponível."}
+                {description || "Descrição não disponível."}
               </Text>
             </View>
           </View>
 
           <View style={styles.seasonRow}>
             {seasons.map((s) => {
-              const active = s.seasonNumber === selectedSeason;
+              const active = s.seasonNumber === (currentSeason?.seasonNumber || selectedSeasonNumber);
+
               return (
                 <TouchableOpacity
                   key={s.seasonNumber}
                   style={[styles.seasonBtn, active && styles.seasonBtnActive]}
-                  onPress={() => setSelectedSeason(s.seasonNumber)}
+                  onPress={() => {
+                    setSelectedSeasonNumber(s.seasonNumber);
+                    setSelectedEpisodeIndex(null);
+                  }}
                 >
                   <Text style={styles.seasonText}>{s.name}</Text>
                 </TouchableOpacity>
@@ -197,16 +183,25 @@ export default function SeriesDetailsScreen({ series, onBack }) {
                 style={styles.episodeCard}
                 onPress={() => openEpisode(index)}
               >
-                <Image source={{ uri: item.logo }} style={styles.thumb} />
+                {item?.logo ? (
+                  <Image source={{ uri: item.logo }} style={styles.thumb} />
+                ) : (
+                  <View style={styles.thumbFallback} />
+                )}
 
                 <View style={styles.episodeInfo}>
                   <Text style={styles.epTitle}>{item.name}</Text>
-                  <Text style={styles.epSub}>
+                  <Text style={styles.epSub} numberOfLines={2}>
                     {item?.description || item?.desc || item?.plot || "Toque para reproduzir"}
                   </Text>
                 </View>
               </TouchableOpacity>
             )}
+            ListEmptyComponent={
+              <View style={styles.emptyWrap}>
+                <Text style={styles.emptyText}>Nenhum episódio encontrado</Text>
+              </View>
+            }
           />
         </View>
       </SafeAreaView>
@@ -216,7 +211,6 @@ export default function SeriesDetailsScreen({ series, onBack }) {
           {sourceUri ? (
             <>
               <Video
-                ref={videoRef}
                 key={`ep_${selectedEpisodeIndex}`}
                 source={{ uri: sourceUri }}
                 style={styles.video}
@@ -268,6 +262,20 @@ const styles = StyleSheet.create({
     width: 90,
     height: 130,
     borderRadius: 8,
+  },
+
+  posterFallback: {
+    width: 90,
+    height: 130,
+    borderRadius: 8,
+    backgroundColor: "#203148",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  posterFallbackText: {
+    color: "#fff",
+    fontSize: 9,
   },
 
   info: { flex: 1, marginLeft: 10 },
@@ -338,6 +346,14 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
 
+  thumbFallback: {
+    width: 80,
+    height: 50,
+    borderRadius: 6,
+    marginRight: 8,
+    backgroundColor: "#2a3550",
+  },
+
   episodeInfo: {
     flex: 1,
     justifyContent: "center",
@@ -346,6 +362,16 @@ const styles = StyleSheet.create({
   epTitle: { color: "#fff", fontSize: 11, marginBottom: 2 },
 
   epSub: { color: "#aaa", fontSize: 9 },
+
+  emptyWrap: {
+    paddingVertical: 20,
+    alignItems: "center",
+  },
+
+  emptyText: {
+    color: "#ddd",
+    fontSize: 11,
+  },
 
   fullscreen: { flex: 1, backgroundColor: "#000" },
 
