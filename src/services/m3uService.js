@@ -281,61 +281,75 @@ function extractSeasonEpisode(name = "") {
 }
 
 function buildSeriesCollections(seriesItems = []) {
+  if (!Array.isArray(seriesItems) || seriesItems.length === 0) return [];
+
   const grouped = new Map();
 
   seriesItems.forEach((item) => {
-    const rawName = safeText(item.name);
-    const baseName = rawName.replace(/\s*S\d{1,2}E\d{1,3}.*$/i, "").trim() || rawName;
-    const key = `${normalizeText(baseName)}__${normalizeText(item.group)}`;
+    try {
+      const rawName = safeText(item?.name);
+      if (!rawName) return;
 
-    if (!grouped.has(key)) {
-      grouped.set(key, {
-        id: `series_group_${grouped.size + 1}_${baseName}`.replace(/\s+/g, "_"),
-        name: baseName,
-        group: item.group,
-        logo: item.logo,
-        type: "series",
-        year: item.year || "",
-        description: item.description || item.desc || item.plot || "",
-        desc: item.description || item.desc || item.plot || "",
-        plot: item.description || item.desc || item.plot || "",
-        director: item.director || "",
-        duration: item.duration || "",
-        cast: item.cast || "",
-        genre: item.genre || item.group || "",
-        episodes: [],
-        seasons: [],
-      });
-    }
+      const baseName =
+        rawName.replace(/\s*S\d{1,2}E\d{1,3}.*$/i, "").trim() || rawName;
 
-    const series = grouped.get(key);
-    series.episodes.push(item);
+      const key = `${normalizeText(baseName)}__${normalizeText(item?.group)}`;
 
-    if (!series.logo && item.logo) series.logo = item.logo;
-    if (!series.year && item.year) series.year = item.year;
-    if (!series.description && item.description) {
-      series.description = item.description;
-      series.desc = item.description;
-      series.plot = item.description;
-    }
-    if (!series.director && item.director) series.director = item.director;
-    if (!series.duration && item.duration) series.duration = item.duration;
-    if (!series.cast && item.cast) series.cast = item.cast;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          id: `series_group_${grouped.size + 1}_${baseName}`.replace(/\s+/g, "_"),
+          name: baseName,
+          group: safeText(item?.group || "SÉRIES"),
+          logo: safeText(item?.logo),
+          type: "series",
+          year: safeText(item?.year),
+          description: safeText(item?.description || item?.desc || item?.plot),
+          desc: safeText(item?.description || item?.desc || item?.plot),
+          plot: safeText(item?.description || item?.desc || item?.plot),
+          director: safeText(item?.director),
+          duration: safeText(item?.duration),
+          cast: safeText(item?.cast),
+          genre: safeText(item?.genre || item?.group),
+          episodes: [],
+          seasons: [],
+        });
+      }
+
+      const series = grouped.get(key);
+      series.episodes.push(item);
+
+      if (!series.logo && item?.logo) series.logo = item.logo;
+      if (!series.year && item?.year) series.year = item.year;
+
+      const itemDesc = safeText(item?.description || item?.desc || item?.plot);
+      if (!series.description && itemDesc) {
+        series.description = itemDesc;
+        series.desc = itemDesc;
+        series.plot = itemDesc;
+      }
+
+      if (!series.director && item?.director) series.director = item.director;
+      if (!series.duration && item?.duration) series.duration = item.duration;
+      if (!series.cast && item?.cast) series.cast = item.cast;
+    } catch (e) {}
   });
 
   return Array.from(grouped.values()).map((series) => {
     const seasonMap = new Map();
 
-    series.episodes.forEach((ep) => {
-      const { season } = extractSeasonEpisode(ep.name || "");
-      if (!seasonMap.has(season)) {
-        seasonMap.set(season, {
-          seasonNumber: season,
-          name: `Temporada ${season}`,
+    safeArray(series.episodes).forEach((ep) => {
+      const info = extractSeasonEpisode(ep?.name || "");
+      const seasonNumber = Number(info?.season || 1) || 1;
+
+      if (!seasonMap.has(seasonNumber)) {
+        seasonMap.set(seasonNumber, {
+          seasonNumber,
+          name: `Temporada ${seasonNumber}`,
           episodes: [],
         });
       }
-      seasonMap.get(season).episodes.push(ep);
+
+      seasonMap.get(seasonNumber).episodes.push(ep);
     });
 
     series.seasons = Array.from(seasonMap.values()).sort(
@@ -343,14 +357,18 @@ function buildSeriesCollections(seriesItems = []) {
     );
 
     series.episodes.sort((a, b) => {
-      const aInfo = extractSeasonEpisode(a.name || "");
-      const bInfo = extractSeasonEpisode(b.name || "");
+      const aInfo = extractSeasonEpisode(a?.name || "");
+      const bInfo = extractSeasonEpisode(b?.name || "");
       if (aInfo.season !== bInfo.season) return aInfo.season - bInfo.season;
       return aInfo.episode - bInfo.episode;
     });
 
     return series;
   });
+}
+
+function safeArray(value) {
+  return Array.isArray(value) ? value : [];
 }
 
 export async function loadM3U(url) {
@@ -392,52 +410,60 @@ export async function loadM3U(url) {
     }
 
     if (!line.startsWith("#") && currentInfo) {
-      const name = extractName(currentInfo);
-      const group = extractGroup(currentInfo);
-      const logo = extractLogo(currentInfo);
-      const tvgId = extractTvgId(currentInfo);
-      const tvgName = extractTvgName(currentInfo);
-      const year = extractYear(currentInfo, name);
-      const description = extractDescription(currentInfo);
-      const director = extractDirector(currentInfo);
-      const duration = extractDuration(currentInfo, name);
-      const cast = extractCast(currentInfo);
-      const streamUrl = line;
+      try {
+        const name = extractName(currentInfo);
+        const group = extractGroup(currentInfo);
+        const logo = extractLogo(currentInfo);
+        const tvgId = extractTvgId(currentInfo);
+        const tvgName = extractTvgName(currentInfo);
+        const year = extractYear(currentInfo, name);
+        const description = extractDescription(currentInfo);
+        const director = extractDirector(currentInfo);
+        const duration = extractDuration(currentInfo, name);
+        const cast = extractCast(currentInfo);
+        const streamUrl = line;
 
-      const type = inferType(name, group, streamUrl, tvgName, logo);
+        const type = inferType(name, group, streamUrl, tvgName, logo);
 
-      const item = {
-        id: `${type}_${i}_${name}`.replace(/\s+/g, "_"),
-        name,
-        group,
-        logo,
-        url: streamUrl,
-        type,
-        tvgId,
-        tvgName,
-        year,
-        description,
-        desc: description,
-        plot: description,
-        director,
-        duration,
-        cast,
-        genre: group,
-      };
+        const item = {
+          id: `${type}_${i}_${name}`.replace(/\s+/g, "_"),
+          name,
+          group,
+          logo,
+          url: streamUrl,
+          type,
+          tvgId,
+          tvgName,
+          year,
+          description,
+          desc: description,
+          plot: description,
+          director,
+          duration,
+          cast,
+          genre: group,
+        };
 
-      if (type === "movie") {
-        movies.push(item);
-      } else if (type === "series") {
-        rawSeriesEpisodes.push(item);
-      } else {
-        live.push(item);
-      }
+        if (type === "movie") {
+          movies.push(item);
+        } else if (type === "series") {
+          rawSeriesEpisodes.push(item);
+        } else {
+          live.push(item);
+        }
+      } catch (e) {}
 
       currentInfo = null;
     }
   }
 
-  const series = buildSeriesCollections(rawSeriesEpisodes);
+  let series = [];
+
+  try {
+    series = buildSeriesCollections(rawSeriesEpisodes);
+  } catch (e) {
+    series = [];
+  }
 
   return {
     live,
