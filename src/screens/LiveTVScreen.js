@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ResizeMode, Video } from "expo-av";
-import { loadEPG, findNowAndNextForChannel } from "../services/epgService";
+import { findNowAndNextForChannel } from "../services/epgService";
 
 const PLAYER_TIMEOUT_MS = 12000;
 const LIVE_FAVORITES_KEY = "mundoplaytv_live_favorites";
@@ -123,7 +123,7 @@ export default function LiveTVScreen({
 
   const [favoriteIds, setFavoriteIds] = useState([]);
   const [recentIds, setRecentIds] = useState([]);
-  const [epgItems, setEpgItems] = useState([]);
+  const [epgItems] = useState([]);
   const [selectedCategoryKey, setSelectedCategoryKey] = useState("all");
   const [search, setSearch] = useState("");
   const [selectedChannelId, setSelectedChannelId] = useState(null);
@@ -149,27 +149,6 @@ export default function LiveTVScreen({
 
     loadSavedData();
   }, []);
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function warmup() {
-      try {
-        const items = await loadEPG(session);
-        if (mounted) {
-          setEpgItems(Array.isArray(items) ? items : []);
-        }
-      } catch (e) {
-        if (mounted) setEpgItems([]);
-      }
-    }
-
-    warmup();
-
-    return () => {
-      mounted = false;
-    };
-  }, [session]);
 
   useEffect(() => {
     return () => {
@@ -317,6 +296,7 @@ export default function LiveTVScreen({
   const openChannel = async (channel) => {
     if (!channel?.url) return;
 
+    await stopPlayers();
     await addToRecent(channel);
 
     setSelectedChannelId(channel.id);
@@ -362,13 +342,6 @@ export default function LiveTVScreen({
 
   const closeFullscreen = async () => {
     setIsFullscreen(false);
-    await stopPlayers();
-
-    if (selectedChannel?.url) {
-      setTimeout(() => {
-        openChannel(selectedChannel);
-      }, 200);
-    }
   };
 
   const renderCategoryItem = ({ item }) => {
@@ -477,6 +450,10 @@ export default function LiveTVScreen({
               renderItem={renderCategoryItem}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="always"
+              initialNumToRender={12}
+              maxToRenderPerBatch={12}
+              windowSize={6}
+              removeClippedSubviews
             />
           </View>
 
@@ -487,6 +464,10 @@ export default function LiveTVScreen({
               renderItem={renderChannelItem}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="always"
+              initialNumToRender={20}
+              maxToRenderPerBatch={20}
+              windowSize={8}
+              removeClippedSubviews
             />
           </View>
 

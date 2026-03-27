@@ -113,6 +113,7 @@ export default function SeriesDetailsScreen({ series, onBack }) {
 
   const openEpisode = (index) => {
     setSelectedEpisodeIndex(index);
+    setIsBuffering(true);
     setIsFullscreen(true);
   };
 
@@ -202,6 +203,10 @@ export default function SeriesDetailsScreen({ series, onBack }) {
                 <Text style={styles.emptyText}>Nenhum episódio encontrado</Text>
               </View>
             }
+            initialNumToRender={12}
+            maxToRenderPerBatch={12}
+            windowSize={6}
+            removeClippedSubviews
           />
         </View>
       </SafeAreaView>

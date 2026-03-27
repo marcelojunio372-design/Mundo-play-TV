@@ -59,20 +59,23 @@ export default function SeasonEpisodesScreen({
 
   const openEpisode = (index) => {
     setSelectedIndex(index);
+    setIsBuffering(true);
     setIsFullscreen(true);
   };
 
   const handleStatus = (status) => {
-    if (!status || !status.isLoaded) return;
+    if (!status) return;
 
-    if (status.didJustFinish && !status.isLooping) {
-      const nextIndex = (selectedIndex ?? -1) + 1;
-      if (nextIndex < episodes.length) {
-        setSelectedIndex(nextIndex);
+    if (status.isLoaded) {
+      setIsBuffering(!!status.isBuffering);
+
+      if (status.didJustFinish && !status.isLooping) {
+        const nextIndex = (selectedIndex ?? -1) + 1;
+        if (nextIndex < episodes.length) {
+          setSelectedIndex(nextIndex);
+        }
       }
     }
-
-    setIsBuffering(!!status.isBuffering);
   };
 
   return (
@@ -157,6 +160,10 @@ export default function SeasonEpisodesScreen({
                 );
               }}
               showsVerticalScrollIndicator={false}
+              initialNumToRender={12}
+              maxToRenderPerBatch={12}
+              windowSize={6}
+              removeClippedSubviews
             />
           </View>
         </View>
